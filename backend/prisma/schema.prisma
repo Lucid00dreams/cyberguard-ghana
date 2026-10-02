@@ -1,0 +1,373 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String        @id @default(uuid())
+  email             String        @unique
+  passwordHash      String
+  displayName       String
+  role              Role          @default(STUDENT)
+  ageBand           AgeBand?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  avatarUrl         String?
+  phoneNumber       String?
+  bio               String?
+  tokenVersion      Int           @default(0)
+  bookingsAsStudent Booking[]     @relation("StudentBookings")
+  certificates      Certificate[]
+  chatSessions      ChatSession[]
+  coursesCreated    Course[]      @relation("CourseAuthor")
+  enrollments       Enrollment[]
+  quizAttempts      QuizAttempt[]
+  tutorProfile      TutorProfile?
+  username          String?       @unique
+  sentFriendRequests FriendRequest[] @relation("SentFriendRequests")
+  receivedFriendRequests FriendRequest[] @relation("ReceivedFriendRequests")
+  publicKey         UserPublicKey?
+  conversationParticipants ConversationParticipant[]
+  sentSecureMessages SecureMessage[] @relation("SentSecureMessages")
+  receivedSecureMessages SecureMessage[] @relation("ReceivedSecureMessages")
+
+  @@map("users")
+}
+
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String
+  title     String        @default("CyberGod Conversation")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id            String      @id @default(uuid())
+  chatSessionId String
+  sender        String
+  content       String
+  createdAt     DateTime    @default(now())
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+
+  @@map("chat_messages")
+}
+
+model Course {
+  id            String        @id @default(uuid())
+  title         String
+  slug          String        @unique
+  description   String
+  coverImageUrl String?
+  ageBand       AgeBand
+  category      String
+  isPublished   Boolean       @default(false)
+  authorId      String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  certificates  Certificate[]
+  author        User          @relation("CourseAuthor", fields: [authorId], references: [id])
+  enrollments   Enrollment[]
+  modules       Module[]
+
+  @@map("courses")
+}
+
+model Module {
+  id       String   @id @default(uuid())
+  title    String
+  order    Int
+  courseId String
+  lessons  Lesson[]
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@map("modules")
+}
+
+model Lesson {
+  id                 String     @id @default(uuid())
+  title              String
+  type               LessonType
+  order              Int
+  videoUrl           String?
+  textContent        String?
+  transcript         String?
+  transcriptSegments Json?
+  moduleId           String
+  module             Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  quiz               Quiz?
+
+  @@map("lessons")
+}
+
+model Quiz {
+  id          String         @id @default(uuid())
+  lessonId    String         @unique
+  passMarkPct Int            @default(70)
+  attempts    QuizAttempt[]
+  questions   QuizQuestion[]
+  lesson      Lesson         @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id           String   @id @default(uuid())
+  quizId       String
+  prompt       String
+  options      String[]
+  correctIndex Int
+  order        Int
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id          String   @id @default(uuid())
+  quizId      String
+  userId      String
+  scorePct    Int
+  passed      Boolean
+  answers     Json
+  attemptedAt DateTime @default(now())
+  quiz        Quiz     @relation(fields: [quizId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@map("quiz_attempts")
+}
+
+model Enrollment {
+  id           String           @id @default(uuid())
+  userId       String
+  courseId     String
+  status       EnrollmentStatus @default(ACTIVE)
+  progressPct  Int              @default(0)
+  streakCount  Int              @default(0)
+  lastActiveAt DateTime         @default(now())
+  enrolledAt   DateTime         @default(now())
+  course       Course           @relation(fields: [courseId], references: [id])
+  user         User             @relation(fields: [userId], references: [id])
+
+  @@unique([userId, courseId])
+  @@map("enrollments")
+}
+
+model Certificate {
+  id       String   @id @default(uuid())
+  userId   String
+  courseId String
+  issuedAt DateTime @default(now())
+  certRef  String   @unique
+  course   Course   @relation(fields: [courseId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  @@map("certificates")
+}
+
+model TutorProfile {
+  id            String             @id @default(uuid())
+  userId        String             @unique
+  headline      String
+  bio           String
+  specialties   String[]
+  vetted        Boolean            @default(false)
+  hourlyRateGHS Decimal            @default(0) @db.Decimal(10, 2)
+  createdAt     DateTime           @default(now())
+  avatarUrl     String?
+  availability  AvailabilitySlot[]
+  bookings      Booking[]          @relation("TutorBookings")
+  user          User               @relation(fields: [userId], references: [id])
+
+  @@map("tutor_profiles")
+}
+
+model AvailabilitySlot {
+  id       String       @id @default(uuid())
+  tutorId  String
+  startsAt DateTime
+  endsAt   DateTime
+  isBooked Boolean      @default(false)
+  tutor    TutorProfile @relation(fields: [tutorId], references: [id], onDelete: Cascade)
+  booking  Booking?
+
+  @@map("availability_slots")
+}
+
+model Booking {
+  id          String           @id @default(uuid())
+  studentId   String
+  tutorId     String
+  slotId      String           @unique
+  status      BookingStatus    @default(PENDING)
+  jitsiRoomId String           @unique
+  createdAt   DateTime         @default(now())
+  slot        AvailabilitySlot @relation(fields: [slotId], references: [id])
+  student     User             @relation("StudentBookings", fields: [studentId], references: [id])
+  tutor       TutorProfile     @relation("TutorBookings", fields: [tutorId], references: [id])
+
+  @@map("bookings")
+}
+
+model IncidentReport {
+  id           String           @id @default(uuid())
+  refCode      String           @unique
+  category     IncidentCategory
+  narrative    String
+  status       IncidentStatus   @default(SUBMITTED)
+  reviewedById String?
+  reviewNotes  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  evidence     EvidenceHash[]
+
+  @@map("incident_reports")
+}
+
+model EvidenceHash {
+  id            String         @id @default(uuid())
+  incidentId    String
+  sha256Hash    String
+  storageKey    String
+  mimeType      String
+  byteSize      Int
+  duplicateOfId String?
+  uploadedAt    DateTime       @default(now())
+  incident      IncidentReport @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@index([sha256Hash])
+  @@map("evidence_hashes")
+}
+
+enum Role {
+  STUDENT
+  TUTOR
+  ADMIN
+  CSA_OFFICER
+}
+
+enum AgeBand {
+  JUNIOR
+  YOUNG_ADULT
+}
+
+enum LessonType {
+  VIDEO
+  TEXT
+  QUIZ
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  DROPPED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum IncidentCategory {
+  SEXTORTION
+  GROOMING
+  SCAM
+  BULLYING
+  IMPERSONATION
+  OTHER
+}
+
+enum IncidentStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  ESCALATED
+  RESOLVED
+  DISMISSED
+}
+
+model UserPublicKey {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  ecdhPublicKey  String   @db.Text
+  ecdsaPublicKey String   @db.Text
+  fingerprint    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_public_keys")
+}
+
+model Conversation {
+  id           String                    @id @default(uuid())
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+  participants ConversationParticipant[]
+  messages     SecureMessage[]
+
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id             String       @id @default(uuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime     @default(now())
+  lastReadAt     DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+model SecureMessage {
+  id                  String       @id @default(uuid())
+  conversationId      String
+  senderId            String
+  recipientId         String
+  ciphertext          String       @db.Text
+  iv                  String       // 12-byte IV base64
+  signature           String       @db.Text // ECDSA signature
+  hasAttachment       Boolean      @default(false)
+  attachmentMeta      String?      @db.Text // optional encrypted attachment metadata
+  selfDestructSeconds Int          @default(0)
+  expiresAt           DateTime?
+  createdAt           DateTime     @default(now())
+  conversation        Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender              User         @relation("SentSecureMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient           User         @relation("ReceivedSecureMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("secure_messages")
+}
+
+model FriendRequest {
+  id         String              @id @default(uuid())
+  senderId   String
+  receiverId String
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  sender     User                @relation("SentFriendRequests", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User                @relation("ReceivedFriendRequests", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@map("friend_requests")
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}

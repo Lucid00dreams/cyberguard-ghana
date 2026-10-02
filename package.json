@@ -1,0 +1,14 @@
+{
+  "name": "cyberguard-ghana-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "National Child Online Protection (COP) Cyber Safety Platform for Ghana",
+  "scripts": {
+    "dev": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend start",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "start": "npm --prefix backend start",
+    "build": "npm --prefix frontend run build",
+    "seed": "npm --prefix backend run seed"
+  }
+}

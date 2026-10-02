@@ -1,0 +1,467 @@
+import { useEffect, useState, useRef } from "react";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  Shield,
+  ShieldAlert,
+  Sun,
+  Moon,
+  BookOpen,
+  Users,
+  LayoutDashboard,
+  Compass,
+  Menu,
+  X,
+  Sparkles,
+  PhoneCall,
+  Zap,
+  Award,
+  Search,
+  SlidersHorizontal,
+  Lock,
+  Store,
+  ChevronDown,
+  LogOut,
+  MessageSquare,
+  Smartphone
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
+import { useNotifications } from "../context/NotificationContext";
+import CyberSpinner from "../components/CyberSpinner";
+import SessionTimeoutModal from "../components/SessionTimeoutModal";
+import CyberGodChatbot from "../components/CyberGodChatbot";
+import CyberGuardLogo from "../components/CyberGuardLogo";
+
+const navLinkClass = ({ isActive }) =>
+  `relative text-xs font-semibold whitespace-nowrap transition-colors px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 ${isActive
+    ? "text-[#0056D2] bg-blue-50/90 font-bold"
+    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/70"
+  }`;
+
+export default function MainLayout() {
+  const { user, logout, sessionTimedOut, dismissSessionTimeoutModal } = useAuth();
+  const { unreadCount } = useNotifications();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const userDropdownRef = useRef(null);
+
+  const handleLoginAgain = () => {
+    dismissSessionTimeoutModal();
+    navigate("/login", { state: { from: location } });
+  };
+
+  useEffect(() => {
+    // Show custom CyberSpinner loading screen on route changes
+    setRouteLoading(true);
+    setUserDropdownOpen(false);
+    setMobileMenuOpen(false);
+    const timer = setTimeout(() => {
+      setRouteLoading(false);
+    }, 320);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
+
+  // Click outside to close user dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setUserDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const isAdminRoute = location.pathname.startsWith("/admin");
+  const isDashboardRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/dashboard");
+
+  return (
+    <div className={`min-h-screen flex flex-col ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}>
+      <SessionTimeoutModal
+        isOpen={sessionTimedOut}
+        onClose={dismissSessionTimeoutModal}
+        onLogin={handleLoginAgain}
+      />
+      {routeLoading && (
+        <CyberSpinner fullScreen label="Loading CyberGuard Ghana..." />
+      )}
+      {!isDashboardRoute && (
+        <>
+          {/* Top National Incident Helpline Notice Bar */}
+          <div className="bg-[#0A1A33] text-slate-200 text-[11px] py-1 px-4 border-b border-slate-800">
+            <div className="max-w-7xl mx-auto flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span className="font-medium text-slate-300">National Cyber Threat Helpline:</span>
+                <span className="text-amber-400 font-bold">Toll-Free 292</span>
+              </div>
+              <div className="hidden sm:flex items-center gap-4 text-slate-400 text-[11px]">
+                <span>Child Online Protection</span>
+                <Link to="/report" className="text-rose-400 hover:text-rose-300 font-medium transition">
+                  Confidential Report
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <header className="border-b border-slate-200 bg-white sticky top-0 z-50 shadow-xs">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 h-15 flex items-center justify-between gap-3">
+              {/* Clean Single-Line Logo */}
+              <Link to="/" className="flex items-center group shrink-0">
+                <CyberGuardLogo variant="compact" size="sm" interactive />
+              </Link>
+
+              {/* Desktop Navigation Links */}
+              <nav className="hidden md:flex items-center gap-1">
+                <NavLink to="/courses" className={navLinkClass}>
+                  <BookOpen className="w-3.5 h-3.5" /> Courses
+                </NavLink>
+                <NavLink to="/extensions" className={navLinkClass}>
+                  <Store className="w-3.5 h-3.5 text-[#0056D2]" /> Extensions
+                </NavLink>
+                <NavLink to="/tutors" className={navLinkClass}>
+                  <Users className="w-3.5 h-3.5" /> Mentors
+                </NavLink>
+                {user && (
+                  <NavLink to="/cyberchat" className={navLinkClass}>
+                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-emerald-700 font-semibold">CyberChat</span>
+                    {unreadCount > 0 && (
+                      <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse shrink-0" />
+                    )}
+                  </NavLink>
+                )}
+                {user && (user.role === "ADMIN" || user.role === "TUTOR") && (
+                  <NavLink to="/course-studio" className={navLinkClass}>
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Studio
+                  </NavLink>
+                )}
+                {user && (user.role === "ADMIN" || user.role === "CSA_OFFICER") && (
+                  <NavLink to="/admin" className={navLinkClass}>
+                    <Compass className="w-3.5 h-3.5 text-indigo-600" /> Portal
+                  </NavLink>
+                )}
+                <NavLink
+                  to="/report"
+                  className={({ isActive }) =>
+                    `text-xs font-bold whitespace-nowrap px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors ${isActive
+                      ? "bg-red-50 text-red-700 font-bold"
+                      : "text-red-600 hover:text-red-700 hover:bg-red-50/70"
+                    }`
+                  }
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" /> Report
+                </NavLink>
+              </nav>
+
+              {/* Right Side User Profile Area */}
+              <div className="flex items-center gap-2">
+                {user ? (
+                  <div className="relative" ref={userDropdownRef}>
+                    <button
+                      onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                      className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition shadow-2xs"
+                    >
+                      {user.avatarUrl ? (
+                        <img
+                          src={user.avatarUrl}
+                          alt={user.displayName}
+                          className="h-7 w-7 rounded-lg object-cover border border-slate-200"
+                        />
+                      ) : (
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#0056D2] font-bold text-xs border border-blue-100">
+                          {user.displayName ? user.displayName.charAt(0).toUpperCase() : "U"}
+                        </div>
+                      )}
+                      <span className="hidden sm:inline-block text-xs font-bold text-slate-800 max-w-[90px] truncate text-left">
+                        {user.displayName}
+                      </span>
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform ${userDropdownOpen ? "rotate-180" : ""
+                          }`}
+                      />
+                    </button>
+
+                    {/* Clean User Dropdown Popover */}
+                    {userDropdownOpen && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-slate-200/90 shadow-xl py-1.5 z-50 animate-in fade-in-50 zoom-in-95 duration-150">
+                        <div className="px-3.5 py-2 border-b border-slate-100">
+                          <p className="text-xs font-bold text-slate-900 truncate">{user.displayName}</p>
+                          <p className="text-[10px] text-slate-500 truncate mt-0.5">{user.email || user.phoneNumber}</p>
+                          <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-blue-50 text-[#0056D2] border border-blue-200/60">
+                            {user.role}
+                          </span>
+                        </div>
+
+                        <div className="py-1">
+                          <Link
+                            to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin" : "/dashboard"}
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                          >
+                            <LayoutDashboard className="w-4 h-4 text-blue-600" />
+                            <span>{user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "Command Center" : "Student Dashboard"}</span>
+                          </Link>
+
+                          <Link
+                            to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin?tab=settings" : "/dashboard?tab=settings"}
+                            onClick={() => setUserDropdownOpen(false)}
+                            className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                          >
+                            <SlidersHorizontal className="w-4 h-4 text-slate-500" />
+                            <span>Account Settings</span>
+                          </Link>
+
+                          {(user.role === "ADMIN" || user.role === "TUTOR") && (
+                            <Link
+                              to="/course-studio"
+                              onClick={() => setUserDropdownOpen(false)}
+                              className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                            >
+                              <Sparkles className="w-4 h-4 text-amber-500" />
+                              <span>Course Studio</span>
+                            </Link>
+                          )}
+
+                          {(user.role === "ADMIN" || user.role === "CSA_OFFICER") && (
+                            <Link
+                              to="/admin"
+                              onClick={() => setUserDropdownOpen(false)}
+                              className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                            >
+                              <Compass className="w-4 h-4 text-indigo-600" />
+                              <span>CSA Portal</span>
+                            </Link>
+                          )}
+                        </div>
+
+                        <div className="border-t border-slate-100 pt-1">
+                          <button
+                            onClick={() => {
+                              setUserDropdownOpen(false);
+                              logout();
+                            }}
+                            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                          >
+                            <LogOut className="w-4 h-4 text-rose-500" />
+                            <span>Sign out</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      to="/login"
+                      state={{ from: location }}
+                      className="text-xs font-semibold text-slate-700 hover:text-[#0056D2] px-3 py-1.5 rounded-lg transition hover:bg-slate-100"
+                    >
+                      Sign in
+                    </Link>
+                    <Link
+                      to="/register"
+                      state={{ from: location }}
+                      className="text-xs font-bold bg-[#0056D2] hover:bg-[#00419E] text-white px-3.5 py-1.5 rounded-lg shadow-xs transition"
+                    >
+                      Join Free
+                    </Link>
+                  </div>
+                )}
+
+                {/* Mobile Menu Button */}
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  aria-label="Toggle navigation menu"
+                  aria-expanded={mobileMenuOpen}
+                  className="md:hidden p-2 rounded-lg border border-line text-mist hover:text-ink"
+                >
+                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Navigation Drawer */}
+            {mobileMenuOpen && (
+              <div className="md:hidden border-t border-line bg-paper p-4 space-y-2">
+                <NavLink
+                  to="/courses"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-ink"
+                >
+                  <BookOpen className="w-4 h-4 text-blue-500" /> Courses
+                </NavLink>
+                <NavLink
+                  to="/extensions"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-ink"
+                >
+                  <Store className="w-4 h-4 text-[#0056D2]" /> Extentions Store
+                </NavLink>
+                <NavLink
+                  to="/tutors"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-ink"
+                >
+                  <Users className="w-4 h-4 text-emerald-500" /> Mentors
+                </NavLink>
+                {user && (
+                  <NavLink
+                    to="/cyberchat"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold text-emerald-600"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-emerald-600" /> CyberChat (E2EE)
+                    </span>
+                    {unreadCount > 0 && (
+                      <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-black text-white bg-rose-600 rounded-full animate-pulse shadow-xs">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </NavLink>
+                )}
+                <NavLink
+                  to="/report"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-red-500"
+                >
+                  <ShieldAlert className="w-4 h-4" /> Report Incident
+                </NavLink>
+                {user && (user.role === "ADMIN" || user.role === "CSA_OFFICER" ? (
+                  <NavLink
+                    to="/admin"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-800"
+                  >
+                    <Compass className="w-4 h-4 text-blue-600" /> Admin Command Center
+                  </NavLink>
+                ) : (
+                  <NavLink
+                    to="/dashboard"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-800"
+                  >
+                    <LayoutDashboard className="w-4 h-4 text-blue-600" /> Student Dashboard
+                  </NavLink>
+                ))}
+                {user && (
+                  <NavLink
+                    to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin?tab=settings" : "/dashboard?tab=settings"}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-800"
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-blue-600" /> Account Settings
+                  </NavLink>
+                )}
+                {user && (
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm font-semibold text-red-500"
+                  >
+                    Log out
+                  </button>
+                )}
+              </div>
+            )}
+          </header>
+        </>
+      )}
+
+      <main className="flex-1 relative z-10">
+        <Outlet />
+      </main>
+
+      {!isDashboardRoute && (
+        <footer className="border-t-2 border-[#0056D2] bg-[#0B1528] text-slate-200 shadow-2xl relative z-10">
+          <div className="max-w-7xl mx-auto px-6 py-12 grid md:grid-cols-3 gap-8">
+            <div className="space-y-3">
+              <Link to="/" className="inline-block group">
+                <CyberGuardLogo variant="full" size="md" theme="dark" interactive />
+              </Link>
+              <p className="text-xs text-slate-300 leading-relaxed max-w-sm font-normal">
+                A national cyber safety platform providing practical digital defense courses, verified mentor guidance, and confidential incident reporting for Ghanaian students, parents, and schools.
+              </p>
+              <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span>Cyber Security Authority (CSA) Framework · Ghana</span>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
+                Quick Navigation
+              </h4>
+              <ul className="space-y-2.5 text-xs">
+                <li>
+                  <Link to="/courses" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Courses & Safety Modules
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/extensions" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Browser Extension Store
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/tutors" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Find an Accredited Mentor
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/report" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5 text-rose-300 hover:text-rose-200 font-semibold">
+                    <span className="text-rose-400">›</span> Anonymous Incident Reporting
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/tutor-onboarding" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Become a Cybersecurity Tutor
+                  </Link>
+                </li>
+                <li>
+                  <a href="/#faq" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Frequently Asked Questions (FAQ)
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
+                Emergency Hotline & Support
+              </h4>
+              <div className="text-amber-200 font-bold bg-amber-400/10 p-3.5 rounded-xl border border-amber-400/30 flex items-start gap-2.5 shadow-xs">
+                <PhoneCall className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs text-amber-300 font-black tracking-wide">
+                    Toll-Free Emergency: Dial 292
+                  </p>
+                  <p className="text-[11px] text-amber-200/80 font-normal mt-0.5 leading-snug">
+                    Ghana National Cyber Threat Hotline for immediate assistance with harassment or cyber fraud.
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Incident reports submitted on this portal are processed confidentially by authorized Cyber Security Authority (CSA) officers.
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-800/80 py-5 text-center text-xs text-slate-400 font-mono">
+            © {new Date().getFullYear()} CyberGuard Ghana. Built for National Child Online Protection (COP). All rights reserved.
+          </div>
+        </footer>
+      )}
+
+      {/* CyberGod AI Floating Chatbot */}
+      <CyberGodChatbot />
+    </div>
+  );
+}
+

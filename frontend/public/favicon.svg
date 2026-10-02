@@ -1,0 +1,124 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <defs>
+    <!-- Background / Shield Gradients -->
+    <linearGradient id="cgShieldBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0056D2" />
+      <stop offset="40%" stop-color="#0A3C96" />
+      <stop offset="100%" stop-color="#061838" />
+    </linearGradient>
+
+    <linearGradient id="cgShieldBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#0284C7" />
+    </linearGradient>
+
+    <linearGradient id="cgGoldSun" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+
+    <linearGradient id="cgGoldRing" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FEF08A" />
+      <stop offset="100%" stop-color="#B45309" />
+    </linearGradient>
+
+    <!-- Subtle Glow Filter -->
+    <filter id="cgGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Outer Protective Shield Silhouette -->
+  <path
+    d="M 32 4 C 44 4, 55 9, 58 14 C 58 35, 50 51, 32 61 C 14 51, 6 35, 6 14 C 9 9, 20 4, 32 4 Z"
+    fill="url(#cgShieldBg)"
+    stroke="url(#cgShieldBorder)"
+    stroke-width="2.5"
+    stroke-linejoin="round"
+  />
+
+  <!-- Inner Bevel Contour -->
+  <path
+    d="M 32 8.5 C 41 8.5, 50 12.5, 52.5 16.5 C 52.5 33, 46 46, 32 54.5 C 18 46, 11.5 33, 11.5 16.5 C 14 12.5, 23 8.5, 32 8.5 Z"
+    fill="#081426"
+    stroke="#1E3A8A"
+    stroke-width="1"
+    opacity="0.9"
+  />
+
+  <!-- High-Tech Circuit Traces -->
+  <!-- Left Circuit -->
+  <path
+    d="M 16 23 L 23 23 L 27 28"
+    stroke="#38BDF8"
+    stroke-width="1.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.85"
+  />
+  <circle cx="16" cy="23" r="1.6" fill="#38BDF8" />
+
+  <!-- Right Circuit -->
+  <path
+    d="M 48 23 L 41 23 L 37 28"
+    stroke="#38BDF8"
+    stroke-width="1.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.85"
+  />
+  <circle cx="48" cy="23" r="1.6" fill="#38BDF8" />
+
+  <!-- Center Top Keyline -->
+  <line x1="32" y1="9" x2="32" y2="18" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" opacity="0.9" />
+
+  <!-- Ghana National Gold Medallion / Radar Ring -->
+  <circle
+    cx="32"
+    cy="33"
+    r="14"
+    fill="url(#cgGoldSun)"
+    stroke="url(#cgGoldRing)"
+    stroke-width="1.8"
+    filter="url(#cgGlow)"
+  />
+
+  <!-- Inner Concentric Tech Track -->
+  <circle
+    cx="32"
+    cy="33"
+    r="11.8"
+    fill="none"
+    stroke="#FEF08A"
+    stroke-width="0.75"
+    stroke-dasharray="2 1.5"
+    opacity="0.75"
+  />
+
+  <!-- Iconic Ghanaian Black Star -->
+  <!-- Center at (32, 33), Outer R=9.5, Inner R=3.8 -->
+  <polygon
+    points="
+      32,23.5
+      34.3,29.8
+      41.0,30.0
+      35.7,34.2
+      37.6,40.7
+      32,36.8
+      26.4,40.7
+      28.3,34.2
+      23.0,30.0
+      29.7,29.8
+    "
+    fill="#050811"
+  />
+
+  <!-- Tiny Gold Star Core Highlight -->
+  <circle cx="32" cy="33" r="1.2" fill="#FBBF24" opacity="0.9" />
+
+  <!-- Bottom Defensive Node Accent -->
+  <circle cx="32" cy="51" r="1.8" fill="#10B981" />
+</svg>
