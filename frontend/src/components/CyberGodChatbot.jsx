@@ -237,7 +237,7 @@ export default function CyberGodChatbot() {
   ];
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 font-sans">
+    <div className="fixed bottom-18 right-3 sm:bottom-6 sm:right-6 z-40 font-sans">
       {/* ------------------------------------------------------------ */}
       {/* FLOATING LAUNCHER BUTTON (WHITE THEME EXECUTIVE BADGE) */}
       {/* ------------------------------------------------------------ */}
@@ -246,7 +246,7 @@ export default function CyberGodChatbot() {
           onClick={() => setIsOpen(true)}
           title="Chat with CyberGuard AI"
           aria-label="Open CyberGuard Chatbot"
-          className="group relative flex items-center gap-3 pl-2.5 pr-4 py-2 rounded-full bg-white border border-slate-200/90 shadow-xl hover:shadow-2xl shadow-slate-300/40 hover:border-slate-300 transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
+          className="group relative flex items-center gap-2.5 p-1.5 sm:pl-2.5 sm:pr-4 sm:py-2 rounded-full bg-white border border-slate-200/90 shadow-xl hover:shadow-2xl shadow-slate-300/40 hover:border-slate-300 transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
         >
           {/* Circular Bot Badge */}
           <div className="relative w-9 h-9 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center shrink-0 shadow-xs">
@@ -263,7 +263,7 @@ export default function CyberGodChatbot() {
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
           </div>
 
-          <div className="text-left">
+          <div className="text-left hidden sm:block">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-black text-slate-900 leading-tight">Safety Assistant</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -279,7 +279,7 @@ export default function CyberGodChatbot() {
       {/* EXPANDED CHAT CONTAINER OVERLAY (PREMIUM WHITE THEME) */}
       {/* ------------------------------------------------------------ */}
       {isOpen && (
-        <div className="w-[94vw] sm:w-[440px] h-[640px] max-h-[88vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden relative backdrop-blur-2xl transition-all duration-300">
+        <div className="w-[95vw] sm:w-[440px] h-[580px] max-h-[82vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden relative backdrop-blur-2xl transition-all duration-300">
           
           {/* HEADER BAR */}
           <div className="bg-white/95 backdrop-blur-md px-4 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 relative z-20">

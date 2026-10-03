@@ -79,7 +79,7 @@ export default function MainLayout() {
   const isDashboardRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/dashboard");
 
   return (
-    <div className={`min-h-screen flex flex-col ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}>
+    <div className={`min-h-screen flex flex-col w-full max-w-full overflow-x-hidden ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}>
       <SessionTimeoutModal
         isOpen={sessionTimedOut}
         onClose={dismissSessionTimeoutModal}
@@ -91,14 +91,16 @@ export default function MainLayout() {
       {!isDashboardRoute && (
         <>
           {/* Top National Incident Helpline Notice Bar */}
-          <div className="bg-[#0A1A33] text-slate-200 text-[11px] py-1 px-4 border-b border-slate-800">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                <span className="font-medium text-slate-300">National Cyber Threat Helpline:</span>
-                <span className="text-amber-400 font-bold">Toll-Free 292</span>
+          <div className="bg-[#0A1A33] text-slate-200 text-[10px] sm:text-[11px] py-1 px-3 sm:px-4 border-b border-slate-800 w-full overflow-hidden">
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                <span className="font-medium text-slate-300 truncate">
+                  <span className="hidden sm:inline">National Cyber Threat </span>Helpline:
+                </span>
+                <span className="text-amber-400 font-bold whitespace-nowrap">Toll-Free 292</span>
               </div>
-              <div className="hidden sm:flex items-center gap-4 text-slate-400 text-[11px]">
+              <div className="hidden sm:flex items-center gap-4 text-slate-400 text-[11px] shrink-0">
                 <span>Child Online Protection</span>
                 <Link to="/report" className="text-rose-400 hover:text-rose-300 font-medium transition">
                   Confidential Report
@@ -254,7 +256,7 @@ export default function MainLayout() {
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5">
+                  <div className="hidden sm:flex items-center gap-1.5">
                     <Link
                       to="/login"
                       state={{ from: location }}
