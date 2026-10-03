@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import { useAuth } from "./AuthContext";
 import { MessageSquare, UserPlus, X, Bell, Shield } from "lucide-react";
+import UserAvatar from "../components/UserAvatar";
 
 const NotificationContext = createContext(null);
 
@@ -251,17 +252,12 @@ export function NotificationProvider({ children }) {
           >
             {/* Avatar / Icon */}
             <div className="relative shrink-0">
-              {toast.avatarUrl ? (
-                <img
-                  src={toast.avatarUrl}
-                  alt=""
-                  className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-blue-50 text-[#0056D2] flex items-center justify-center text-xl border border-blue-100">
-                  <i className="fa-solid fa-circle-user"></i>
-                </div>
-              )}
+              <UserAvatar
+                src={toast.avatarUrl}
+                name={toast.senderName}
+                size="md"
+                rounded="rounded-full"
+              />
               <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#0056D2] text-white flex items-center justify-center text-[9px] shadow-xs">
                 {toast.type === "friend_request" ? (
                   <UserPlus className="w-2.5 h-2.5" />

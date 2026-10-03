@@ -12,6 +12,16 @@ const router = express.Router();
 
 const UPLOADS_DIR = path.join(__dirname, "../../public/uploads");
 const VIDEOS_DIR = path.join(UPLOADS_DIR, "videos");
+
+function resolveBaseUrl(req) {
+  if (process.env.BACKEND_URL) return process.env.BACKEND_URL.replace(/\/$/, "");
+  const host = req.get("host");
+  if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
+    const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
+    return `${proto}://${host}`;
+  }
+  return process.env.NODE_ENV === "production" ? "https://cyberguard-ghana.onrender.com" : "http://localhost:4000";
+}
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
@@ -146,7 +156,7 @@ router.post("/image", requireAuth, async (req, res, next) => {
 
     fs.writeFileSync(filePath, buffer);
 
-    const baseUrl = process.env.BACKEND_URL || "http://localhost:4000";
+    const baseUrl = resolveBaseUrl(req);
     const imageUrl = `${baseUrl}/uploads/${filename}`;
 
     res.json({ success: true, url: imageUrl, filename });
@@ -162,7 +172,7 @@ router.post("/video", requireAuth, videoUpload.single("video"), async (req, res,
       return res.status(400).json({ error: "No video file was uploaded." });
     }
 
-    const baseUrl = process.env.BACKEND_URL || "http://localhost:4000";
+    const baseUrl = resolveBaseUrl(req);
     const videoUrl = `${baseUrl}/uploads/videos/${req.file.filename}`;
 
     res.json({
@@ -185,7 +195,7 @@ router.post("/video-with-transcription", requireAuth, videoUpload.single("video"
       return res.status(400).json({ error: "No video file was uploaded." });
     }
 
-    const baseUrl = process.env.BACKEND_URL || "http://localhost:4000";
+    const baseUrl = resolveBaseUrl(req);
     const videoUrl = `${baseUrl}/uploads/videos/${req.file.filename}`;
     const filePath = req.file.path;
 

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import api from "../utils/api";
+import UserAvatar from "../components/UserAvatar";
 import {
   initializeUserE2EE,
   deriveSharedAesKey,
@@ -864,17 +865,13 @@ export default function CyberChat() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="relative group cursor-pointer shrink-0" onClick={() => setShowAvatarModal(true)}>
-                  {profile?.avatarUrl ? (
-                    <img
-                      src={profile.avatarUrl}
-                      alt={profile.displayName}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-2xs group-hover:opacity-85 transition"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center text-xl shadow-2xs group-hover:scale-105 transition">
-                      <i className="fa-solid fa-circle-user"></i>
-                    </div>
-                  )}
+                  <UserAvatar
+                    src={profile?.avatarUrl}
+                    name={profile?.displayName}
+                    size="md"
+                    rounded="rounded-full"
+                    className="w-10 h-10 group-hover:opacity-85 transition"
+                  />
                   <div className="absolute inset-0 rounded-full bg-black/25 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
                     <Camera className="w-3.5 h-3.5" />
                   </div>
@@ -1016,13 +1013,7 @@ export default function CyberChat() {
                       className="p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 flex items-center justify-between transition"
                     >
                       <div className="flex items-center gap-2.5">
-                        {u.avatarUrl ? (
-                          <img src={u.avatarUrl} alt={u.displayName} className="w-9 h-9 rounded-xl object-cover border border-slate-200" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0056D2] border border-blue-200 flex items-center justify-center text-xl">
-                            <i className="fa-solid fa-circle-user"></i>
-                          </div>
-                        )}
+                        <UserAvatar user={u} size="md" rounded="rounded-xl" />
                         <div>
                           <div className="text-xs font-bold text-slate-900">{u.displayName}</div>
                           <div className="text-[11px] text-[#0056D2] flex items-center gap-1 font-medium">
@@ -1094,20 +1085,13 @@ export default function CyberChat() {
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="relative shrink-0">
-                            {peer?.avatarUrl ? (
-                              <img
-                                src={peer.avatarUrl}
-                                alt={peer.displayName}
-                                className="w-11 h-11 rounded-full object-cover border border-slate-200"
-                              />
-                            ) : (
-                              <div className="w-11 h-11 rounded-full bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center text-xl">
-                                <i className="fa-solid fa-circle-user"></i>
-                              </div>
-                            )}
-                            <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white" />
-                          </div>
+                          <UserAvatar
+                            src={peer?.avatarUrl}
+                            name={peer?.displayName}
+                            size="lg"
+                            rounded="rounded-full"
+                            showOnlineStatus
+                          />
 
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between">
@@ -1153,13 +1137,7 @@ export default function CyberChat() {
                       className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2.5">
-                        {friend.avatarUrl ? (
-                          <img src={friend.avatarUrl} alt={friend.displayName} className="w-9 h-9 rounded-xl object-cover border border-slate-200" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0056D2] border border-blue-200 flex items-center justify-center text-xl">
-                            <i className="fa-solid fa-circle-user"></i>
-                          </div>
-                        )}
+                        <UserAvatar user={friend} size="md" rounded="rounded-xl" />
                         <div>
                           <div className="text-xs font-bold text-slate-900">{friend.displayName}</div>
                           <div className="text-[11px] text-[#0056D2] font-medium">{friend.username ? `@${friend.username}` : `@${friend.role?.toLowerCase()}`}</div>
@@ -1192,13 +1170,7 @@ export default function CyberChat() {
                         className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2.5 mb-2 shadow-xs"
                       >
                         <div className="flex items-center gap-2.5">
-                          {req.user.avatarUrl ? (
-                            <img src={req.user.avatarUrl} alt={req.user.displayName} className="w-9 h-9 rounded-xl object-cover border border-slate-200" />
-                          ) : (
-                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0056D2] border border-blue-200 flex items-center justify-center text-xl">
-                              <i className="fa-solid fa-circle-user"></i>
-                            </div>
-                          )}
+                          <UserAvatar user={req.user} size="md" rounded="rounded-xl" />
                           <div>
                             <div className="text-xs font-bold text-slate-900">{req.user.displayName}</div>
                             <div className="text-[11px] text-[#0056D2] font-medium">{req.user.username ? `@${req.user.username}` : `@${req.user.role?.toLowerCase()}`}</div>
@@ -1237,13 +1209,7 @@ export default function CyberChat() {
                         className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between mb-1.5"
                       >
                         <div className="flex items-center gap-2">
-                          {req.user.avatarUrl ? (
-                            <img src={req.user.avatarUrl} alt={req.user.displayName} className="w-7 h-7 rounded-lg object-cover" />
-                          ) : (
-                            <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center text-sm">
-                              <i className="fa-solid fa-circle-user"></i>
-                            </div>
-                          )}
+                          <UserAvatar user={req.user} size="xs" rounded="rounded-lg" />
                           <div>
                             <div className="text-xs font-medium text-slate-800">{req.user.displayName}</div>
                             <div className="text-[10px] text-slate-500">{req.user.username}</div>
@@ -1274,20 +1240,13 @@ export default function CyberChat() {
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <div className="relative shrink-0">
-                  {activeConv.peer?.avatarUrl ? (
-                    <img
-                      src={activeConv.peer.avatarUrl}
-                      alt={activeConv.peer.displayName}
-                      className="w-10 h-10 rounded-full object-cover border border-slate-200 shadow-2xs"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0056D2] text-xl">
-                      <i className="fa-solid fa-circle-user"></i>
-                    </div>
-                  )}
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
-                </div>
+                <UserAvatar
+                  src={activeConv.peer?.avatarUrl}
+                  name={activeConv.peer?.displayName}
+                  size="md"
+                  rounded="rounded-full"
+                  showOnlineStatus
+                />
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -1810,17 +1769,13 @@ export default function CyberChat() {
             </div>
 
             <div className="my-5 flex flex-col items-center">
-              {profile?.avatarUrl ? (
-                <img
-                  src={profile.avatarUrl}
-                  alt={profile.displayName}
-                  className="w-24 h-24 rounded-3xl object-cover border-4 border-[#0056D2] shadow-md mb-3"
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-3xl bg-blue-50 border-2 border-dashed border-[#0056D2] flex items-center justify-center text-5xl text-[#0056D2] shadow-md mb-3">
-                  <i className="fa-solid fa-circle-user"></i>
-                </div>
-              )}
+              <UserAvatar
+                src={profile?.avatarUrl}
+                name={profile?.displayName}
+                size="xl"
+                rounded="rounded-3xl"
+                className="w-24 h-24 mb-3 border-4 border-[#0056D2] shadow-md"
+              />
 
               <p className="text-xs text-slate-600">Choose a new photo to represent your CyberGuard profile</p>
 

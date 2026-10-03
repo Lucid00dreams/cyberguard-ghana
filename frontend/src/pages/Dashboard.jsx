@@ -31,6 +31,7 @@ import CyberSpinner from "../components/CyberSpinner";
 import CertificateModal from "../components/CertificateModal";
 import AccountSettingsView from "../components/AccountSettingsView";
 import CyberGuardLogo from "../components/CyberGuardLogo";
+import UserAvatar from "../components/UserAvatar";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
@@ -278,13 +279,7 @@ export default function Dashboard() {
         {/* Minimal User Profile Footer */}
         <div className="border-t border-slate-100 p-3 bg-slate-50/50 flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
-            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
-              ) : (
-                <span>{user?.displayName?.charAt(0).toUpperCase() || "S"}</span>
-              )}
-            </div>
+            <UserAvatar user={user} size="md" rounded="rounded-full" />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-slate-900 truncate">
                 {user?.displayName || "Student"}

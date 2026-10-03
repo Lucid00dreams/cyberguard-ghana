@@ -28,6 +28,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useNotifications } from "../context/NotificationContext";
 import CyberSpinner from "../components/CyberSpinner";
+import UserAvatar from "../components/UserAvatar";
 import SessionTimeoutModal from "../components/SessionTimeoutModal";
 import CyberGodChatbot from "../components/CyberGodChatbot";
 import CyberGuardLogo from "../components/CyberGuardLogo";
@@ -167,17 +168,7 @@ export default function MainLayout() {
                       onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                       className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition shadow-2xs"
                     >
-                      {user.avatarUrl ? (
-                        <img
-                          src={user.avatarUrl}
-                          alt={user.displayName}
-                          className="h-7 w-7 rounded-lg object-cover border border-slate-200"
-                        />
-                      ) : (
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-[#0056D2] font-bold text-xs border border-blue-100">
-                          {user.displayName ? user.displayName.charAt(0).toUpperCase() : "U"}
-                        </div>
-                      )}
+                      <UserAvatar user={user} size="sm" rounded="rounded-lg" />
                       <span className="hidden sm:inline-block text-xs font-bold text-slate-800 max-w-[90px] truncate text-left">
                         {user.displayName}
                       </span>
@@ -190,12 +181,15 @@ export default function MainLayout() {
                     {/* Clean User Dropdown Popover */}
                     {userDropdownOpen && (
                       <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-slate-200/90 shadow-xl py-1.5 z-50 animate-in fade-in-50 zoom-in-95 duration-150">
-                        <div className="px-3.5 py-2 border-b border-slate-100">
-                          <p className="text-xs font-bold text-slate-900 truncate">{user.displayName}</p>
-                          <p className="text-[10px] text-slate-500 truncate mt-0.5">{user.email || user.phoneNumber}</p>
-                          <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-blue-50 text-[#0056D2] border border-blue-200/60">
-                            {user.role}
-                          </span>
+                        <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center gap-2.5">
+                          <UserAvatar user={user} size="md" rounded="rounded-xl" />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-900 truncate">{user.displayName}</p>
+                            <p className="text-[10px] text-slate-500 truncate mt-0.5">{user.email || user.phoneNumber}</p>
+                            <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider bg-blue-50 text-[#0056D2] border border-blue-200/60">
+                              {user.role}
+                            </span>
+                          </div>
                         </div>
 
                         <div className="py-1">
@@ -310,9 +304,7 @@ export default function MainLayout() {
                 {/* Logged in User Bar */}
                 {user && (
                   <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 mb-2">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center font-bold text-xs shrink-0">
-                      {user.displayName ? user.displayName.charAt(0).toUpperCase() : "U"}
-                    </div>
+                    <UserAvatar user={user} size="md" rounded="rounded-xl" />
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-bold text-slate-900 truncate">{user.displayName}</p>
                       <span className="text-[10px] text-slate-500 font-mono uppercase">{user.role}</span>

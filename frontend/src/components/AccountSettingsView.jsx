@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import UserAvatar from "./UserAvatar";
 
 export default function AccountSettingsView({ isModal = false, onClose }) {
   const { user, updateUser } = useAuth();
@@ -321,16 +322,14 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
                       <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
                       <span className="text-[10px] font-bold mt-1">Uploading...</span>
                     </div>
-                  ) : avatarUrl ? (
-                    <img
-                      src={avatarUrl}
-                      alt={displayName || "Profile photo"}
-                      className="w-full h-full object-cover"
-                    />
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-[#0056D2] to-teal-600 text-white font-black text-5xl flex items-center justify-center">
-                      <i className="fa-solid fa-circle-user"></i>
-                    </div>
+                    <UserAvatar
+                      src={avatarUrl}
+                      name={displayName}
+                      size="xl"
+                      rounded="rounded-full"
+                      className="w-full h-full"
+                    />
                   )}
                 </div>
 

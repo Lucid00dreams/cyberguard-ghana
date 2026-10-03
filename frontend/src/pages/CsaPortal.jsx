@@ -38,6 +38,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AccountSettingsView from "../components/AccountSettingsView";
 import CyberGuardLogo from "../components/CyberGuardLogo";
+import UserAvatar from "../components/UserAvatar";
 
 export default function CsaPortal() {
   const { user, logout } = useAuth();
@@ -412,20 +413,7 @@ export default function CsaPortal() {
             title="Open Account Settings"
             className="flex items-center gap-2.5 min-w-0 text-left hover:opacity-90 transition cursor-pointer group flex-1 mr-1"
           >
-            <div className="relative shrink-0">
-              {user?.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.displayName}
-                  className="w-9 h-9 rounded-full object-cover border border-blue-400/40 shadow-xs"
-                />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-blue-900/60 text-emerald-400 flex items-center justify-center text-base border border-blue-500/40 shadow-xs">
-                  <i className="fa-solid fa-circle-user"></i>
-                </div>
-              )}
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#07162E]" />
-            </div>
+            <UserAvatar user={user} size="md" rounded="rounded-full" showOnlineStatus />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition">
                 {user?.displayName || "Patrick Paul"}
@@ -518,13 +506,7 @@ export default function CsaPortal() {
               title="Open Account Settings"
               className="w-8 h-8 rounded-full overflow-hidden border border-slate-700 hover:ring-2 hover:ring-emerald-400 transition cursor-pointer shrink-0"
             >
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-slate-900 text-emerald-400 flex items-center justify-center text-base">
-                  <i className="fa-solid fa-circle-user"></i>
-                </div>
-              )}
+              <UserAvatar user={user} size="sm" rounded="rounded-full" />
             </button>
           </div>
         </header>
@@ -693,9 +675,7 @@ export default function CsaPortal() {
                         className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-slate-300 hover:bg-white transition"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0">
-                            <i className="fa-solid fa-circle-user text-base"></i>
-                          </div>
+                          <UserAvatar user={u} size="sm" rounded="rounded-full" />
                           <div>
                             <p className="text-xs font-bold text-slate-900">{u.displayName}</p>
                             <p className="text-[11px] text-slate-500 mt-0.5">
@@ -845,13 +825,7 @@ export default function CsaPortal() {
                         className="p-4 sm:p-5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-xs transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
                       >
                         <div className="flex items-center gap-3.5">
-                          <div className="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-200 flex items-center justify-center font-bold text-emerald-800 text-sm overflow-hidden shrink-0">
-                            {u.avatarUrl ? (
-                              <img src={u.avatarUrl} alt={u.displayName} className="w-full h-full object-cover" />
-                            ) : (
-                              <i className="fa-solid fa-circle-user text-xl text-emerald-700"></i>
-                            )}
-                          </div>
+                          <UserAvatar user={u} size="md" rounded="rounded-full" />
                           <div>
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-slate-900 text-sm">{u.displayName}</span>

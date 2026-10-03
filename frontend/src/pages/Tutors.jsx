@@ -4,6 +4,7 @@ import { Video, Star, ArrowRight } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import CyberSpinner from "../components/CyberSpinner";
+import UserAvatar from "../components/UserAvatar";
 
 export default function Tutors() {
   const { user } = useAuth();
@@ -92,17 +93,12 @@ export default function Tutors() {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      {t.user?.avatarUrl ? (
-                        <img
-                          src={t.user.avatarUrl}
-                          alt={t.user.displayName}
-                          className="h-12 w-12 rounded-xl object-cover border border-slate-200"
-                        />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-[#0056D2] text-2xl border border-blue-100 shadow-2xs">
-                          <i className="fa-solid fa-circle-user"></i>
-                        </div>
-                      )}
+                      <UserAvatar
+                        user={t.user}
+                        name={t.user?.displayName}
+                        size="lg"
+                        rounded="rounded-xl"
+                      />
                       <div>
                         <h3 className="font-black text-base text-slate-900 leading-tight">{t.user?.displayName}</h3>
                         <p className="text-xs text-blue-700 font-bold mt-0.5">{t.headline}</p>

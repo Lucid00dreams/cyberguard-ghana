@@ -136,6 +136,12 @@ router.post("/google", async (req, res, next) => {
       sendWelcomeEmail(user.email, user.displayName).catch((err) => {
         console.error(`[Mailer] Google signup welcome email to ${user.email} failed:`, err.message);
       });
+    } else if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes("googleusercontent.com") || user.avatarUrl.includes("default-user"))) {
+      // Keep existing user's profile picture up to date with Google account photo
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { avatarUrl },
+      });
     }
 
     const token = signToken(user);

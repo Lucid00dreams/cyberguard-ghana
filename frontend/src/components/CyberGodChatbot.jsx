@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
+import UserAvatar from "./UserAvatar";
 import FormattedLessonContent from "./FormattedLessonContent";
 
 /**
@@ -536,9 +537,7 @@ export default function CyberGodChatbot() {
                     className={`flex items-start gap-2.5 ${m.sender === "user" ? "flex-row-reverse" : "flex-row"}`}
                   >
                     {m.sender === "user" ? (
-                      <div className="w-7 h-7 rounded-full bg-slate-100 text-[#0056D2] border border-slate-200 flex items-center justify-center text-sm shrink-0 shadow-2xs">
-                        <i className="fa-solid fa-circle-user"></i>
-                      </div>
+                      <UserAvatar user={user} size="sm" rounded="rounded-full" />
                     ) : (
                       <Robot3DAvatar size="sm" online={true} />
                     )}

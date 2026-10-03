@@ -18,6 +18,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import api from "../utils/api";
 import AccountSettingsView from "../components/AccountSettingsView";
+import UserAvatar from "../components/UserAvatar";
 
 export default function CourseStudio() {
   const { user } = useAuth();
@@ -389,17 +390,7 @@ export default function CourseStudio() {
 
           <section className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-xs flex items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
-              {user?.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt={user.displayName}
-                  className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-blue-100 text-[#0056D2] font-bold flex items-center justify-center text-xl shrink-0">
-                  <i className="fa-solid fa-circle-user"></i>
-                </div>
-              )}
+              <UserAvatar user={user} size="md" rounded="rounded-full" />
               <div className="min-w-0">
                 <p className="text-xs font-bold text-slate-900 truncate">{user?.displayName}</p>
                 <p className="text-[10px] text-slate-500 font-mono capitalize">{user?.role?.toLowerCase()} Author</p>
