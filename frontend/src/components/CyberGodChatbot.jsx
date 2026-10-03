@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion, useDragControls } from "framer-motion";
 import {
   Sparkles,
   Send,
@@ -19,7 +20,9 @@ import {
   ChevronRight,
   ExternalLink,
   Shield,
-  HelpCircle
+  HelpCircle,
+  Move,
+  GripVertical
 } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
@@ -68,6 +71,10 @@ function Robot3DAvatar({ size = "md", online = true }) {
 export default function CyberGodChatbot() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const dragConstraintsRef = useRef(null);
+  const isDraggingRef = useRef(false);
+  const windowDragControls = useDragControls();
 
   const [isOpen, setIsOpen] = useState(false);
   const [showDrawer, setShowDrawer] = useState(false);
@@ -237,16 +244,45 @@ export default function CyberGodChatbot() {
   ];
 
   return (
-    <div className="fixed bottom-18 right-3 sm:bottom-6 sm:right-6 z-40 font-sans">
+    <div
+      ref={dragConstraintsRef}
+      className="fixed inset-0 pointer-events-none z-40 overflow-hidden p-2 sm:p-5 font-sans"
+    >
       {/* ------------------------------------------------------------ */}
-      {/* FLOATING LAUNCHER BUTTON (WHITE THEME EXECUTIVE BADGE) */}
+      {/* FLOATING LAUNCHER BUTTON (DRAGGABLE ANYWHERE ON SCREEN)       */}
       {/* ------------------------------------------------------------ */}
-      {!isOpen && (
+      <motion.div
+        drag
+        dragConstraints={dragConstraintsRef}
+        dragMomentum={false}
+        dragElastic={0.08}
+        whileDrag={{ scale: 1.08, cursor: "grabbing" }}
+        onDragStart={() => {
+          isDraggingRef.current = true;
+        }}
+        onDragEnd={() => {
+          setTimeout(() => {
+            isDraggingRef.current = false;
+          }, 150);
+        }}
+        className={`pointer-events-auto absolute bottom-18 right-3 sm:bottom-6 sm:right-6 touch-none cursor-grab active:cursor-grabbing select-none transition-opacity duration-200 ${
+          isOpen ? "opacity-0 pointer-events-none scale-75" : "opacity-100 scale-100"
+        }`}
+        style={{ touchAction: "none" }}
+      >
         <button
-          onClick={() => setIsOpen(true)}
-          title="Chat with CyberGuard AI"
+          type="button"
+          onClick={(e) => {
+            if (isDraggingRef.current) {
+              e.preventDefault();
+              e.stopPropagation();
+              return;
+            }
+            setIsOpen(true);
+          }}
+          title="Chat with CyberGuard AI • Drag anywhere on screen"
           aria-label="Open CyberGuard Chatbot"
-          className="group relative flex items-center gap-2.5 p-1.5 sm:pl-2.5 sm:pr-4 sm:py-2 rounded-full bg-white border border-slate-200/90 shadow-xl hover:shadow-2xl shadow-slate-300/40 hover:border-slate-300 transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
+          className="group relative flex items-center gap-2 p-1.5 sm:pl-2.5 sm:pr-3.5 sm:py-2 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl hover:shadow-2xl shadow-slate-300/40 hover:border-slate-300 transition-all duration-300 cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95"
         >
           {/* Circular Bot Badge */}
           <div className="relative w-9 h-9 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center shrink-0 shadow-xs">
@@ -272,17 +308,40 @@ export default function CyberGodChatbot() {
               Ask about Cyber Safety
             </span>
           </div>
+
+          {/* Drag Grip Handle */}
+          <div className="hidden sm:flex items-center pl-0.5 text-slate-300 group-hover:text-slate-400 transition-colors">
+            <GripVertical className="w-3.5 h-3.5" />
+          </div>
         </button>
-      )}
+      </motion.div>
 
       {/* ------------------------------------------------------------ */}
-      {/* EXPANDED CHAT CONTAINER OVERLAY (PREMIUM WHITE THEME) */}
+      {/* EXPANDED CHAT CONTAINER OVERLAY (DRAGGABLE VIA HEADER)       */}
       {/* ------------------------------------------------------------ */}
       {isOpen && (
-        <div className="w-[95vw] sm:w-[440px] h-[580px] max-h-[82vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden relative backdrop-blur-2xl transition-all duration-300">
-          
-          {/* HEADER BAR */}
-          <div className="bg-white/95 backdrop-blur-md px-4 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 relative z-20">
+        <motion.div
+          drag
+          dragListener={false}
+          dragControls={windowDragControls}
+          dragConstraints={dragConstraintsRef}
+          dragMomentum={false}
+          dragElastic={0.08}
+          className="pointer-events-auto absolute bottom-18 right-3 sm:bottom-6 sm:right-6 w-[95vw] sm:w-[440px] h-[580px] max-h-[82vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden backdrop-blur-2xl transition-shadow duration-300"
+        >
+          {/* HEADER BAR (DRAG HANDLE) */}
+          <div
+            onPointerDown={(e) => {
+              if (e.target.closest("button") || e.target.closest("a") || e.target.closest("input")) return;
+              windowDragControls.start(e);
+            }}
+            style={{ touchAction: "none" }}
+            className="bg-white/95 backdrop-blur-md px-4 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 relative z-20 cursor-grab active:cursor-grabbing select-none"
+            title="Click and drag header to reposition chat window"
+          >
+            {/* Mobile drag handle pill */}
+            <div className="sm:hidden absolute top-1.5 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-slate-300/80 pointer-events-none" />
+
             <div className="flex items-center gap-3">
               <Robot3DAvatar size="sm" online={true} />
               <div>
@@ -298,9 +357,18 @@ export default function CyberGodChatbot() {
 
             {/* Header Controls */}
             <div className="flex items-center gap-1">
+              <div
+                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-100 text-slate-500 text-[10px] font-mono font-semibold cursor-grab active:cursor-grabbing mr-1"
+                title="Drag to reposition window"
+              >
+                <Move className="w-3 h-3 text-slate-400" />
+                <span>Drag</span>
+              </div>
+
               {user && (
                 <>
                   <button
+                    type="button"
                     onClick={() => setShowDrawer(!showDrawer)}
                     title="Saved Conversations History"
                     className={`p-2 rounded-xl border transition ${
@@ -312,6 +380,7 @@ export default function CyberGodChatbot() {
                     <History className="w-4 h-4" />
                   </button>
                   <button
+                    type="button"
                     onClick={startNewSession}
                     title="Start New Chat Session"
                     className="p-2 rounded-xl bg-slate-50 text-slate-600 border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900 transition"
@@ -321,6 +390,7 @@ export default function CyberGodChatbot() {
                 </>
               )}
               <button
+                type="button"
                 onClick={() => setIsOpen(false)}
                 title="Minimize CyberGod"
                 className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
@@ -555,7 +625,7 @@ export default function CyberGodChatbot() {
               </form>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
     </div>
   );
