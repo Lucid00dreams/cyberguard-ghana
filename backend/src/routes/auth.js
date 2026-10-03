@@ -105,7 +105,11 @@ router.post("/google", async (req, res, next) => {
     }
 
     // Verify audience if GOOGLE_CLIENT_ID is configured
-    if (process.env.GOOGLE_CLIENT_ID && tokenData.aud !== process.env.GOOGLE_CLIENT_ID) {
+    const configuredClientId = process.env.GOOGLE_CLIENT_ID
+      ? process.env.GOOGLE_CLIENT_ID.trim().replace(/^["']|["']$/g, "")
+      : "";
+    if (configuredClientId && tokenData.aud?.trim() !== configuredClientId) {
+      console.warn(`[OAuth] Client ID mismatch. Token aud: "${tokenData.aud}", Configured: "${configuredClientId}"`);
       return res.status(401).json({ error: "Google OAuth client ID mismatch." });
     }
 

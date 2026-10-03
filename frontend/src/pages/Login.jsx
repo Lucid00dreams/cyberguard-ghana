@@ -79,6 +79,7 @@ export default function Login() {
   async function handleGoogleResponse(response) {
     if (!response?.credential) return;
     setLoading(true);
+    setError("");
     try {
       const base64Url = response.credential.split(".")[1];
       const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -93,7 +94,13 @@ export default function Login() {
       login(data.token, data.user);
       navigate(getRedirectTarget(data.user?.role), { replace: true });
     } catch (err) {
-      setError(err.response?.data?.error || "Google authentication failed. Please try again.");
+      console.error("Google authentication error:", err);
+      const serverError = err.response?.data?.error;
+      const networkError =
+        err.code === "ERR_NETWORK" || err.message === "Network Error"
+          ? "Cannot connect to server. Please check your internet connection or backend service status."
+          : null;
+      setError(serverError || networkError || err.message || "Google authentication failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -201,6 +208,13 @@ export default function Login() {
                 Enter your registered email and password to access your dashboard.
               </p>
             </div>
+
+            {error && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-start gap-2.5 animate-in fade-in duration-150">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                <span>{error}</span>
+              </div>
+            )}
 
             {/* Official Google Sign-In Button */}
             <div id="googleButtonContainer" className="w-full flex justify-center items-center min-h-[40px] overflow-hidden" />
