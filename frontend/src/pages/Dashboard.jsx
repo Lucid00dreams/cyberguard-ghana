@@ -69,10 +69,22 @@ export default function Dashboard() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    if (mobileSidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileSidebarOpen]);
+
   const handleTabChange = (tabKey) => {
     setActiveTab(tabKey);
     setSearchParams({ tab: tabKey });
     setMobileSidebarOpen(false);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   };
 
   useEffect(() => {
@@ -197,8 +209,8 @@ export default function Dashboard() {
 
       {/* Minimalist, Clean Light Sidebar */}
       <aside
-        className={`w-64 bg-white text-slate-800 border-r border-slate-200/90 flex flex-col justify-between shrink-0 h-screen sticky top-0 z-40 transition-transform duration-200 lg:translate-x-0 ${
-          mobileSidebarOpen ? "translate-x-0 fixed shadow-xl" : "-translate-x-full lg:translate-x-0 fixed lg:sticky"
+        className={`w-64 bg-white text-slate-800 border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:sticky lg:inset-auto lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
+          mobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
         {/* Brand Header */}

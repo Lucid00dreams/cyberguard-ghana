@@ -59,6 +59,7 @@ export default function MainLayout() {
     setRouteLoading(true);
     setUserDropdownOpen(false);
     setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
     const timer = setTimeout(() => {
       setRouteLoading(false);
     }, 320);
@@ -80,7 +81,7 @@ export default function MainLayout() {
   const isDashboardRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/dashboard");
 
   return (
-    <div className={`min-h-screen flex flex-col w-full max-w-full overflow-x-hidden ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}>
+    <div className={`min-h-screen flex flex-col w-full max-w-full overflow-x-clip ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}>
       <SessionTimeoutModal
         isOpen={sessionTimedOut}
         onClose={dismissSessionTimeoutModal}

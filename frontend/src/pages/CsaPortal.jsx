@@ -73,6 +73,17 @@ export default function CsaPortal() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
+  useEffect(() => {
+    if (mobileSidebarOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileSidebarOpen]);
+
   function handleSearchSubmit(e) {
     if (e) e.preventDefault();
     const query = globalSearch.trim();
@@ -302,8 +313,8 @@ export default function CsaPortal() {
 
       {/* ===================== CSA COMMAND CENTER BLUE SIDEBAR ===================== */}
       <aside
-        className={`w-68 bg-[#0A1E3F] text-white border-r border-blue-900/60 flex flex-col justify-between shrink-0 h-screen sticky top-0 z-40 transition-transform duration-200 lg:translate-x-0 ${
-          mobileSidebarOpen ? "translate-x-0 fixed shadow-2xl" : "-translate-x-full lg:translate-x-0 fixed lg:sticky"
+        className={`w-68 bg-[#0A1E3F] text-white border-r border-blue-900/60 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:sticky lg:inset-auto lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
+          mobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
         {/* Top Brand Header */}
