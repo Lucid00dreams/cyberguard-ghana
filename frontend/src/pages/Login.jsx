@@ -16,13 +16,47 @@ export default function Login() {
   const [searchParams] = useSearchParams();
 
   const getRedirectTarget = (role) => {
-    const fromState = location.state?.from;
-    if (typeof fromState === "string" && fromState.trim().length > 0) return fromState;
-    if (fromState?.pathname) return `${fromState.pathname}${fromState.search || ""}`;
+    // 1. Explicit query parameter (?redirectTo=/some-path)
     const queryRedirect = searchParams.get("redirectTo");
-    if (queryRedirect) return queryRedirect;
-    if (role === "ADMIN" || role === "CSA_OFFICER") return "/admin";
-    return "/dashboard";
+    if (
+      queryRedirect &&
+      typeof queryRedirect === "string" &&
+      queryRedirect.startsWith("/") &&
+      !queryRedirect.startsWith("/login") &&
+      !queryRedirect.startsWith("/register")
+    ) {
+      return queryRedirect;
+    }
+
+    // 2. Intercepted / asked to sign in to continue work
+    const fromState = location.state?.from;
+    const isIntercepted = Boolean(location.state?.intercepted);
+
+    if (fromState && (isIntercepted || typeof fromState === "string" || fromState?.pathname)) {
+      let targetPath = "";
+      if (typeof fromState === "string") {
+        targetPath = fromState;
+      } else if (fromState?.pathname) {
+        targetPath = `${fromState.pathname}${fromState.search || ""}${fromState.hash || ""}`;
+      }
+
+      if (
+        targetPath &&
+        targetPath !== "/" &&
+        !targetPath.startsWith("/login") &&
+        !targetPath.startsWith("/register")
+      ) {
+        return targetPath;
+      }
+    }
+
+    // 3. Admin / CSA Officer direct login -> /admin
+    if (role === "ADMIN" || role === "CSA_OFFICER") {
+      return "/admin";
+    }
+
+    // 4. Direct click on sign in: go to homepage
+    return "/";
   };
 
   useEffect(() => {
@@ -294,7 +328,15 @@ export default function Login() {
             <div className="pt-4 border-t border-slate-100 text-center">
               <p className="text-sm text-slate-600">
                 Don't have an account yet?{" "}
-                <Link to="/register" state={{ from: location.state?.from || location }} className="text-[#0056D2] font-bold hover:underline">
+                <Link
+                  to="/register"
+                  state={
+                    location.state?.intercepted && location.state?.from
+                      ? { from: location.state.from, intercepted: true }
+                      : undefined
+                  }
+                  className="text-[#0056D2] font-bold hover:underline"
+                >
                   Create a Free Account
                 </Link>
               </p>

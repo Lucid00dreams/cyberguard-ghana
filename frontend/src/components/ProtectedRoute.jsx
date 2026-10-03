@@ -10,7 +10,7 @@ export default function ProtectedRoute({ children, roles }) {
     return <CyberSpinner fullScreen label="Verifying CyberGuard Credentials..." />;
   }
   if (!user) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location, intercepted: true }} replace />;
   }
   if (roles && !roles.includes(user.role)) {
     return <Navigate to="/dashboard" replace />;

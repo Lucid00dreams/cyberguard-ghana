@@ -492,7 +492,7 @@ export default function CyberGodChatbot() {
               <div className="w-full max-w-xs space-y-2.5 relative z-10">
                 <Link
                   to="/login"
-                  state={{ from: window.location.pathname + window.location.search }}
+                  state={{ from: window.location.pathname + window.location.search, intercepted: true }}
                   onClick={() => setIsOpen(false)}
                   className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-xl shadow-xs transition flex items-center justify-center gap-2 text-xs"
                 >
@@ -500,7 +500,7 @@ export default function CyberGodChatbot() {
                 </Link>
                 <Link
                   to="/register"
-                  state={{ from: window.location.pathname + window.location.search }}
+                  state={{ from: window.location.pathname + window.location.search, intercepted: true }}
                   onClick={() => setIsOpen(false)}
                   className="w-full bg-white hover:bg-slate-50 text-slate-800 font-bold py-3 rounded-xl border border-slate-200/90 shadow-2xs transition flex items-center justify-center gap-2 text-xs"
                 >

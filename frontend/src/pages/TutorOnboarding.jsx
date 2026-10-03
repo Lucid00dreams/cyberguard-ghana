@@ -59,8 +59,8 @@ export default function TutorOnboarding() {
         <div className="border border-line rounded-xl bg-paper p-10 text-center">
           <p className="text-mist mb-4">Log in or register to apply as a tutor.</p>
           <div className="flex justify-center gap-4">
-            <Link to="/login" state={{ from: location }} className="text-sm font-semibold text-guard">Log in</Link>
-            <Link to="/register" state={{ from: location }} className="text-sm font-semibold bg-guard text-white px-4 py-2 rounded-md">Create account</Link>
+            <Link to="/login" state={{ from: location, intercepted: true }} className="text-sm font-semibold text-guard">Log in</Link>
+            <Link to="/register" state={{ from: location, intercepted: true }} className="text-sm font-semibold bg-guard text-white px-4 py-2 rounded-md">Create account</Link>
           </div>
         </div>
       ) : (

@@ -50,7 +50,7 @@ export default function MainLayout() {
 
   const handleLoginAgain = () => {
     dismissSessionTimeoutModal();
-    navigate("/login", { state: { from: location } });
+    navigate("/login", { state: { from: location, intercepted: true } });
   };
 
   useEffect(() => {
@@ -259,14 +259,12 @@ export default function MainLayout() {
                   <div className="hidden sm:flex items-center gap-1.5">
                     <Link
                       to="/login"
-                      state={{ from: location }}
                       className="text-xs font-semibold text-slate-700 hover:text-[#0056D2] px-3 py-1.5 rounded-lg transition hover:bg-slate-100"
                     >
                       Sign in
                     </Link>
                     <Link
                       to="/register"
-                      state={{ from: location }}
                       className="text-xs font-bold bg-[#0056D2] hover:bg-[#00419E] text-white px-3.5 py-1.5 rounded-lg shadow-xs transition"
                     >
                       Join Free

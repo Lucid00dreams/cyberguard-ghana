@@ -30,13 +30,48 @@ export default function Register() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  const getRedirectTarget = () => {
-    const fromState = location.state?.from;
-    if (typeof fromState === "string" && fromState.trim().length > 0) return fromState;
-    if (fromState?.pathname) return `${fromState.pathname}${fromState.search || ""}`;
+  const getRedirectTarget = (role) => {
+    // 1. Explicit query parameter (?redirectTo=/some-path)
     const queryRedirect = searchParams.get("redirectTo");
-    if (queryRedirect) return queryRedirect;
-    return "/dashboard";
+    if (
+      queryRedirect &&
+      typeof queryRedirect === "string" &&
+      queryRedirect.startsWith("/") &&
+      !queryRedirect.startsWith("/login") &&
+      !queryRedirect.startsWith("/register")
+    ) {
+      return queryRedirect;
+    }
+
+    // 2. Intercepted / asked to register to continue work
+    const fromState = location.state?.from;
+    const isIntercepted = Boolean(location.state?.intercepted);
+
+    if (fromState && (isIntercepted || typeof fromState === "string" || fromState?.pathname)) {
+      let targetPath = "";
+      if (typeof fromState === "string") {
+        targetPath = fromState;
+      } else if (fromState?.pathname) {
+        targetPath = `${fromState.pathname}${fromState.search || ""}${fromState.hash || ""}`;
+      }
+
+      if (
+        targetPath &&
+        targetPath !== "/" &&
+        !targetPath.startsWith("/login") &&
+        !targetPath.startsWith("/register")
+      ) {
+        return targetPath;
+      }
+    }
+
+    // 3. Admin / CSA Officer direct login -> /admin
+    if (role === "ADMIN" || role === "CSA_OFFICER") {
+      return "/admin";
+    }
+
+    // 4. Direct account creation: go to homepage
+    return "/";
   };
 
   useEffect(() => {
@@ -113,7 +148,7 @@ export default function Register() {
         avatarUrl: payload.picture || null,
       });
       login(data.token, data.user);
-      navigate(getRedirectTarget(), { replace: true });
+      navigate(getRedirectTarget(data.user?.role), { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || "Google authentication failed. Please try again.");
     } finally {
@@ -128,7 +163,7 @@ export default function Register() {
     try {
       const { data } = await api.post("/auth/register", form);
       login(data.token, data.user);
-      navigate(getRedirectTarget(), { replace: true });
+      navigate(getRedirectTarget(data.user?.role), { replace: true });
     } catch (err) {
       setError(err.response?.data?.error || err.response?.data?.errors?.[0]?.msg || "Registration failed. Please try again.");
       setShowEmailForm(true);
@@ -327,7 +362,15 @@ export default function Register() {
             <div className="pt-2 text-center border-t border-slate-100">
               <p className="text-xs text-slate-600">
                 Already have an account?{" "}
-                <Link to="/login" state={{ from: location.state?.from || location }} className="text-[#0056D2] font-bold hover:underline">
+                <Link
+                  to="/login"
+                  state={
+                    location.state?.intercepted && location.state?.from
+                      ? { from: location.state.from, intercepted: true }
+                      : undefined
+                  }
+                  className="text-[#0056D2] font-bold hover:underline"
+                >
                   Sign In
                 </Link>
               </p>

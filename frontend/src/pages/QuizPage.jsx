@@ -120,14 +120,14 @@ export default function QuizPage() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             to="/login"
-            state={{ from: location }}
+            state={{ from: location, intercepted: true }}
             className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-blue-600/30 transition text-sm flex items-center justify-center gap-2"
           >
             Sign In to Start Quiz <ArrowRight className="w-4 h-4" />
           </Link>
           <Link
             to="/register"
-            state={{ from: location }}
+            state={{ from: location, intercepted: true }}
             className="border border-line bg-paper text-ink font-bold px-6 py-3 rounded-xl hover:border-slate-400 transition text-sm flex items-center justify-center"
           >
             Create Account

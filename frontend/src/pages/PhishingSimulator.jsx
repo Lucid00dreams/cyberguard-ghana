@@ -572,7 +572,7 @@ export default function PhishingSimulator() {
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               to="/login"
-              state={{ from: "/phishing-simulator" }}
+              state={{ from: "/phishing-simulator", intercepted: true }}
               className="w-full sm:w-auto bg-[#0056D2] hover:bg-[#00419E] text-white font-extrabold px-8 py-4 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 text-xs"
             >
               <LogIn className="w-4 h-4" /> Sign In to Your Account
@@ -580,7 +580,7 @@ export default function PhishingSimulator() {
 
             <Link
               to="/register"
-              state={{ from: "/phishing-simulator" }}
+              state={{ from: "/phishing-simulator", intercepted: true }}
               className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-8 py-4 rounded-2xl shadow-xl transition flex items-center justify-center gap-2 text-xs"
             >
               <UserPlus className="w-4 h-4 text-emerald-400" /> Create Free Account

@@ -291,8 +291,8 @@ export default function CourseStudio() {
         <div className="rounded-xl border border-line bg-paper p-10 text-center">
           <p className="text-mist mb-4">You must be logged in as a tutor or admin to build courses.</p>
           <div className="flex justify-center gap-4">
-            <Link to="/login" state={{ from: location }} className="text-sm font-semibold text-guard">Log in</Link>
-            <Link to="/register" state={{ from: location }} className="text-sm font-semibold bg-guard text-white px-4 py-2 rounded-md">Create account</Link>
+            <Link to="/login" state={{ from: location, intercepted: true }} className="text-sm font-semibold text-guard">Log in</Link>
+            <Link to="/register" state={{ from: location, intercepted: true }} className="text-sm font-semibold bg-guard text-white px-4 py-2 rounded-md">Create account</Link>
           </div>
         </div>
       </div>
