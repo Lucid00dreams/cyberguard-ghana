@@ -246,7 +246,7 @@ export default function CyberGodChatbot() {
   return (
     <div
       ref={dragConstraintsRef}
-      className="fixed inset-0 pointer-events-none z-40 overflow-hidden p-2 sm:p-5 font-sans"
+      className="fixed inset-0 pointer-events-none z-40 overflow-hidden p-2 sm:p-4 font-sans"
     >
       {/* ------------------------------------------------------------ */}
       {/* FLOATING LAUNCHER BUTTON (DRAGGABLE ANYWHERE ON SCREEN)       */}
@@ -265,7 +265,7 @@ export default function CyberGodChatbot() {
             isDraggingRef.current = false;
           }, 150);
         }}
-        className={`pointer-events-auto absolute bottom-18 right-3 sm:bottom-6 sm:right-6 touch-none cursor-grab active:cursor-grabbing select-none transition-opacity duration-200 ${
+        className={`pointer-events-auto absolute bottom-4 right-4 sm:bottom-6 sm:right-6 touch-none cursor-grab active:cursor-grabbing select-none transition-opacity duration-200 ${
           isOpen ? "opacity-0 pointer-events-none scale-75" : "opacity-100 scale-100"
         }`}
         style={{ touchAction: "none" }}
@@ -327,7 +327,7 @@ export default function CyberGodChatbot() {
           dragConstraints={dragConstraintsRef}
           dragMomentum={false}
           dragElastic={0.08}
-          className="pointer-events-auto absolute bottom-18 right-3 sm:bottom-6 sm:right-6 w-[95vw] sm:w-[440px] h-[580px] max-h-[82vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden backdrop-blur-2xl transition-shadow duration-300"
+          className="pointer-events-auto absolute bottom-4 right-4 sm:bottom-6 sm:right-6 w-[95vw] sm:w-[440px] h-[580px] max-h-[82vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden backdrop-blur-2xl transition-shadow duration-300"
         >
           {/* HEADER BAR (DRAG HANDLE) */}
           <div
