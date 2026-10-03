@@ -429,9 +429,95 @@ export default function MainLayout() {
         </>
       )}
 
-      <main className="flex-1 relative z-10">
+      <main className={`flex-1 relative z-10 ${!isDashboardRoute ? "pb-16 md:pb-0" : ""}`}>
         <Outlet />
       </main>
+
+      {/* Mobile Sticky Bottom Navigation Bar */}
+      {!isDashboardRoute && (
+        <nav
+          aria-label="Mobile Bottom Navigation"
+          className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-2 py-1 flex items-center justify-around h-14"
+        >
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
+              }`
+            }
+          >
+            <Shield className="w-4 h-4" />
+            <span className="text-[10px] font-semibold mt-0.5">Home</span>
+          </NavLink>
+
+          <NavLink
+            to="/courses"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
+              }`
+            }
+          >
+            <BookOpen className="w-4 h-4" />
+            <span className="text-[10px] font-semibold mt-0.5">Courses</span>
+          </NavLink>
+
+          <NavLink
+            to="/report"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-rose-600 font-bold" : "text-rose-500 hover:text-rose-700"
+              }`
+            }
+          >
+            <div className="relative">
+              <ShieldAlert className="w-4 h-4" />
+              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-rose-600 rounded-full animate-ping" />
+            </div>
+            <span className="text-[10px] font-bold mt-0.5">Report</span>
+          </NavLink>
+
+          <NavLink
+            to="/tutors"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
+              }`
+            }
+          >
+            <Users className="w-4 h-4" />
+            <span className="text-[10px] font-semibold mt-0.5">Mentors</span>
+          </NavLink>
+
+          {user ? (
+            <NavLink
+              to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin" : "/dashboard"}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                  isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
+                }`
+              }
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="text-[10px] font-semibold mt-0.5">Portal</span>
+            </NavLink>
+          ) : (
+            <NavLink
+              to="/login"
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                  isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
+                }`
+              }
+            >
+              <Users className="w-4 h-4" />
+              <span className="text-[10px] font-semibold mt-0.5">Sign In</span>
+            </NavLink>
+          )}
+        </nav>
+      )}
 
       {!isDashboardRoute && (
         <footer className="border-t-2 border-[#0056D2] bg-[#0B1528] text-slate-200 shadow-2xl relative z-10">

@@ -265,7 +265,7 @@ export default function CyberGodChatbot() {
             isDraggingRef.current = false;
           }, 150);
         }}
-        className={`pointer-events-auto absolute bottom-4 right-4 sm:bottom-6 sm:right-6 touch-none cursor-grab active:cursor-grabbing select-none transition-opacity duration-200 ${
+        className={`pointer-events-auto absolute bottom-16 right-3 md:bottom-6 md:right-6 touch-none cursor-grab active:cursor-grabbing select-none transition-opacity duration-200 ${
           isOpen ? "opacity-0 pointer-events-none scale-75" : "opacity-100 scale-100"
         }`}
         style={{ touchAction: "none" }}
@@ -282,7 +282,7 @@ export default function CyberGodChatbot() {
           }}
           title="Chat with CyberGuard AI • Drag anywhere on screen"
           aria-label="Open CyberGuard Chatbot"
-          className="group relative flex items-center gap-2 p-1.5 sm:pl-2.5 sm:pr-3.5 sm:py-2 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl hover:shadow-2xl shadow-slate-300/40 hover:border-slate-300 transition-all duration-300 cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95"
+          className="group relative flex items-center gap-2 p-1.5 md:pl-2.5 md:pr-3.5 md:py-2 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/90 shadow-xl hover:shadow-2xl shadow-slate-300/40 hover:border-slate-300 transition-all duration-300 cursor-grab active:cursor-grabbing hover:scale-105 active:scale-95"
         >
           {/* Circular Bot Badge */}
           <div className="relative w-9 h-9 rounded-full bg-slate-950 border border-slate-700 flex items-center justify-center shrink-0 shadow-xs">
@@ -299,7 +299,7 @@ export default function CyberGodChatbot() {
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full ring-2 ring-white" />
           </div>
 
-          <div className="text-left hidden sm:block">
+          <div className="text-left hidden md:block">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-black text-slate-900 leading-tight">Safety Assistant</span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -310,7 +310,7 @@ export default function CyberGodChatbot() {
           </div>
 
           {/* Drag Grip Handle */}
-          <div className="hidden sm:flex items-center pl-0.5 text-slate-300 group-hover:text-slate-400 transition-colors">
+          <div className="hidden md:flex items-center pl-0.5 text-slate-300 group-hover:text-slate-400 transition-colors">
             <GripVertical className="w-3.5 h-3.5" />
           </div>
         </button>
@@ -327,7 +327,7 @@ export default function CyberGodChatbot() {
           dragConstraints={dragConstraintsRef}
           dragMomentum={false}
           dragElastic={0.08}
-          className="pointer-events-auto absolute bottom-4 right-4 sm:bottom-6 sm:right-6 w-[95vw] sm:w-[440px] h-[580px] max-h-[82vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden backdrop-blur-2xl transition-shadow duration-300"
+          className="pointer-events-auto absolute bottom-16 right-3 md:bottom-6 md:right-6 w-[95vw] md:w-[440px] h-[580px] max-h-[80vh] bg-white text-slate-900 rounded-3xl border border-slate-200/90 shadow-2xl flex flex-col overflow-hidden backdrop-blur-2xl transition-shadow duration-300 z-50"
         >
           {/* HEADER BAR (DRAG HANDLE) */}
           <div
