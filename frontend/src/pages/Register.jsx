@@ -66,10 +66,11 @@ export default function Register() {
         }
 
         if (container.childElementCount === 0) {
+          const containerWidth = Math.min(container.offsetWidth || 340, 360);
           window.google.accounts.id.renderButton(container, {
             theme: "outline",
             size: "large",
-            width: "360",
+            width: String(Math.max(containerWidth, 240)),
             text: "signup_with",
             shape: "rectangular",
           });

@@ -55,7 +55,7 @@ export default function Courses() {
 
         {/* Search & Filter Bar */}
         <div className="space-y-4">
-          <div className="flex flex-col md:flex-row gap-4 justify-between items-stretch md:items-center">
+          <div className="flex flex-col md:flex-row gap-3 sm:gap-4 justify-between items-stretch md:items-center">
             {/* Search Input */}
             <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-mist" />
@@ -69,7 +69,7 @@ export default function Courses() {
             </div>
 
             {/* Age Band Tabs */}
-            <div className="flex items-center bg-surface p-1 rounded-xl gap-1 border border-line">
+            <div className="flex items-center bg-surface p-1 rounded-xl gap-1 border border-line overflow-x-auto scrollbar-none w-full sm:w-auto">
               {[
                 { label: "All Bands", value: "" },
                 { label: "Ages 12–18", value: "JUNIOR" },
@@ -78,7 +78,7 @@ export default function Courses() {
                 <button
                   key={opt.value}
                   onClick={() => setAgeBand(opt.value)}
-                  className={`text-xs font-bold px-3.5 py-1.5 rounded-lg transition ${
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap flex-1 sm:flex-none text-center transition ${
                     ageBand === opt.value
                       ? "bg-blue-600 text-white shadow-sm"
                       : "text-mist hover:text-ink"
@@ -90,13 +90,13 @@ export default function Courses() {
             </div>
           </div>
 
-          {/* Category Chips */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {/* Category Chips - Edge-to-edge swiping on phones */}
+          <div className="-mx-4 px-4 sm:mx-0 sm:px-0 flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCat(cat)}
-                className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg whitespace-nowrap transition border ${
+                className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg whitespace-nowrap transition border shrink-0 ${
                   selectedCat === cat
                     ? "bg-ink text-paper border-ink font-bold shadow-sm"
                     : "border-line bg-card text-mist hover:text-ink hover:border-slate-400"

@@ -347,12 +347,45 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* Mobile Horizontal Quick Tab Bar */}
+        <div className="lg:hidden bg-white border-b border-slate-200/90 px-3 py-2 flex items-center gap-1.5 overflow-x-auto scrollbar-none sticky top-16 z-10 shadow-2xs">
+          {[
+            { key: "courses", label: "Courses", count: myEnrollments.length },
+            { key: "certificates", label: "Certificates", count: completedEnrollments.length },
+            { key: "mentorship", label: "Mentorship", count: bookings.length },
+            { key: "settings", label: "Settings" },
+            { key: "security", label: "Security" },
+          ].map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => handleTabChange(t.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 shrink-0 ${
+                activeTab === t.key
+                  ? "bg-[#0056D2] text-white shadow-2xs"
+                  : "bg-slate-50 text-slate-600 hover:text-slate-900 border border-slate-200/70"
+              }`}
+            >
+              <span>{t.label}</span>
+              {typeof t.count === "number" && t.count > 0 && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    activeTab === t.key ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                  }`}
+                >
+                  {t.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
         {/* Content Body */}
-        <main className="flex-1 p-4 sm:p-8 space-y-6 max-w-6xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-8 space-y-6 max-w-6xl w-full mx-auto pb-24 lg:pb-12">
           {/* Calm Welcome Header */}
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
             <div className="space-y-1">
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                 Welcome back, {user?.displayName?.split(" ")[0] || "Student"}
               </h1>
               <p className="text-xs text-slate-500 leading-relaxed">
@@ -362,13 +395,13 @@ export default function Dashboard() {
 
             {/* Quiet, Human Summary Chips */}
             <div className="flex items-center gap-2 flex-wrap text-xs text-slate-600">
-              <span className="px-3 py-1 rounded-md bg-white border border-slate-200 font-medium">
+              <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 font-medium text-[11px] sm:text-xs">
                 {myEnrollments.length} {myEnrollments.length === 1 ? "course" : "courses"}
               </span>
-              <span className="px-3 py-1 rounded-md bg-white border border-slate-200 font-medium">
+              <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 font-medium text-[11px] sm:text-xs">
                 {completedEnrollments.length} {completedEnrollments.length === 1 ? "certificate" : "certificates"}
               </span>
-              <span className="px-3 py-1 rounded-md bg-white border border-slate-200 font-medium">
+              <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 font-medium text-[11px] sm:text-xs">
                 {overallProgress}% completion rate
               </span>
             </div>
@@ -379,11 +412,11 @@ export default function Dashboard() {
             <div className="space-y-5">
               {/* Single, Focused Search & Status Filter */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 overflow-x-auto scrollbar-none max-w-full">
                   <button
                     type="button"
                     onClick={() => setCourseFilter("all")}
-                    className={`text-xs px-3 py-1.5 rounded-md transition ${
+                    className={`text-xs px-3 py-1.5 rounded-md whitespace-nowrap transition ${
                       courseFilter === "all"
                         ? "bg-slate-900 text-white font-semibold"
                         : "text-slate-600 hover:text-slate-900"
@@ -394,7 +427,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setCourseFilter("in-progress")}
-                    className={`text-xs px-3 py-1.5 rounded-md transition ${
+                    className={`text-xs px-3 py-1.5 rounded-md whitespace-nowrap transition ${
                       courseFilter === "in-progress"
                         ? "bg-slate-900 text-white font-semibold"
                         : "text-slate-600 hover:text-slate-900"
@@ -405,7 +438,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => setCourseFilter("completed")}
-                    className={`text-xs px-3 py-1.5 rounded-md transition ${
+                    className={`text-xs px-3 py-1.5 rounded-md whitespace-nowrap transition ${
                       courseFilter === "completed"
                         ? "bg-slate-900 text-white font-semibold"
                         : "text-slate-600 hover:text-slate-900"

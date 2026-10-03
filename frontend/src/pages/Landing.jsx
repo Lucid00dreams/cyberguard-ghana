@@ -103,7 +103,7 @@ export default function Landing() {
   return (
     <div className="space-y-16 pb-16 bg-paper">
       {/* Executive Hero with High-Visibility Background Image */}
-      <section className="bg-slate-950 text-white relative overflow-hidden py-24 sm:py-32 px-4 sm:px-6 min-h-[600px] flex items-center border-b border-slate-800">
+      <section className="bg-slate-950 text-white relative overflow-hidden py-14 sm:py-28 lg:py-32 px-4 sm:px-6 min-h-[500px] sm:min-h-[600px] flex items-center border-b border-slate-800">
         {/* Background Image Layer - High Visibility */}
         <div
           className="absolute inset-0 bg-cover bg-center lg:bg-right scale-100 opacity-75 sm:opacity-85"
@@ -115,25 +115,25 @@ export default function Landing() {
 
         <div className="max-w-7xl mx-auto relative z-10 w-full">
           {/* Hero Content Block */}
-          <div className="max-w-2xl space-y-6 text-white">
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-white drop-shadow-xl">
+          <div className="max-w-2xl space-y-5 text-white">
+            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.15] text-white drop-shadow-xl">
               Ghana's National Youth Cyber Safety Platform.
             </h1>
 
-            <p className="text-slate-200 text-base sm:text-lg leading-relaxed font-medium drop-shadow-md">
+            <p className="text-slate-200 text-sm sm:text-base lg:text-lg leading-relaxed font-medium drop-shadow-md">
               Equipping Ghanaian youth (ages 12–23) with accredited cybersecurity curriculums, verified 1-on-1 mentorship, and confidential zero-knowledge incident reporting.
             </p>
 
-            <div className="flex flex-wrap gap-4 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2 w-full sm:w-auto">
               <Link
                 to="/courses"
-                className="inline-flex items-center gap-2 bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-7 py-3.5 rounded-xl shadow-md transition hover:scale-[1.01]"
+                className="inline-flex items-center justify-center gap-2 bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-6 py-3.5 rounded-xl shadow-md transition hover:scale-[1.01] text-sm sm:text-base w-full sm:w-auto text-center"
               >
                 Access Course Catalog
               </Link>
               <Link
                 to="/report"
-                className="inline-flex items-center gap-2 border border-red-500/50 bg-red-950/70 hover:bg-red-900/90 text-red-200 font-bold px-7 py-3.5 rounded-xl backdrop-blur-md transition shadow-md"
+                className="inline-flex items-center justify-center gap-2 border border-red-500/50 bg-red-950/70 hover:bg-red-900/90 text-red-200 font-bold px-6 py-3.5 rounded-xl backdrop-blur-md transition shadow-md text-sm sm:text-base w-full sm:w-auto text-center"
               >
                 <ShieldAlert className="w-4 h-4 text-red-400" /> Confidential Report
               </Link>
@@ -286,7 +286,7 @@ export default function Landing() {
         </div>
 
         {/* Contact Helpline Callout Card */}
-        <div className="border border-blue-100 rounded-2xl p-6 bg-blue-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="border border-blue-100 rounded-2xl p-5 sm:p-6 bg-blue-50/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1">
             <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <PhoneCall className="w-4 h-4 text-[#0056D2]" />
@@ -296,16 +296,16 @@ export default function Landing() {
               Call the National Cyber Threat Hotline at toll-free <strong className="text-slate-900">292</strong> or report anonymously with zero metadata retention.
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto shrink-0">
             <Link
               to="/tutors"
-              className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-4 py-2 border border-slate-300 rounded-lg hover:bg-white transition bg-white"
+              className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-4 py-2.5 border border-slate-300 rounded-xl hover:bg-white transition bg-white text-center"
             >
               Ask a Mentor
             </Link>
             <Link
               to="/report"
-              className="text-xs font-bold bg-[#0056D2] hover:bg-[#00419E] text-white px-4 py-2 rounded-lg transition shadow-xs"
+              className="text-xs font-bold bg-[#0056D2] hover:bg-[#00419E] text-white px-4 py-2.5 rounded-xl transition shadow-xs text-center"
             >
               Report Incident
             </Link>
@@ -314,8 +314,8 @@ export default function Landing() {
       </section>
 
       {/* Bottom Callout Banner Card with Topic Background Image */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-6">
-        <div className="relative rounded-3xl overflow-hidden bg-[#001E3C] border border-blue-900/50 shadow-xl p-8 sm:p-12 text-white">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6">
+        <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden bg-[#001E3C] border border-blue-900/50 shadow-xl p-6 sm:p-12 text-white">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-45 scale-105"
             style={{ backgroundImage: "url('/hero-students.png?v=1038')" }}
@@ -323,16 +323,16 @@ export default function Landing() {
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 to-blue-950/50" />
 
           <div className="relative z-10 max-w-2xl space-y-4">
-            <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight drop-shadow-md">
+            <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight drop-shadow-md">
               Ready to Begin Your Cyber Defense Journey?
             </h2>
-            <p className="text-white text-sm sm:text-base leading-relaxed font-medium drop-shadow-sm">
+            <p className="text-white text-xs sm:text-base leading-relaxed font-medium drop-shadow-sm">
               Join thousands of students across Ghana earning accredited certificates, defending against scams, and building a secure digital future.
             </p>
-            <div className="pt-2 flex flex-wrap gap-4">
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <Link
                 to="/register"
-                className="inline-flex items-center gap-2 bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-7 py-3.5 rounded-xl shadow-md transition hover:scale-[1.01]"
+                className="inline-flex items-center justify-center gap-2 bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-6 py-3.5 rounded-xl shadow-md transition hover:scale-[1.01] text-sm w-full sm:w-auto text-center"
               >
                 Create Your Account
               </Link>

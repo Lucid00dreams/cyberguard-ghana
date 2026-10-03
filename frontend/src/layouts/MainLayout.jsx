@@ -277,106 +277,245 @@ export default function MainLayout() {
                   onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                   aria-label="Toggle navigation menu"
                   aria-expanded={mobileMenuOpen}
-                  className="md:hidden p-2 rounded-lg border border-line text-mist hover:text-ink"
+                  className="md:hidden p-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 hover:text-slate-900 hover:bg-slate-100 transition shadow-2xs"
                 >
-                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                  {mobileMenuOpen ? <X className="w-5 h-5 text-slate-800" /> : <Menu className="w-5 h-5 text-slate-800" />}
                 </button>
               </div>
             </div>
 
-            {/* Mobile Navigation Drawer */}
+            {/* Premium Touch-Optimized Mobile Navigation Drawer */}
             {mobileMenuOpen && (
-              <div className="md:hidden border-t border-line bg-paper p-4 space-y-2">
-                <NavLink
-                  to="/courses"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-ink"
-                >
-                  <BookOpen className="w-4 h-4 text-blue-500" /> Courses
-                </NavLink>
-                <NavLink
-                  to="/extensions"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-ink"
-                >
-                  <Store className="w-4 h-4 text-[#0056D2]" /> Extentions Store
-                </NavLink>
-                <NavLink
-                  to="/tutors"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-ink"
-                >
-                  <Users className="w-4 h-4 text-emerald-500" /> Mentors
-                </NavLink>
+              <div className="md:hidden border-t border-slate-200 bg-white/98 backdrop-blur-md px-4 py-4 space-y-3 shadow-xl animate-in slide-in-from-top-2 duration-150 max-h-[85vh] overflow-y-auto">
+                {/* Logged-out quick auth CTA bar on mobile */}
+                {!user && (
+                  <div className="grid grid-cols-2 gap-2 pb-2 border-b border-slate-100">
+                    <Link
+                      to="/login"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="text-center py-2.5 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 hover:bg-slate-50 transition"
+                    >
+                      Sign In
+                    </Link>
+                    <Link
+                      to="/register"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="text-center py-2.5 px-3 rounded-xl bg-[#0056D2] text-xs font-bold text-white hover:bg-[#00419E] shadow-xs transition"
+                    >
+                      Join Free
+                    </Link>
+                  </div>
+                )}
+
+                {/* Logged in User Bar */}
                 {user && (
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 mb-2">
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center font-bold text-xs shrink-0">
+                      {user.displayName ? user.displayName.charAt(0).toUpperCase() : "U"}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900 truncate">{user.displayName}</p>
+                      <span className="text-[10px] text-slate-500 font-mono uppercase">{user.role}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1">
                   <NavLink
-                    to="/cyberchat"
+                    to="/courses"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg text-sm font-bold text-emerald-600"
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
                   >
-                    <span className="flex items-center gap-2">
-                      <Lock className="w-4 h-4 text-emerald-600" /> CyberChat (E2EE)
-                    </span>
-                    {unreadCount > 0 && (
-                      <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-black text-white bg-rose-600 rounded-full animate-pulse shadow-xs">
-                        {unreadCount}
+                    <BookOpen className="w-4 h-4 text-[#0056D2]" />
+                    <span>Courses & Curriculums</span>
+                  </NavLink>
+                  <NavLink
+                    to="/extensions"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                  >
+                    <Store className="w-4 h-4 text-[#0056D2]" />
+                    <span>Extensions Store</span>
+                  </NavLink>
+                  <NavLink
+                    to="/tutors"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                  >
+                    <Users className="w-4 h-4 text-emerald-600" />
+                    <span>Find a Mentor</span>
+                  </NavLink>
+                  {user && (
+                    <NavLink
+                      to="/cyberchat"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                    >
+                      <span className="flex items-center gap-3">
+                        <Lock className="w-4 h-4 text-emerald-600" />
+                        <span>CyberChat (E2EE)</span>
                       </span>
-                    )}
-                  </NavLink>
-                )}
-                <NavLink
-                  to="/report"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-red-500"
-                >
-                  <ShieldAlert className="w-4 h-4" /> Report Incident
-                </NavLink>
-                {user && (user.role === "ADMIN" || user.role === "CSA_OFFICER" ? (
+                      {unreadCount > 0 && (
+                        <span className="px-2 py-0.5 text-[10px] font-bold text-white bg-rose-600 rounded-full animate-pulse">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  )}
                   <NavLink
-                    to="/admin"
+                    to="/report"
                     onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-800"
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-700 bg-rose-50/80 hover:bg-rose-100 transition"
                   >
-                    <Compass className="w-4 h-4 text-blue-600" /> Admin Command Center
+                    <ShieldAlert className="w-4 h-4 text-rose-600" />
+                    <span>Confidential Incident Report</span>
                   </NavLink>
-                ) : (
-                  <NavLink
-                    to="/dashboard"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-800"
-                  >
-                    <LayoutDashboard className="w-4 h-4 text-blue-600" /> Student Dashboard
-                  </NavLink>
-                ))}
+                </div>
+
                 {user && (
-                  <NavLink
-                    to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin?tab=settings" : "/dashboard?tab=settings"}
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-slate-800"
-                  >
-                    <SlidersHorizontal className="w-4 h-4 text-blue-600" /> Account Settings
-                  </NavLink>
+                  <div className="pt-2 border-t border-slate-100 space-y-1">
+                    <NavLink
+                      to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin" : "/dashboard"}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-800 hover:bg-slate-50 transition"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-blue-600" />
+                      <span>{user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "Command Center" : "Student Dashboard"}</span>
+                    </NavLink>
+                    <NavLink
+                      to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin?tab=settings" : "/dashboard?tab=settings"}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-800 hover:bg-slate-50 transition"
+                    >
+                      <SlidersHorizontal className="w-4 h-4 text-slate-500" />
+                      <span>Account Settings</span>
+                    </NavLink>
+                    <button
+                      onClick={() => {
+                        logout();
+                        setMobileMenuOpen(false);
+                      }}
+                      className="w-full text-left flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Sign out</span>
+                    </button>
+                  </div>
                 )}
-                {user && (
-                  <button
-                    onClick={() => {
-                      logout();
-                      setMobileMenuOpen(false);
-                    }}
-                    className="w-full text-left px-3 py-2 text-sm font-semibold text-red-500"
-                  >
-                    Log out
-                  </button>
-                )}
+
+                {/* Emergency 292 Helpline Card inside Mobile Menu */}
+                <div className="pt-2">
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <PhoneCall className="w-4 h-4 text-amber-600 shrink-0" />
+                      <div>
+                        <p className="font-bold text-amber-900">Emergency Helpline</p>
+                        <p className="text-[11px] text-amber-800">Toll-Free Dial 292</p>
+                      </div>
+                    </div>
+                    <a
+                      href="tel:292"
+                      className="px-2.5 py-1 rounded-lg bg-amber-600 text-white font-bold text-[11px] hover:bg-amber-700 transition"
+                    >
+                      Call
+                    </a>
+                  </div>
+                </div>
               </div>
             )}
           </header>
         </>
       )}
 
-      <main className="flex-1 relative z-10">
+      <main className={`flex-1 relative z-10 ${!isDashboardRoute ? "pb-20 md:pb-0" : ""}`}>
         <Outlet />
       </main>
+
+      {/* App-like Sticky Bottom Mobile Navigation Bar */}
+      {!isDashboardRoute && (
+        <nav
+          aria-label="Mobile Bottom Navigation"
+          className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg px-2 py-1.5 flex items-center justify-around"
+        >
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-[#0056D2]" : "text-slate-500 hover:text-slate-800"
+              }`
+            }
+          >
+            <Shield className="w-4 h-4" />
+            <span className="text-[10px] font-semibold mt-0.5">Home</span>
+          </NavLink>
+
+          <NavLink
+            to="/courses"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-[#0056D2]" : "text-slate-500 hover:text-slate-800"
+              }`
+            }
+          >
+            <BookOpen className="w-4 h-4" />
+            <span className="text-[10px] font-semibold mt-0.5">Courses</span>
+          </NavLink>
+
+          <NavLink
+            to="/report"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-rose-600 font-bold" : "text-rose-500 hover:text-rose-700"
+              }`
+            }
+          >
+            <div className="relative">
+              <ShieldAlert className="w-4 h-4" />
+              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-rose-600 rounded-full animate-ping" />
+            </div>
+            <span className="text-[10px] font-bold mt-0.5">Report</span>
+          </NavLink>
+
+          <NavLink
+            to="/tutors"
+            className={({ isActive }) =>
+              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                isActive ? "text-[#0056D2]" : "text-slate-500 hover:text-slate-800"
+              }`
+            }
+          >
+            <Users className="w-4 h-4" />
+            <span className="text-[10px] font-semibold mt-0.5">Mentors</span>
+          </NavLink>
+
+          {user ? (
+            <NavLink
+              to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin" : "/dashboard"}
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                  isActive ? "text-[#0056D2]" : "text-slate-500 hover:text-slate-800"
+                }`
+              }
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              <span className="text-[10px] font-semibold mt-0.5">Portal</span>
+            </NavLink>
+          ) : (
+            <NavLink
+              to="/login"
+              className={({ isActive }) =>
+                `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                  isActive ? "text-[#0056D2]" : "text-slate-500 hover:text-slate-800"
+                }`
+              }
+            >
+              <Users className="w-4 h-4" />
+              <span className="text-[10px] font-semibold mt-0.5">Sign In</span>
+            </NavLink>
+          )}
+        </nav>
+      )}
 
       {!isDashboardRoute && (
         <footer className="border-t-2 border-[#0056D2] bg-[#0B1528] text-slate-200 shadow-2xl relative z-10">
