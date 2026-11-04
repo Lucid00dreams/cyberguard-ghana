@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ShieldCheck,
   FileDown,
@@ -31,7 +31,10 @@ import {
   ChevronDown,
   Globe,
   LayoutGrid,
-  Menu
+  Menu,
+  Mail,
+  Send,
+  Loader2
 } from "lucide-react";
 import api from "../utils/api";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -43,16 +46,29 @@ import UserAvatar from "../components/UserAvatar";
 export default function CsaPortal() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const adminScrollRef = useRef(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialActive = searchParams.get("tab") || "overview";
   const [active, setActive] = useState(initialActive);
+  const isSuperAdmin = user?.role === "ADMIN";
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam && ["overview", "users", "reports", "approvals", "tutors", "courses", "certificates", "settings"].includes(tabParam)) {
+    if (
+      tabParam &&
+      ["overview", "users", "daily-tips", "reports", "approvals", "tutors", "courses", "certificates", "settings"].includes(tabParam)
+    ) {
       setActive(tabParam);
     }
   }, [searchParams]);
+
+  const selectAdminTab = (tabKey) => {
+    setActive(tabKey);
+    setSearchParams({ tab: tabKey });
+    setMobileSidebarOpen(false);
+    adminScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  };
 
   const [reports, setReports] = useState([]);
   const [pendingTutors, setPendingTutors] = useState([]);
@@ -72,6 +88,20 @@ export default function CsaPortal() {
   const [searchCategory, setSearchCategory] = useState("all");
   const [globalSearch, setGlobalSearch] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+
+  // Daily Cyber Safety Tips Superadmin Log State
+  const [dailyTipsData, setDailyTipsData] = useState({
+    summary: null,
+    dispatches: [],
+    emailLogs: [],
+    subscribers: [],
+  });
+  const [dailyTipsLoading, setDailyTipsLoading] = useState(false);
+  const [dispatchingNow, setDispatchingNow] = useState(false);
+  const [tipLogDate, setTipLogDate] = useState("");
+  const [tipLogStatus, setTipLogStatus] = useState("");
+  const [tipLogSearch, setTipLogSearch] = useState("");
+  const [tipLogSubView, setTipLogSubView] = useState("daily"); // "daily" | "emails" | "subscribers"
 
   useEffect(() => {
     if (mobileSidebarOpen) {
@@ -121,10 +151,81 @@ export default function CsaPortal() {
     if (active === "reports") loadReports();
     if (active === "approvals") loadPendingTutors();
     if (active === "users") loadUsers();
+    if (active === "daily-tips" && isSuperAdmin) loadDailyTipsLogs();
     if (active === "tutors") loadTutors();
     if (active === "courses") loadCourses();
     if (active === "certificates") loadCertificates();
-  }, [active, categoryFilter, userRoleFilter]);
+  }, [active, categoryFilter, userRoleFilter, tipLogDate, tipLogStatus]);
+
+  async function loadDailyTipsLogs(customSearch = tipLogSearch) {
+    if (!isSuperAdmin) return;
+    setDailyTipsLoading(true);
+    try {
+      const res = await api.get("/daily-tips/logs", {
+        params: {
+          date: tipLogDate || undefined,
+          status: tipLogStatus || undefined,
+          search: customSearch || undefined,
+        },
+      });
+      setDailyTipsData({
+        summary: res.data?.summary || null,
+        dispatches: res.data?.dispatches || [],
+        emailLogs: res.data?.emailLogs || [],
+        subscribers: res.data?.subscribers || [],
+      });
+    } catch (err) {
+      setDailyTipsData({ summary: null, dispatches: [], emailLogs: [], subscribers: [] });
+    } finally {
+      setDailyTipsLoading(false);
+    }
+  }
+
+  async function handleDispatchTipsNow() {
+    if (dispatchingNow) return;
+    setDispatchingNow(true);
+    try {
+      const res = await api.post("/daily-tips/dispatch-now");
+      setActionStatus(res.data?.message || "Daily cyber safety tips dispatched successfully.");
+      await loadDailyTipsLogs();
+    } catch (err) {
+      setActionStatus(err.response?.data?.error || "Failed to dispatch daily cyber safety tips.");
+    } finally {
+      setDispatchingNow(false);
+    }
+  }
+
+  function exportDailyTipLogsCsv() {
+    const rows = dailyTipsData.emailLogs || [];
+    if (rows.length === 0) return;
+    const headers = ["Date", "Sent At (ISO)", "Recipient Email", "Recipient Name", "Tip Title", "Status", "Message ID", "Error"];
+    const escapeCsv = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((r) =>
+        [
+          r.dispatchDate,
+          r.sentAt ? new Date(r.sentAt).toISOString() : "",
+          r.recipientEmail,
+          r.recipientName,
+          r.tipTitle,
+          r.status,
+          r.messageId || "",
+          r.errorMessage || "",
+        ]
+          .map(escapeCsv)
+          .join(",")
+      ),
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `daily-cyber-tips-log-${tipLogDate || "all"}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
 
   async function loadUsers(searchVal = userSearch, roleVal = userRoleFilter) {
     try {
@@ -175,6 +276,7 @@ export default function CsaPortal() {
         loadTutors(),
         loadCertificates(),
         loadUsers(),
+        ...(isSuperAdmin ? [loadDailyTipsLogs()] : []),
       ]);
     } finally {
       setLoading(false);
@@ -267,7 +369,19 @@ export default function CsaPortal() {
       title: "Operations & Governance",
       items: [
         { key: "overview", label: "Overview", icon: LayoutGrid, count: null, color: "text-blue-300", bg: "bg-blue-500/20" },
-        { key: "users", label: "User Governance", icon: Users, count: users.length, color: "text-indigo-300", bg: "bg-indigo-500/20" },
+        ...(isSuperAdmin
+          ? [
+              { key: "users", label: "User Governance", icon: Users, count: users.length, color: "text-indigo-300", bg: "bg-indigo-500/20" },
+              {
+                key: "daily-tips",
+                label: "Daily Tips Mail Log",
+                icon: Mail,
+                count: dailyTipsData.summary?.totalEmailsSent ?? null,
+                color: "text-cyan-300",
+                bg: "bg-cyan-500/20",
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -302,7 +416,7 @@ export default function CsaPortal() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col lg:flex-row font-sans selection:bg-slate-900 selection:text-white">
+    <div className="h-screen h-[100dvh] overflow-hidden bg-[#f8fafc] text-slate-900 flex flex-col lg:flex-row font-sans selection:bg-slate-900 selection:text-white">
       {/* Mobile Drawer Backdrop */}
       {mobileSidebarOpen && (
         <div
@@ -313,7 +427,7 @@ export default function CsaPortal() {
 
       {/* ===================== CSA COMMAND CENTER BLUE SIDEBAR ===================== */}
       <aside
-        className={`w-68 bg-[#0A1E3F] text-white border-r border-blue-900/60 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:sticky lg:inset-auto lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
+        className={`w-68 bg-[#0A1E3F] text-white border-r border-blue-900/60 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:static lg:h-full lg:translate-x-0 lg:shadow-none ${
           mobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
@@ -332,7 +446,7 @@ export default function CsaPortal() {
         </div>
 
         {/* Middle Scrollable Nav List Categorized */}
-        <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-4 custom-scrollbar">
+        <nav className="flex-1 overflow-y-auto overscroll-contain py-3 px-3 space-y-4 custom-scrollbar">
           {SIDEBAR_SECTIONS.map((section) => (
             <div key={section.title} className="space-y-1">
               <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-blue-300/80">
@@ -364,10 +478,7 @@ export default function CsaPortal() {
                 return (
                   <button
                     key={item.key}
-                    onClick={() => {
-                      setActive(item.key);
-                      setMobileSidebarOpen(false);
-                    }}
+                    onClick={() => selectAdminTab(item.key)}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all group ${
                       isActive
                         ? "bg-[#0056D2] text-white font-bold shadow-md shadow-blue-950/60 ring-1 ring-blue-400/40"
@@ -417,10 +528,7 @@ export default function CsaPortal() {
         {/* Bottom User Profile Footer */}
         <div className="border-t border-blue-900/60 p-3 bg-[#07162E]/80 flex items-center justify-between">
           <button
-            onClick={() => {
-              setActive("settings");
-              setMobileSidebarOpen(false);
-            }}
+            onClick={() => selectAdminTab("settings")}
             title="Open Account Settings"
             className="flex items-center gap-2.5 min-w-0 text-left hover:opacity-90 transition cursor-pointer group flex-1 mr-1"
           >
@@ -437,10 +545,7 @@ export default function CsaPortal() {
 
           <div className="flex items-center gap-1 shrink-0">
             <button
-              onClick={() => {
-                setActive("settings");
-                setMobileSidebarOpen(false);
-              }}
+              onClick={() => selectAdminTab("settings")}
               title="Account Settings"
               className={`p-1.5 rounded-lg transition ${
                 active === "settings"
@@ -462,9 +567,12 @@ export default function CsaPortal() {
       </aside>
 
       {/* ===================== MAIN ADMINISTRATIVE CANVAS ===================== */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen bg-[#f8fafc]">
+      <div
+        ref={adminScrollRef}
+        className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto overscroll-contain bg-[#f8fafc]"
+      >
         {/* Top Header Bar */}
-        <header className="h-16 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+        <header className="h-16 shrink-0 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileSidebarOpen(true)}
@@ -479,7 +587,11 @@ export default function CsaPortal() {
               </div>
               <span className="text-slate-300">/</span>
               <span className="font-bold text-slate-900 capitalize">
-                {active === "overview" ? "Overview" : active}
+                {active === "overview"
+                  ? "Overview"
+                  : active === "daily-tips"
+                  ? "Daily Tips Mail Log"
+                  : active}
               </span>
             </div>
           </div>
@@ -848,6 +960,11 @@ export default function CsaPortal() {
                                   {u.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
                                 </span>
                               )}
+                              {u.receiveDailyTips && (
+                                <span className="text-[10px] font-semibold text-[#0056D2] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 inline-flex items-center gap-1">
+                                  <Mail className="w-2.5 h-2.5" /> 7AM Tips
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
                               <span>{u.email}</span>
@@ -890,6 +1007,425 @@ export default function CsaPortal() {
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* PANEL 2B: SUPERADMIN DAILY CYBER SAFETY TIPS EMAIL LOGS */}
+          {active === "daily-tips" && isSuperAdmin && (
+            <div className="space-y-6">
+              {/* Top Schedule & Dispatch Banner */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-7 shadow-xs space-y-5">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+                  <div className="space-y-1">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0056D2] border border-blue-200 text-[11px] font-bold">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Automated Schedule: Every Morning at 07:00 AM GMT ({dailyTipsData.summary?.timezone || "Africa/Accra"})</span>
+                    </div>
+                    <h2 className="text-xl font-black text-slate-900">
+                      Daily Cyber Safety Tips — Email Delivery Ledger
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Audit every daily 7:00 AM cyber safety broadcast and inspect the exact email addresses that received each tip daily.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => loadDailyTipsLogs()}
+                      disabled={dailyTipsLoading}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${dailyTipsLoading ? "animate-spin" : ""}`} />
+                      <span>Refresh</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={exportDailyTipLogsCsv}
+                      disabled={!dailyTipsData.emailLogs?.length}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition disabled:opacity-40 cursor-pointer"
+                    >
+                      <FileDown className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Export CSV</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDispatchTipsNow}
+                      disabled={dispatchingNow || (dailyTipsData.summary?.activeSubscribers ?? 0) === 0}
+                      title="Immediately send today's cyber safety tip to all opted-in subscribers"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0056D2] hover:bg-[#00419E] text-white text-xs font-bold shadow-xs transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {dispatchingNow ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Sending Mails...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-3.5 h-3.5" />
+                          <span>Send Today's Tip Now</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Daily Tips Summary Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                  <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80">
+                    <p className="text-[11px] font-semibold text-slate-500">Opted-In Subscribers</p>
+                    <p className="text-2xl font-extrabold text-slate-900 mt-1">
+                      {dailyTipsData.summary?.activeSubscribers ?? 0}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Active 7:00 AM recipients</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80">
+                    <p className="text-[11px] font-semibold text-emerald-800">Sent Today ({dailyTipsData.summary?.todayDateStr || "Today"})</p>
+                    <p className="text-2xl font-extrabold text-emerald-900 mt-1">
+                      {dailyTipsData.summary?.sentTodayCount ?? 0}
+                    </p>
+                    <p className="text-[11px] text-emerald-700 mt-0.5">
+                      Next auto-run: {dailyTipsData.summary?.nextScheduledRunLabel || "07:00 AM GMT"}
+                    </p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-200/80">
+                    <p className="text-[11px] font-semibold text-blue-800">Total Daily Mails Sent</p>
+                    <p className="text-2xl font-extrabold text-blue-950 mt-1">
+                      {dailyTipsData.summary?.totalEmailsSent ?? 0}
+                    </p>
+                    <p className="text-[11px] text-blue-700 mt-0.5">Cumulative delivered tips</p>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80">
+                    <p className="text-[11px] font-semibold text-slate-500">Delivery Failures</p>
+                    <p className="text-2xl font-extrabold text-slate-900 mt-1">
+                      {dailyTipsData.summary?.totalFailed ?? 0}
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">SMTP bounce / error count</p>
+                  </div>
+                </div>
+
+                {/* Today's Scheduled Tip Preview */}
+                {dailyTipsData.summary?.todaysTip && (
+                  <div className="p-4 rounded-xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 text-[11px] text-sky-300 font-semibold">
+                        <span>Today's Tip #{dailyTipsData.summary.todaysTip.index}</span>
+                        <span>•</span>
+                        <span>{dailyTipsData.summary.todaysTip.category}</span>
+                      </div>
+                      <p className="text-sm font-bold text-white">
+                        {dailyTipsData.summary.todaysTip.title}
+                      </p>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {dailyTipsData.summary.todaysTip.summary}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Filter & Sub-View Controls */}
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+                    <button
+                      type="button"
+                      onClick={() => setTipLogSubView("daily")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        tipLogSubView === "daily"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Daily Dispatches ({dailyTipsData.dispatches.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTipLogSubView("emails")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        tipLogSubView === "emails"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      All Recipient Emails ({dailyTipsData.emailLogs.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTipLogSubView("subscribers")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        tipLogSubView === "subscribers"
+                          ? "bg-white text-slate-900 shadow-2xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      Subscribed Emails ({dailyTipsData.subscribers.length})
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="date"
+                      value={tipLogDate}
+                      onChange={(e) => setTipLogDate(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 focus:outline-none focus:bg-white"
+                      title="Filter logs by dispatch date"
+                    />
+
+                    <select
+                      value={tipLogStatus}
+                      onChange={(e) => setTipLogStatus(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 focus:outline-none focus:bg-white"
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="SENT">SENT</option>
+                      <option value="FAILED">FAILED</option>
+                    </select>
+
+                    <div className="relative flex-1 sm:w-56">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={tipLogSearch}
+                        onChange={(e) => setTipLogSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") loadDailyTipsLogs(tipLogSearch);
+                        }}
+                        placeholder="Search recipient email..."
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:bg-white"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => loadDailyTipsLogs(tipLogSearch)}
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+                    >
+                      Filter
+                    </button>
+
+                    {(tipLogDate || tipLogStatus || tipLogSearch) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTipLogDate("");
+                          setTipLogStatus("");
+                          setTipLogSearch("");
+                          loadDailyTipsLogs("");
+                        }}
+                        className="px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* SUB-VIEW 1: GROUPED BY DAY (DAILY DISPATCHES + RECIPIENT EMAILS) */}
+                {tipLogSubView === "daily" && (
+                  <div className="space-y-4 pt-2">
+                    {dailyTipsLoading ? (
+                      <div className="py-10 text-center text-xs text-slate-500">Loading daily email logs...</div>
+                    ) : dailyTipsData.dispatches.length === 0 ? (
+                      <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 space-y-2">
+                        <Mail className="w-6 h-6 text-slate-400 mx-auto" />
+                        <p className="text-sm font-bold text-slate-800">No daily tip dispatches recorded yet</p>
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                          Emails are automatically dispatched every morning at 07:00 AM GMT to all opted-in users, or you can click &ldquo;Send Today&apos;s Tip Now&rdquo; above.
+                        </p>
+                      </div>
+                    ) : (
+                      dailyTipsData.dispatches.map((d) => (
+                        <div
+                          key={d.id}
+                          className="rounded-2xl border border-slate-200 bg-slate-50/40 overflow-hidden"
+                        >
+                          <div className="p-4 sm:p-5 bg-white border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-mono text-xs font-extrabold text-[#0056D2] bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-md">
+                                  {d.dispatchDate}
+                                </span>
+                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                                  {d.triggerType === "SCHEDULED_7AM" ? "07:00 AM Auto-Schedule" : "Admin Dispatch"}
+                                </span>
+                                <span className="text-[11px] text-slate-400">
+                                  {new Date(d.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              </div>
+                              <h3 className="text-sm font-bold text-slate-900">
+                                Tip #{d.tipIndex}: {d.tipTitle}
+                              </h3>
+                              <p className="text-xs text-slate-500">{d.subject}</p>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                                {d.sentCount} Sent
+                              </span>
+                              {d.failedCount > 0 && (
+                                <span className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
+                                  {d.failedCount} Failed
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Recipient Emails List for this Daily Dispatch */}
+                          {!d.logs || d.logs.length === 0 ? (
+                            <p className="p-4 text-xs text-slate-500">
+                              No matching recipient emails recorded for this dispatch.
+                            </p>
+                          ) : (
+                            <div className="overflow-x-auto">
+                              <table className="w-full text-left border-collapse text-xs">
+                                <thead>
+                                  <tr className="border-b border-slate-200/80 text-[11px] text-slate-500 bg-slate-50">
+                                    <th className="py-2.5 px-4 font-semibold">Recipient Email</th>
+                                    <th className="py-2.5 px-4 font-semibold">Name</th>
+                                    <th className="py-2.5 px-4 font-semibold">Time Sent</th>
+                                    <th className="py-2.5 px-4 font-semibold">Status</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200/60 bg-white">
+                                  {d.logs.map((log) => (
+                                    <tr key={log.id} className="hover:bg-slate-50/70">
+                                      <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
+                                        {log.recipientEmail}
+                                      </td>
+                                      <td className="py-2.5 px-4 text-slate-700">{log.recipientName}</td>
+                                      <td className="py-2.5 px-4 text-slate-500 font-mono text-[11px]">
+                                        {new Date(log.sentAt).toLocaleString()}
+                                      </td>
+                                      <td className="py-2.5 px-4">
+                                        {log.status === "SENT" ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                            <CheckCircle2 className="w-3 h-3" /> SENT
+                                          </span>
+                                        ) : (
+                                          <span
+                                            title={log.errorMessage || "Delivery failed"}
+                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold"
+                                          >
+                                            FAILED
+                                          </span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {/* SUB-VIEW 2: FLAT CHRONOLOGICAL RECIPIENT EMAILS LOG */}
+                {tipLogSubView === "emails" && (
+                  <div className="pt-2">
+                    {dailyTipsData.emailLogs.length === 0 ? (
+                      <p className="py-10 text-center text-xs text-slate-400">
+                        No individual email delivery entries match your current filter.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500">
+                              <th className="py-3 px-4 font-semibold">Date</th>
+                              <th className="py-3 px-4 font-semibold">Recipient Email</th>
+                              <th className="py-3 px-4 font-semibold">Recipient Name</th>
+                              <th className="py-3 px-4 font-semibold">Cyber Safety Tip Sent</th>
+                              <th className="py-3 px-4 font-semibold">Timestamp</th>
+                              <th className="py-3 px-4 font-semibold">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/70 bg-white">
+                            {dailyTipsData.emailLogs.map((log) => (
+                              <tr key={log.id} className="hover:bg-slate-50/70">
+                                <td className="py-2.5 px-4 font-mono font-bold text-[#0056D2]">
+                                  {log.dispatchDate}
+                                </td>
+                                <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
+                                  {log.recipientEmail}
+                                </td>
+                                <td className="py-2.5 px-4 text-slate-700">{log.recipientName}</td>
+                                <td className="py-2.5 px-4 text-slate-800 font-medium">{log.tipTitle}</td>
+                                <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
+                                  {new Date(log.sentAt).toLocaleTimeString([], {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                    second: "2-digit",
+                                  })}
+                                </td>
+                                <td className="py-2.5 px-4">
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                      log.status === "SENT"
+                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                        : "bg-rose-50 text-rose-700 border-rose-200"
+                                    }`}
+                                  >
+                                    {log.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* SUB-VIEW 3: OPTED-IN SUBSCRIBERS ROSTER */}
+                {tipLogSubView === "subscribers" && (
+                  <div className="pt-2">
+                    {dailyTipsData.subscribers.length === 0 ? (
+                      <p className="py-10 text-center text-xs text-slate-400">
+                        No users have opted in to 7:00 AM Daily Cyber Safety Tips yet.
+                      </p>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500">
+                              <th className="py-3 px-4 font-semibold">Subscribed Email</th>
+                              <th className="py-3 px-4 font-semibold">Member Name</th>
+                              <th className="py-3 px-4 font-semibold">Role</th>
+                              <th className="py-3 px-4 font-semibold">Joined</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200/70 bg-white">
+                            {dailyTipsData.subscribers.map((sub) => (
+                              <tr key={sub.id} className="hover:bg-slate-50/70">
+                                <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
+                                  {sub.email}
+                                </td>
+                                <td className="py-2.5 px-4 text-slate-800 font-medium">{sub.displayName}</td>
+                                <td className="py-2.5 px-4">
+                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700">
+                                    {sub.role}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-4 text-slate-500">
+                                  {new Date(sub.createdAt).toLocaleDateString()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

@@ -221,9 +221,117 @@ async function sendWelcomeEmail(toEmail, displayName = "CyberGuard Member") {
   return sendEmail({ to: toEmail, subject, html, text });
 }
 
+/**
+ * Send Daily 7:00 AM Cyber Safety Tip Email to opted-in users
+ * @param {Object} params
+ * @param {string} params.toEmail - Recipient email
+ * @param {string} params.displayName - Recipient display name
+ * @param {Object} params.tip - { index, category, title, summary, actionStep, courseSlug }
+ * @param {string} params.dateFormatted - Readable date string (e.g. "Wednesday, 4 November 2026")
+ * @param {string} params.unsubscribeUrl - Signed one-click unsubscribe URL
+ */
+async function sendDailySafetyTipEmail({
+  toEmail,
+  displayName = "CyberGuard Member",
+  tip,
+  dateFormatted,
+  unsubscribeUrl,
+}) {
+  const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+  const courseUrl = tip?.courseSlug
+    ? `${clientOrigin}/courses/${tip.courseSlug}`
+    : `${clientOrigin}/courses`;
+  const settingsUrl = `${clientOrigin}/dashboard?tab=settings`;
+
+  const subject = `Daily Cyber Safety Tip: ${tip.title} — CyberGuard Ghana`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${subject}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 0; }
+        .wrapper { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); }
+        .header { background-color: #001E3C; padding: 28px 36px; text-align: left; border-bottom: 4px solid #0056D2; }
+        .header-meta { color: #93c5fd; margin: 0 0 6px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
+        .header-date { color: #cbd5e1; margin: 6px 0 0 0; font-size: 12px; }
+        .content { padding: 32px 36px; text-align: left; }
+        .greeting { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+        .category-pill { display: inline-block; background: #eff6ff; color: #0056D2; border: 1px solid #bfdbfe; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 4px 12px; margin-bottom: 12px; }
+        .tip-title { font-size: 19px; font-weight: 800; color: #0f172a; margin: 0 0 12px 0; line-height: 1.35; }
+        .tip-body { font-size: 14px; line-height: 1.65; color: #334155; margin: 0 0 20px 0; }
+        .action-box { background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 8px; padding: 16px 18px; margin: 22px 0; }
+        .action-label { font-size: 12px; font-weight: 800; color: #15803d; margin: 0 0 4px 0; }
+        .action-text { font-size: 13px; line-height: 1.55; color: #14532d; margin: 0; }
+        .btn-container { text-align: left; margin: 24px 0 18px 0; }
+        .btn { display: inline-block; background-color: #0056D2; color: #ffffff !important; font-weight: 700; font-size: 13px; text-decoration: none; padding: 11px 22px; border-radius: 8px; }
+        .hotline-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-top: 20px; font-size: 12px; color: #475569; }
+        .footer { background-color: #f1f5f9; padding: 20px 36px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; line-height: 1.5; }
+        .footer a { color: #0056D2; text-decoration: underline; }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="header">
+          <p class="header-meta">CyberGuard Ghana • Morning Safety Briefing</p>
+          <h1>7:00 AM Daily Cyber Safety Tip</h1>
+          <p class="header-date">${dateFormatted}</p>
+        </div>
+
+        <div class="content">
+          <div class="greeting">Good morning, ${displayName},</div>
+
+          <span class="category-pill">Tip #${tip.index} • ${tip.category}</span>
+          <h2 class="tip-title">${tip.title}</h2>
+          <p class="tip-body">${tip.summary}</p>
+
+          <div class="action-box">
+            <p class="action-label">Today's 60-Second Safety Action</p>
+            <p class="action-text">${tip.actionStep}</p>
+          </div>
+
+          <div class="btn-container">
+            <a href="${courseUrl}" class="btn" target="_blank">Practice in CyberGuard Academy</a>
+          </div>
+
+          <div class="hotline-box">
+            <strong>Spotted a scam or cyber threat?</strong> Call the Ghana Cyber Security Authority toll-free helpline on <strong>292</strong> or forward suspicious SMS alerts to <strong>419</strong>.
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
+          <p>You are receiving this 7:00 AM briefing because you opted in to Daily Cyber Safety Tips.</p>
+          <p style="margin-top: 8px;">
+            <a href="${settingsUrl}" target="_blank">Manage email preferences</a>
+            ${unsubscribeUrl ? ` &bull; <a href="${unsubscribeUrl}" target="_blank">Unsubscribe from daily tips</a>` : ""}
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Good morning ${displayName},\n\nCyberGuard Ghana — 7:00 AM Daily Cyber Safety Tip (${dateFormatted})\n\n[${tip.category}] ${tip.title}\n\n${tip.summary}\n\nToday's 60-Second Safety Action:\n${tip.actionStep}\n\nPractice on CyberGuard Ghana: ${courseUrl}\n\nManage preferences: ${settingsUrl}${unsubscribeUrl ? `\nUnsubscribe: ${unsubscribeUrl}` : ""}`;
+
+  const extraHeaders = unsubscribeUrl
+    ? {
+        "List-Unsubscribe": `<${unsubscribeUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      }
+    : {};
+
+  return sendEmail({ to: toEmail, subject, html, text, headers: extraHeaders });
+}
+
 module.exports = {
   transporter,
   sendEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
+  sendDailySafetyTipEmail,
 };

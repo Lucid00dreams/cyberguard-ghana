@@ -243,6 +243,13 @@ export default function Login() {
               </p>
             </div>
 
+            {location.state?.accountDeleted && !error && (
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <span>Your account and personal data have been permanently deleted.</span>
+              </div>
+            )}
+
             {error && (
               <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-start gap-2.5 animate-in fade-in duration-150">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />

@@ -21,6 +21,82 @@ function signToken(user) {
   );
 }
 
+/**
+ * Safely deletes a user and cleans up or reassigns all foreign-key dependencies
+ * inside an atomic transaction while preserving anonymized email audit logs.
+ */
+async function deleteUserAccountCleanly(targetUserId) {
+  return prisma.$transaction(async (tx) => {
+    // 1. Detach user reference from historical daily tip email logs so audit logs remain intact
+    await tx.dailyTipEmailLog.updateMany({
+      where: { userId: targetUserId },
+      data: { userId: null },
+    });
+
+    // 2. Clean up bookings made as a student and free future unstarted tutor slots
+    const studentBookings = await tx.booking.findMany({
+      where: { studentId: targetUserId },
+      select: { slotId: true },
+    });
+    const bookedSlotIds = studentBookings.map((b) => b.slotId).filter(Boolean);
+
+    if (studentBookings.length > 0) {
+      await tx.booking.deleteMany({ where: { studentId: targetUserId } });
+    }
+    if (bookedSlotIds.length > 0) {
+      await tx.availabilitySlot.updateMany({
+        where: { id: { in: bookedSlotIds }, startsAt: { gt: new Date() } },
+        data: { isBooked: false },
+      });
+    }
+
+    // 3. Clean up TutorProfile, tutor bookings, and availability slots if user is a tutor
+    const tutorProfile = await tx.tutorProfile.findUnique({
+      where: { userId: targetUserId },
+      select: { id: true },
+    });
+    if (tutorProfile) {
+      await tx.booking.deleteMany({ where: { tutorId: tutorProfile.id } });
+      await tx.availabilitySlot.deleteMany({ where: { tutorId: tutorProfile.id } });
+      await tx.tutorProfile.delete({ where: { id: tutorProfile.id } });
+    }
+
+    // 4. Delete quiz attempts, certificates, and enrollments belonging to this user
+    await tx.quizAttempt.deleteMany({ where: { userId: targetUserId } });
+    await tx.certificate.deleteMany({ where: { userId: targetUserId } });
+    await tx.enrollment.deleteMany({ where: { userId: targetUserId } });
+
+    // 5. Handle authored courses: reassign to an active admin so students keep enrolled courses
+    const authoredCourses = await tx.course.findMany({
+      where: { authorId: targetUserId },
+      select: { id: true },
+    });
+    if (authoredCourses.length > 0) {
+      const fallbackAdmin = await tx.user.findFirst({
+        where: { role: "ADMIN", id: { not: targetUserId } },
+        select: { id: true },
+      });
+      if (fallbackAdmin) {
+        await tx.course.updateMany({
+          where: { authorId: targetUserId },
+          data: { authorId: fallbackAdmin.id },
+        });
+      } else {
+        const courseIds = authoredCourses.map((c) => c.id);
+        await tx.quizAttempt.deleteMany({
+          where: { quiz: { lesson: { module: { courseId: { in: courseIds } } } } },
+        });
+        await tx.certificate.deleteMany({ where: { courseId: { in: courseIds } } });
+        await tx.enrollment.deleteMany({ where: { courseId: { in: courseIds } } });
+        await tx.course.deleteMany({ where: { id: { in: courseIds } } });
+      }
+    }
+
+    // 6. Delete user (cascades ChatSession, UserPublicKey, ConversationParticipant, SecureMessage, FriendRequest)
+    await tx.user.delete({ where: { id: targetUserId } });
+  });
+}
+
 router.post(
   "/register",
   [
@@ -28,6 +104,7 @@ router.post(
     body("password").isLength({ min: 8 }).withMessage("Password must be at least 8 characters."),
     body("displayName").trim().isLength({ min: 2 }),
     body("ageBand").isIn(["JUNIOR", "YOUNG_ADULT"]),
+    body("receiveDailyTips").optional().isBoolean(),
   ],
   async (req, res, next) => {
     try {
@@ -36,7 +113,7 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { email, password, displayName, ageBand, avatarUrl } = req.body;
+      const { email, password, displayName, ageBand, avatarUrl, receiveDailyTips } = req.body;
 
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
@@ -46,7 +123,15 @@ router.post(
       const passwordHash = await bcrypt.hash(password, 12);
 
       const user = await prisma.user.create({
-        data: { email, passwordHash, displayName, ageBand, role: "STUDENT", avatarUrl },
+        data: {
+          email,
+          passwordHash,
+          displayName,
+          ageBand,
+          role: "STUDENT",
+          avatarUrl,
+          receiveDailyTips: Boolean(receiveDailyTips),
+        },
       });
 
       // Send personalized welcome email automatically upon registration
@@ -66,6 +151,7 @@ router.post(
           phoneNumber: user.phoneNumber,
           bio: user.bio,
           ageBand: user.ageBand,
+          receiveDailyTips: user.receiveDailyTips,
         },
       });
     } catch (err) {
@@ -116,6 +202,7 @@ router.post("/google", async (req, res, next) => {
     const verifiedEmail = tokenData.email.trim().toLowerCase();
     const displayName = tokenData.name || verifiedEmail.split("@")[0];
     const avatarUrl = tokenData.picture || null;
+    const optedInDailyTips = Boolean(req.body.receiveDailyTips);
 
     let user = await prisma.user.findUnique({ where: { email: verifiedEmail } });
 
@@ -129,6 +216,7 @@ router.post("/google", async (req, res, next) => {
           avatarUrl,
           role: "STUDENT",
           ageBand: "JUNIOR",
+          receiveDailyTips: optedInDailyTips,
         },
       });
 
@@ -136,12 +224,20 @@ router.post("/google", async (req, res, next) => {
       sendWelcomeEmail(user.email, user.displayName).catch((err) => {
         console.error(`[Mailer] Google signup welcome email to ${user.email} failed:`, err.message);
       });
-    } else if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes("googleusercontent.com") || user.avatarUrl.includes("default-user"))) {
-      // Keep existing user's profile picture up to date with Google account photo
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { avatarUrl },
-      });
+    } else {
+      const googleUpdates = {};
+      if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes("googleusercontent.com") || user.avatarUrl.includes("default-user"))) {
+        googleUpdates.avatarUrl = avatarUrl;
+      }
+      if (optedInDailyTips && !user.receiveDailyTips) {
+        googleUpdates.receiveDailyTips = true;
+      }
+      if (Object.keys(googleUpdates).length > 0) {
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: googleUpdates,
+        });
+      }
     }
 
     const token = signToken(user);
@@ -156,6 +252,7 @@ router.post("/google", async (req, res, next) => {
         phoneNumber: user.phoneNumber,
         bio: user.bio,
         ageBand: user.ageBand,
+        receiveDailyTips: user.receiveDailyTips,
       },
     });
   } catch (err) {
@@ -196,6 +293,7 @@ router.post(
           phoneNumber: user.phoneNumber,
           bio: user.bio,
           ageBand: user.ageBand,
+          receiveDailyTips: user.receiveDailyTips,
         },
       });
     } catch (err) {
@@ -217,6 +315,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
         avatarUrl: true,
         phoneNumber: true,
         bio: true,
+        receiveDailyTips: true,
         createdAt: true,
       },
     });
@@ -236,19 +335,21 @@ router.patch(
     body("phoneNumber").optional({ nullable: true }),
     body("bio").optional({ nullable: true }),
     body("ageBand").optional().isIn(["JUNIOR", "YOUNG_ADULT"]),
+    body("receiveDailyTips").optional().isBoolean(),
   ],
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-      const { displayName, ageBand, avatarUrl, phoneNumber, bio } = req.body;
+      const { displayName, ageBand, avatarUrl, phoneNumber, bio, receiveDailyTips } = req.body;
       const dataToUpdate = {};
       if (displayName !== undefined) dataToUpdate.displayName = displayName.trim();
       if (ageBand !== undefined) dataToUpdate.ageBand = ageBand;
       if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl || null;
       if (phoneNumber !== undefined) dataToUpdate.phoneNumber = phoneNumber ? phoneNumber.trim() : null;
       if (bio !== undefined) dataToUpdate.bio = bio ? bio.trim() : null;
+      if (typeof receiveDailyTips === "boolean") dataToUpdate.receiveDailyTips = receiveDailyTips;
 
       const updated = await prisma.user.update({
         where: { id: req.user.id },
@@ -262,6 +363,7 @@ router.patch(
           avatarUrl: true,
           phoneNumber: true,
           bio: true,
+          receiveDailyTips: true,
           createdAt: true,
         },
       });
@@ -271,6 +373,37 @@ router.patch(
     }
   }
 );
+
+// Self-service Account Deletion: permanently deletes the authenticated user's account and records
+router.delete("/me", requireAuth, async (req, res, next) => {
+  try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { id: true, role: true },
+    });
+    if (!existingUser) {
+      return res.status(404).json({ error: "User account not found." });
+    }
+
+    // Prevent locking out platform governance if this is the sole ADMIN account
+    if (existingUser.role === "ADMIN") {
+      const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+      if (adminCount <= 1) {
+        return res.status(400).json({
+          error: "Cannot delete the sole Superadmin account. Promote another administrator first.",
+        });
+      }
+    }
+
+    await deleteUserAccountCleanly(existingUser.id);
+    res.json({
+      success: true,
+      message: "Your account and personal data have been permanently deleted.",
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // Admin Managerial: list all platform users
 router.get("/users", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
@@ -295,6 +428,7 @@ router.get("/users", requireAuth, requireRole("ADMIN"), async (req, res, next) =
         role: true,
         ageBand: true,
         avatarUrl: true,
+        receiveDailyTips: true,
         createdAt: true,
         _count: {
           select: {
@@ -351,7 +485,7 @@ router.delete("/users/:id", requireAuth, requireRole("ADMIN"), async (req, res, 
       return res.status(400).json({ error: "You cannot delete your own admin account." });
     }
 
-    await prisma.user.delete({ where: { id: targetId } });
+    await deleteUserAccountCleanly(targetId);
     res.json({ success: true, message: "User deleted successfully." });
   } catch (err) {
     next(err);

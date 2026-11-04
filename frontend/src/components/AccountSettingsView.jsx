@@ -23,6 +23,7 @@ import {
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
+import DeleteAccountSection from "./DeleteAccountSection";
 
 export default function AccountSettingsView({ isModal = false, onClose }) {
   const { user, updateUser } = useAuth();
@@ -54,6 +55,8 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
   const [passwordFeedback, setPasswordFeedback] = useState(null);
 
   // Preferences toggles (locally remembered or customizable)
+  const [receiveDailyTips, setReceiveDailyTips] = useState(Boolean(user?.receiveDailyTips));
+  const [savingTipsPref, setSavingTipsPref] = useState(false);
   const [prefs, setPrefs] = useState({
     emailCertificates: true,
     momoSmsAlerts: true,
@@ -67,8 +70,34 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
       setBio(user.bio || "");
       setAgeBand(user.ageBand || "JUNIOR");
       setAvatarUrl(user.avatarUrl || "");
+      setReceiveDailyTips(Boolean(user.receiveDailyTips));
     }
   }, [user]);
+
+  async function handleToggleDailyTips(e) {
+    const checked = e.target.checked;
+    setReceiveDailyTips(checked);
+    setSavingTipsPref(true);
+    try {
+      const res = await api.patch("/auth/me", { receiveDailyTips: checked });
+      updateUser(res.data);
+      setProfileFeedback({
+        type: "success",
+        text: checked
+          ? "Subscribed to 7:00 AM Daily Cyber Safety Tips via email."
+          : "Unsubscribed from 7:00 AM Daily Cyber Safety Tips.",
+      });
+      setTimeout(() => setProfileFeedback(null), 3500);
+    } catch (err) {
+      setReceiveDailyTips(!checked);
+      setProfileFeedback({
+        type: "error",
+        text: "Failed to update daily cyber safety tips preference.",
+      });
+    } finally {
+      setSavingTipsPref(false);
+    }
+  }
 
   // Client-side canvas compression for snappy, fast image uploads
   function compressImage(file, maxWidth = 800, maxHeight = 800) {
@@ -671,6 +700,22 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
             </div>
 
             <div className="space-y-3">
+              <label className="flex items-center justify-between p-3.5 rounded-2xl bg-blue-50/50 border border-blue-200/80 cursor-pointer hover:bg-blue-50 transition">
+                <div className="pr-3">
+                  <p className="text-xs font-bold text-slate-900">Daily 7:00 AM Cyber Safety Tips</p>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Receive a practical cyber defense tip in your inbox every morning at 7:00 AM GMT.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  disabled={savingTipsPref}
+                  checked={receiveDailyTips}
+                  onChange={handleToggleDailyTips}
+                  className="w-4 h-4 rounded text-[#0056D2] focus:ring-0 cursor-pointer shrink-0"
+                />
+              </label>
+
               <label className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 cursor-pointer hover:bg-slate-100/60 transition">
                 <div className="pr-3">
                   <p className="text-xs font-bold text-slate-800">Certificate & Milestone Alerts</p>
@@ -718,6 +763,9 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
           </div>
         </div>
       </div>
+
+      {/* ===================== DANGER ZONE: DELETE ACCOUNT ===================== */}
+      <DeleteAccountSection />
     </div>
   );
 }

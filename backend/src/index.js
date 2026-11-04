@@ -12,6 +12,8 @@ const tutorRoutes = require("./routes/tutors");
 const uploadRoutes = require("./routes/uploads");
 const cybergodRoutes = require("./routes/cybergod");
 const cyberchatRoutes = require("./routes/cyberchat");
+const dailyTipsRoutes = require("./routes/dailyTips");
+const { startDailyTipsScheduler } = require("./services/dailyTipsService");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -101,6 +103,7 @@ app.use(
 );
 
 app.get("/health", (req, res) => res.json({ status: "ok", service: "cyberguard-ghana-backend" }));
+app.get("/api/health", (req, res) => res.json({ status: "ok", service: "cyberguard-ghana-backend" }));
 
 // Rate-limited authentication & recovery endpoints
 app.use("/api/auth/login", authLimiter);
@@ -118,6 +121,7 @@ app.use("/api/uploads", uploadRoutes);
 app.use("/api/cybergod/chat", aiLimiter);
 app.use("/api/cybergod", cybergodRoutes);
 app.use("/api/cyberchat", cyberchatRoutes);
+app.use("/api/daily-tips", dailyTipsRoutes);
 
 app.use((req, res) => res.status(404).json({ error: "Route not found." }));
 app.use(errorHandler);
@@ -125,6 +129,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`CyberGuard Ghana backend listening on port ${PORT}`);
+  startDailyTipsScheduler();
 });
 
 module.exports = app;

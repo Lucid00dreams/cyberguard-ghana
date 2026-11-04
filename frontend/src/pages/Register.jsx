@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link, useLocation, useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,
@@ -19,7 +19,14 @@ import CyberGuardLogo from "../components/CyberGuardLogo";
 const AGES = [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, "24+"];
 
 export default function Register() {
-  const [form, setForm] = useState({ displayName: "", email: "", password: "", ageBand: "JUNIOR" });
+  const [form, setForm] = useState({
+    displayName: "",
+    email: "",
+    password: "",
+    ageBand: "JUNIOR",
+    receiveDailyTips: false,
+  });
+  const receiveDailyTipsRef = useRef(false);
   const [selectedAge, setSelectedAge] = useState(15);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -146,6 +153,7 @@ export default function Register() {
         email: payload.email,
         displayName: payload.name || payload.email.split("@")[0],
         avatarUrl: payload.picture || null,
+        receiveDailyTips: receiveDailyTipsRef.current,
       });
       login(data.token, data.user);
       navigate(getRedirectTarget(data.user?.role), { replace: true });
@@ -174,7 +182,7 @@ export default function Register() {
 
   return (
     <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden grid lg:grid-cols-12 lg:h-[560px]">
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden grid lg:grid-cols-12 lg:min-h-[580px]">
         {/* Left Hero Side Banner with Background Photo */}
         <div className="lg:col-span-5 bg-[#001E3C] relative overflow-hidden p-6 sm:p-8 text-white flex flex-col justify-between hidden lg:flex h-full">
           {/* Background Photo Layer */}
@@ -222,7 +230,7 @@ export default function Register() {
         </div>
 
         {/* Right Clean Form Section */}
-        <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-center bg-white h-full overflow-hidden">
+        <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-center bg-white h-full">
           <div className="max-w-sm w-full mx-auto space-y-3">
             {/* Header */}
             <div className="space-y-0.5">
@@ -258,6 +266,28 @@ export default function Register() {
               </span>
               <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showEmailForm ? "rotate-180" : ""}`} />
             </button>
+
+            {/* Daily Cyber Safety Tips Opt-in Checkbox (when email form is collapsed, applies to Google Sign-Up too) */}
+            {!showEmailForm && (
+              <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-blue-50/40 hover:border-blue-200 transition cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={form.receiveDailyTips}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    receiveDailyTipsRef.current = checked;
+                    setForm((prev) => ({ ...prev, receiveDailyTips: checked }));
+                  }}
+                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#0056D2] focus:ring-[#0056D2] cursor-pointer shrink-0"
+                />
+                <span className="text-[11px] leading-snug text-slate-700">
+                  <strong className="font-bold text-slate-900 block">
+                    Would you like to receive daily cyber safety tips?
+                  </strong>
+                  Send me a short safety tip every morning at 7:00 AM in my email.
+                </span>
+              </label>
+            )}
 
             {/* Expanded Email Registration Fields */}
             {showEmailForm && (
@@ -338,6 +368,26 @@ export default function Register() {
                     ))}
                   </div>
                 </div>
+
+                {/* Daily Cyber Safety Tips Opt-in Checkbox */}
+                <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-blue-50/40 hover:border-blue-200 transition cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.receiveDailyTips}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      receiveDailyTipsRef.current = checked;
+                      setForm((prev) => ({ ...prev, receiveDailyTips: checked }));
+                    }}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-300 text-[#0056D2] focus:ring-[#0056D2] cursor-pointer shrink-0"
+                  />
+                  <span className="text-[11px] leading-snug text-slate-700">
+                    <strong className="font-bold text-slate-900 block">
+                      Would you like to receive daily cyber safety tips?
+                    </strong>
+                    Send me a short safety tip every morning at 7:00 AM in my email.
+                  </span>
+                </label>
 
                 {/* Submit Button */}
                 <button

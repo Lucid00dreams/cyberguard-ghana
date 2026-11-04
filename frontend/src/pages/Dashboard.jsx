@@ -30,11 +30,13 @@ import { useAuth } from "../context/AuthContext";
 import CyberSpinner from "../components/CyberSpinner";
 import CertificateModal from "../components/CertificateModal";
 import AccountSettingsView from "../components/AccountSettingsView";
+import DeleteAccountSection from "../components/DeleteAccountSection";
 import CyberGuardLogo from "../components/CyberGuardLogo";
 import UserAvatar from "../components/UserAvatar";
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
+  const mainScrollRef = useRef(null);
 
   // Strict role access control
   if (user?.role === "ADMIN" || user?.role === "CSA_OFFICER") {
@@ -84,6 +86,7 @@ export default function Dashboard() {
     setActiveTab(tabKey);
     setSearchParams({ tab: tabKey });
     setMobileSidebarOpen(false);
+    mainScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   };
 
@@ -198,7 +201,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col lg:flex-row font-sans">
+    <div className="h-screen h-[100dvh] overflow-hidden bg-[#F8FAFC] text-slate-900 flex flex-col lg:flex-row font-sans">
       {/* Mobile Backdrop */}
       {mobileSidebarOpen && (
         <div
@@ -209,7 +212,7 @@ export default function Dashboard() {
 
       {/* Minimalist, Clean Light Sidebar */}
       <aside
-        className={`w-64 bg-white text-slate-800 border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:sticky lg:inset-auto lg:top-0 lg:h-screen lg:translate-x-0 lg:shadow-none ${
+        className={`w-64 bg-white text-slate-800 border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:static lg:h-full lg:translate-x-0 lg:shadow-none ${
           mobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
@@ -228,7 +231,7 @@ export default function Dashboard() {
         </div>
 
         {/* Navigation Sections */}
-        <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-6">
+        <nav className="flex-1 overflow-y-auto overscroll-contain py-5 px-3 space-y-6">
           {navSections.map((section) => (
             <div key={section.title} className="space-y-1">
               <div className="px-3 text-[11px] font-semibold text-slate-400">
@@ -314,9 +317,12 @@ export default function Dashboard() {
       </aside>
 
       {/* Main Canvas */}
-      <div className="flex-1 min-w-0 flex flex-col min-h-screen bg-[#F8FAFC]">
+      <div
+        ref={mainScrollRef}
+        className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto overscroll-contain bg-[#F8FAFC]"
+      >
         {/* Clean, Understated Top Navigation Bar */}
-        <header className="h-16 bg-white border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20">
+        <header className="h-16 shrink-0 bg-white border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-20">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileSidebarOpen(true)}
@@ -355,7 +361,7 @@ export default function Dashboard() {
         </header>
 
         {/* Mobile Horizontal Quick Tab Bar */}
-        <div className="lg:hidden bg-white border-b border-slate-200/90 px-3 py-2 flex items-center gap-1.5 overflow-x-auto scrollbar-none sticky top-16 z-10 shadow-2xs">
+        <div className="lg:hidden shrink-0 bg-white border-b border-slate-200/90 px-3 py-2 flex items-center gap-1.5 overflow-x-auto scrollbar-none sticky top-16 z-10 shadow-2xs">
           {[
             { key: "courses", label: "Courses", count: myEnrollments.length },
             { key: "certificates", label: "Certificates", count: completedEnrollments.length },
@@ -817,6 +823,8 @@ export default function Dashboard() {
                   </button>
                 </form>
               </div>
+
+              <DeleteAccountSection compact />
             </div>
           )}
 

@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("cg_token");
     localStorage.removeItem(LAST_ACTIVITY_KEY);
     setUser(null);
+    setSessionTimedOut(false);
   }, []);
 
   const triggerSessionTimeout = useCallback(() => {

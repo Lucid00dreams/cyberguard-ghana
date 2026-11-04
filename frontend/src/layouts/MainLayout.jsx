@@ -81,7 +81,13 @@ export default function MainLayout() {
   const isDashboardRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/dashboard");
 
   return (
-    <div className={`min-h-screen flex flex-col w-full max-w-full overflow-x-clip ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}>
+    <div
+      className={`${
+        isDashboardRoute
+          ? "h-screen h-[100dvh] overflow-hidden"
+          : "min-h-screen overflow-x-clip"
+      } flex flex-col w-full max-w-full ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}
+    >
       <SessionTimeoutModal
         isOpen={sessionTimedOut}
         onClose={dismissSessionTimeoutModal}
@@ -420,7 +426,11 @@ export default function MainLayout() {
         </>
       )}
 
-      <main className={`flex-1 relative z-10 ${!isDashboardRoute ? "pb-16 md:pb-0" : ""}`}>
+      <main
+        className={`flex-1 relative z-10 ${
+          isDashboardRoute ? "min-h-0 h-full overflow-hidden flex flex-col" : "pb-16 md:pb-0"
+        }`}
+      >
         <Outlet />
       </main>
 

@@ -19,6 +19,7 @@ model User {
   avatarUrl         String?
   phoneNumber       String?
   bio               String?
+  receiveDailyTips  Boolean       @default(false)
   tokenVersion      Int           @default(0)
   bookingsAsStudent Booking[]     @relation("StudentBookings")
   certificates      Certificate[]
@@ -34,6 +35,7 @@ model User {
   conversationParticipants ConversationParticipant[]
   sentSecureMessages SecureMessage[] @relation("SentSecureMessages")
   receivedSecureMessages SecureMessage[] @relation("ReceivedSecureMessages")
+  dailyTipLogs      DailyTipEmailLog[]
 
   @@map("users")
 }
@@ -370,4 +372,45 @@ enum FriendRequestStatus {
   PENDING
   ACCEPTED
   DECLINED
+}
+
+model DailyTipDispatch {
+  id               String             @id @default(uuid())
+  dispatchDate     String
+  triggerType      String             @default("SCHEDULED_7AM")
+  tipIndex         Int
+  tipCategory      String
+  tipTitle         String
+  tipSummary       String             @db.Text
+  subject          String
+  totalSubscribers Int                @default(0)
+  sentCount        Int                @default(0)
+  failedCount      Int                @default(0)
+  startedAt        DateTime           @default(now())
+  completedAt      DateTime?
+  logs             DailyTipEmailLog[]
+
+  @@index([dispatchDate])
+  @@map("daily_tip_dispatches")
+}
+
+model DailyTipEmailLog {
+  id             String           @id @default(uuid())
+  dispatchId     String
+  dispatchDate   String
+  userId         String?
+  recipientEmail String
+  recipientName  String
+  tipTitle       String
+  subject        String
+  status         String           @default("SENT")
+  messageId      String?
+  errorMessage   String?
+  sentAt         DateTime         @default(now())
+  dispatch       DailyTipDispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([dispatchDate])
+  @@index([recipientEmail])
+  @@map("daily_tip_email_logs")
 }
