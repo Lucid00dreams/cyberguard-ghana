@@ -1,12 +1,63 @@
 const express = require("express");
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require("express-validator");
 const prisma = require("../config/prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { sendPasswordResetEmail, sendWelcomeEmail } = require("../utils/mailer");
+const {
+  sendPasswordResetEmail,
+  sendWelcomeEmail,
+  sendOtpVerificationEmail,
+} = require("../utils/mailer");
 
 const router = express.Router();
+
+function calculateAgeBandFromDob(dobInput) {
+  if (!dobInput) return { ageBand: "JUNIOR", age: null, birthDate: null };
+  const birthDate = new Date(dobInput);
+  if (isNaN(birthDate.getTime())) {
+    return { ageBand: "JUNIOR", age: null, birthDate: null };
+  }
+  const now = new Date();
+  let age = now.getFullYear() - birthDate.getFullYear();
+  const m = now.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  const ageBand = age <= 18 ? "JUNIOR" : "YOUNG_ADULT";
+  return { ageBand, age, birthDate };
+}
+
+async function allocateCoursesForUser(tx, userId, ageBand) {
+  const matchingCourses = await tx.course.findMany({
+    where: { isPublished: true, ageBand },
+    select: {
+      id: true,
+      title: true,
+      category: true,
+      slug: true,
+      coverImageUrl: true,
+      ageBand: true,
+    },
+    take: 3,
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (matchingCourses.length > 0) {
+    await tx.enrollment.createMany({
+      data: matchingCourses.map((c) => ({
+        userId,
+        courseId: c.id,
+        status: "ACTIVE",
+        progressPct: 0,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  return matchingCourses;
+}
 
 function signToken(user) {
   return jwt.sign(
@@ -112,12 +163,315 @@ async function deleteUserAccountCleanly(targetUserId) {
 }
 
 router.post(
+  "/register-send-otp",
+  [
+    body("email").isEmail().normalizeEmail().withMessage("Please enter a valid email address."),
+    body("password")
+      .isLength({ min: 8 })
+      .withMessage("Password must be at least 8 characters long."),
+    body("dateOfBirth").notEmpty().withMessage("Date of birth is required."),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0]?.msg, errors: errors.array() });
+      }
+
+      const { email, password, dateOfBirth } = req.body;
+
+      // Validate Date of Birth and age limits
+      const { age, ageBand, birthDate } = calculateAgeBandFromDob(dateOfBirth);
+      if (!birthDate || age === null || age < 10 || age > 100) {
+        return res.status(400).json({
+          error: "Please enter a valid date of birth (minimum 10 years old).",
+        });
+      }
+
+      // Check if user already exists
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return res.status(409).json({ error: "An account with this email already exists." });
+      }
+
+      // Check if an unexpired OTP was dispatched in the last 45 seconds to prevent spamming
+      const existingVerification = await prisma.emailVerification.findUnique({
+        where: { email },
+      });
+      if (
+        existingVerification &&
+        existingVerification.createdAt &&
+        Date.now() - new Date(existingVerification.createdAt).getTime() < 45 * 1000
+      ) {
+        const remainingSec = Math.ceil(
+          (45 * 1000 - (Date.now() - new Date(existingVerification.createdAt).getTime())) / 1000
+        );
+        return res.status(429).json({
+          error: `Please wait ${remainingSec} seconds before requesting another code.`,
+        });
+      }
+
+      // Generate cryptographically secure 6-digit numeric code
+      const otpCode = crypto.randomInt(100000, 1000000).toString();
+      const otpHash = await bcrypt.hash(otpCode, 10);
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+      await prisma.emailVerification.upsert({
+        where: { email },
+        update: {
+          otpHash,
+          expiresAt,
+          verified: false,
+          attempts: 0,
+          createdAt: new Date(),
+        },
+        create: {
+          email,
+          otpHash,
+          expiresAt,
+          verified: false,
+          attempts: 0,
+        },
+      });
+
+      // Dispatch verification email
+      const requestOrigin = getRequestOrigin(req);
+      try {
+        await sendOtpVerificationEmail(email, otpCode, { clientOrigin: requestOrigin });
+      } catch (mailErr) {
+        console.error(`[Mailer] OTP email dispatch to ${email} failed:`, mailErr.message);
+        return res.status(500).json({
+          error: "Unable to send verification code email. Please check the address or try again shortly.",
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Verification code sent to your email.",
+        email,
+        expiresAt,
+        estimatedAge: age,
+        ageBand,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  "/register-verify-otp",
+  [
+    body("email").isEmail().normalizeEmail(),
+    body("otp")
+      .trim()
+      .isLength({ min: 6, max: 6 })
+      .withMessage("Verification code must be 6 digits."),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0]?.msg, errors: errors.array() });
+      }
+
+      const { email, otp } = req.body;
+      const verification = await prisma.emailVerification.findUnique({
+        where: { email },
+      });
+
+      if (!verification) {
+        return res.status(400).json({
+          error: "No active verification found for this email. Please request a new code.",
+        });
+      }
+
+      if (verification.expiresAt < new Date()) {
+        return res.status(400).json({
+          error: "Verification code has expired. Please request a new code.",
+        });
+      }
+
+      if (verification.attempts >= 5) {
+        return res.status(429).json({
+          error: "Too many failed attempts. Please request a new code.",
+        });
+      }
+
+      const isValid = await bcrypt.compare(otp, verification.otpHash);
+      if (!isValid) {
+        await prisma.emailVerification.update({
+          where: { email },
+          data: { attempts: { increment: 1 } },
+        });
+        return res.status(400).json({
+          error: "Invalid 6-digit code. Please check your inbox and try again.",
+        });
+      }
+
+      // Mark verified and issue a 30-minute registration completion token
+      await prisma.emailVerification.update({
+        where: { email },
+        data: { verified: true },
+      });
+
+      const verificationToken = jwt.sign(
+        { email, purpose: "registration_verified" },
+        process.env.JWT_SECRET,
+        { expiresIn: "30m" }
+      );
+
+      res.json({
+        success: true,
+        message: "Email verified successfully.",
+        verificationToken,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
+  "/register-complete",
+  [
+    body("verificationToken").notEmpty().withMessage("Verification token is required."),
+    body("email").isEmail().normalizeEmail(),
+    body("password").isLength({ min: 8 }).withMessage("Password must be at least 8 characters."),
+    body("dateOfBirth").notEmpty().withMessage("Date of birth is required."),
+    body("displayName").trim().isLength({ min: 2 }).withMessage("Full name must be at least 2 characters."),
+    body("avatarUrl").optional({ nullable: true }),
+    body("phoneNumber").optional({ nullable: true }),
+    body("bio").optional({ nullable: true }),
+    body("receiveDailyTips").optional().isBoolean(),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0]?.msg, errors: errors.array() });
+      }
+
+      const {
+        verificationToken,
+        email,
+        password,
+        dateOfBirth,
+        displayName,
+        avatarUrl,
+        phoneNumber,
+        bio,
+        receiveDailyTips,
+      } = req.body;
+
+      // Cryptographically verify completion token
+      let decoded;
+      try {
+        decoded = jwt.verify(verificationToken, process.env.JWT_SECRET);
+      } catch (tokenErr) {
+        return res.status(401).json({
+          error: "Verification session expired. Please verify your email again.",
+        });
+      }
+
+      if (
+        !decoded ||
+        decoded.purpose !== "registration_verified" ||
+        decoded.email?.toLowerCase() !== email.toLowerCase()
+      ) {
+        return res.status(401).json({
+          error: "Invalid verification session. Please verify your email again.",
+        });
+      }
+
+      // Calculate age and learning track
+      const { ageBand, age, birthDate } = calculateAgeBandFromDob(dateOfBirth);
+      if (!birthDate) {
+        return res.status(400).json({ error: "Invalid date of birth provided." });
+      }
+
+      // Check if user already registered in the meantime
+      const existing = await prisma.user.findUnique({ where: { email } });
+      if (existing) {
+        return res.status(409).json({ error: "An account with this email already exists." });
+      }
+
+      const passwordHash = await bcrypt.hash(password, 12);
+
+      let allocatedCourses = [];
+      const user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            passwordHash,
+            displayName: displayName.trim(),
+            dateOfBirth: birthDate,
+            ageBand,
+            role: "STUDENT",
+            avatarUrl: avatarUrl || null,
+            phoneNumber: phoneNumber ? phoneNumber.trim() : null,
+            bio: bio ? bio.trim() : null,
+            receiveDailyTips: Boolean(receiveDailyTips),
+          },
+        });
+
+        // Automatically allocate matching courses for this student's learning track
+        allocatedCourses = await allocateCoursesForUser(tx, newUser.id, ageBand);
+
+        // Clean up verification record
+        await tx.emailVerification.deleteMany({ where: { email } });
+
+        return newUser;
+      });
+
+      // Send welcome email
+      const requestOrigin = getRequestOrigin(req);
+      const hasBackendSmtp = Boolean((process.env.SMTP_PASS || "").trim());
+      if (hasBackendSmtp) {
+        sendWelcomeEmail(user.email, user.displayName, {
+          receiveDailyTips: user.receiveDailyTips,
+          clientOrigin: requestOrigin,
+        }).catch((err) => {
+          console.error(`[Mailer] Welcome email to ${user.email} failed:`, err.message);
+        });
+      }
+
+      const token = signToken(user);
+
+      res.status(201).json({
+        token,
+        isNewUser: true,
+        welcomeDispatchedByBackend: hasBackendSmtp,
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+          phoneNumber: user.phoneNumber,
+          bio: user.bio,
+          ageBand: user.ageBand,
+          dateOfBirth: user.dateOfBirth,
+          receiveDailyTips: user.receiveDailyTips,
+        },
+        allocatedCourses,
+        age,
+        ageBand,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post(
   "/register",
   [
     body("email").isEmail().normalizeEmail(),
     body("password").isLength({ min: 8 }).withMessage("Password must be at least 8 characters."),
     body("displayName").trim().isLength({ min: 2 }),
-    body("ageBand").isIn(["JUNIOR", "YOUNG_ADULT"]),
+    body("ageBand").optional().isIn(["JUNIOR", "YOUNG_ADULT"]),
+    body("dateOfBirth").optional(),
     body("receiveDailyTips").optional().isBoolean(),
   ],
   async (req, res, next) => {
@@ -127,25 +481,42 @@ router.post(
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { email, password, displayName, ageBand, avatarUrl, receiveDailyTips } = req.body;
+      const { email, password, displayName, avatarUrl, receiveDailyTips, dateOfBirth } = req.body;
 
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
         return res.status(409).json({ error: "An account with this email already exists." });
       }
 
+      let effectiveAgeBand = req.body.ageBand || "JUNIOR";
+      let birthDate = null;
+      let calculatedAge = null;
+      if (dateOfBirth) {
+        const derived = calculateAgeBandFromDob(dateOfBirth);
+        effectiveAgeBand = derived.ageBand;
+        birthDate = derived.birthDate;
+        calculatedAge = derived.age;
+      }
+
       const passwordHash = await bcrypt.hash(password, 12);
 
-      const user = await prisma.user.create({
-        data: {
-          email,
-          passwordHash,
-          displayName,
-          ageBand,
-          role: "STUDENT",
-          avatarUrl,
-          receiveDailyTips: Boolean(receiveDailyTips),
-        },
+      let allocatedCourses = [];
+      const user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email,
+            passwordHash,
+            displayName,
+            dateOfBirth: birthDate,
+            ageBand: effectiveAgeBand,
+            role: "STUDENT",
+            avatarUrl,
+            receiveDailyTips: Boolean(receiveDailyTips),
+          },
+        });
+
+        allocatedCourses = await allocateCoursesForUser(tx, newUser.id, effectiveAgeBand);
+        return newUser;
       });
 
       // Send personalized welcome email automatically upon first-time registration
@@ -174,8 +545,12 @@ router.post(
           phoneNumber: user.phoneNumber,
           bio: user.bio,
           ageBand: user.ageBand,
+          dateOfBirth: user.dateOfBirth,
           receiveDailyTips: user.receiveDailyTips,
         },
+        allocatedCourses,
+        age: calculatedAge,
+        ageBand: effectiveAgeBand,
       });
     } catch (err) {
       next(err);
@@ -229,21 +604,36 @@ router.post("/google", async (req, res, next) => {
 
     let user = await prisma.user.findUnique({ where: { email: verifiedEmail } });
     let isNewUser = false;
+    let allocatedCourses = [];
     const hasBackendSmtp = Boolean((process.env.SMTP_PASS || "").trim());
 
     if (!user) {
       isNewUser = true;
+      let effectiveAgeBand = "JUNIOR";
+      let birthDate = null;
+      if (req.body.dateOfBirth) {
+        const derived = calculateAgeBandFromDob(req.body.dateOfBirth);
+        effectiveAgeBand = derived.ageBand;
+        birthDate = derived.birthDate;
+      }
+
       const dummyPassword = await bcrypt.hash(`Google_${Date.now()}_${Math.random()}`, 12);
-      user = await prisma.user.create({
-        data: {
-          email: verifiedEmail,
-          passwordHash: dummyPassword,
-          displayName,
-          avatarUrl,
-          role: "STUDENT",
-          ageBand: "JUNIOR",
-          receiveDailyTips: optedInDailyTips,
-        },
+      user = await prisma.$transaction(async (tx) => {
+        const newUser = await tx.user.create({
+          data: {
+            email: verifiedEmail,
+            passwordHash: dummyPassword,
+            displayName,
+            avatarUrl,
+            role: "STUDENT",
+            ageBand: effectiveAgeBand,
+            dateOfBirth: birthDate,
+            receiveDailyTips: optedInDailyTips,
+          },
+        });
+
+        allocatedCourses = await allocateCoursesForUser(tx, newUser.id, effectiveAgeBand);
+        return newUser;
       });
 
       // Send personalized welcome email automatically for first-time Google OAuth signups
@@ -286,8 +676,10 @@ router.post("/google", async (req, res, next) => {
         phoneNumber: user.phoneNumber,
         bio: user.bio,
         ageBand: user.ageBand,
+        dateOfBirth: user.dateOfBirth,
         receiveDailyTips: user.receiveDailyTips,
       },
+      allocatedCourses,
     });
   } catch (err) {
     next(err);
@@ -346,6 +738,7 @@ router.get("/me", requireAuth, async (req, res, next) => {
         displayName: true,
         role: true,
         ageBand: true,
+        dateOfBirth: true,
         avatarUrl: true,
         phoneNumber: true,
         bio: true,
@@ -369,6 +762,7 @@ router.patch(
     body("phoneNumber").optional({ nullable: true }),
     body("bio").optional({ nullable: true }),
     body("ageBand").optional().isIn(["JUNIOR", "YOUNG_ADULT"]),
+    body("dateOfBirth").optional({ nullable: true }),
     body("receiveDailyTips").optional().isBoolean(),
   ],
   async (req, res, next) => {
@@ -376,14 +770,25 @@ router.patch(
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-      const { displayName, ageBand, avatarUrl, phoneNumber, bio, receiveDailyTips } = req.body;
+      const { displayName, ageBand, dateOfBirth, avatarUrl, phoneNumber, bio, receiveDailyTips } = req.body;
       const dataToUpdate = {};
       if (displayName !== undefined) dataToUpdate.displayName = displayName.trim();
-      if (ageBand !== undefined) dataToUpdate.ageBand = ageBand;
       if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl || null;
       if (phoneNumber !== undefined) dataToUpdate.phoneNumber = phoneNumber ? phoneNumber.trim() : null;
       if (bio !== undefined) dataToUpdate.bio = bio ? bio.trim() : null;
       if (typeof receiveDailyTips === "boolean") dataToUpdate.receiveDailyTips = receiveDailyTips;
+
+      if (dateOfBirth !== undefined) {
+        if (!dateOfBirth) {
+          dataToUpdate.dateOfBirth = null;
+        } else {
+          const derived = calculateAgeBandFromDob(dateOfBirth);
+          dataToUpdate.dateOfBirth = derived.birthDate;
+          dataToUpdate.ageBand = derived.ageBand;
+        }
+      } else if (ageBand !== undefined) {
+        dataToUpdate.ageBand = ageBand;
+      }
 
       const updated = await prisma.user.update({
         where: { id: req.user.id },
@@ -394,6 +799,7 @@ router.patch(
           displayName: true,
           role: true,
           ageBand: true,
+          dateOfBirth: true,
           avatarUrl: true,
           phoneNumber: true,
           bio: true,

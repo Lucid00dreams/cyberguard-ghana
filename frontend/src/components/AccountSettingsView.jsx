@@ -19,6 +19,7 @@ import {
   Award,
   Eye,
   EyeOff,
+  Calendar,
 } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
@@ -41,6 +42,9 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [ageBand, setAgeBand] = useState(user?.ageBand || "JUNIOR");
+  const [dateOfBirth, setDateOfBirth] = useState(
+    user?.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split("T")[0] : ""
+  );
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl || "");
 
   // Avatar upload state
@@ -72,6 +76,9 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
       setPhoneNumber(user.phoneNumber || "");
       setBio(user.bio || "");
       setAgeBand(user.ageBand || "JUNIOR");
+      setDateOfBirth(
+        user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split("T")[0] : ""
+      );
       setAvatarUrl(user.avatarUrl || "");
       setReceiveDailyTips(Boolean(user.receiveDailyTips));
     }
@@ -204,6 +211,7 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
         phoneNumber: phoneNumber.trim(),
         bio: bio.trim(),
         ageBand,
+        dateOfBirth: dateOfBirth || null,
       });
 
       updateUser(updateRes.data);
@@ -542,21 +550,54 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
                 </div>
               </div>
 
-              {/* Age Band Selector */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700">Learning Track</label>
-                <select
-                  value={ageBand}
-                  onChange={(e) => setAgeBand(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
-                >
-                  <option value="JUNIOR">
-                    Junior Learner (Primary, JHS & SHS Students)
-                  </option>
-                  <option value="YOUNG_ADULT">
-                    Young Adult & Professional (Tertiary, Fintech, Practitioners)
-                  </option>
-                </select>
+              {/* Date of Birth & Learning Track Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                    <span>Date of Birth</span>
+                    <span className="text-[11px] text-slate-400 font-normal">For age curriculum</span>
+                  </label>
+                  <div className="relative">
+                    <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="date"
+                      max={new Date().toISOString().split("T")[0]}
+                      min="1920-01-01"
+                      value={dateOfBirth}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDateOfBirth(val);
+                        if (val) {
+                          const birth = new Date(val);
+                          if (!isNaN(birth.getTime())) {
+                            const now = new Date();
+                            let age = now.getFullYear() - birth.getFullYear();
+                            const m = now.getMonth() - birth.getMonth();
+                            if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+                            setAgeBand(age <= 18 ? "JUNIOR" : "YOUNG_ADULT");
+                          }
+                        }
+                      }}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-700">Learning Track</label>
+                  <select
+                    value={ageBand}
+                    onChange={(e) => setAgeBand(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
+                  >
+                    <option value="JUNIOR">
+                      Junior Learner (Primary, JHS &amp; SHS Students)
+                    </option>
+                    <option value="YOUNG_ADULT">
+                      Young Adult &amp; Professional (Tertiary, Fintech, Practitioners)
+                    </option>
+                  </select>
+                </div>
               </div>
 
               {/* Bio */}

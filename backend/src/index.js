@@ -116,6 +116,9 @@ app.get("/api/health", (req, res) => {
 // Rate-limited authentication & recovery endpoints
 app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/register-send-otp", authLimiter);
+app.use("/api/auth/register-verify-otp", authLimiter);
+app.use("/api/auth/register-complete", authLimiter);
 app.use("/api/auth/google", authLimiter);
 app.use("/api/auth/forgot-password", resetLimiter);
 app.use("/api/auth/reset-password", resetLimiter);

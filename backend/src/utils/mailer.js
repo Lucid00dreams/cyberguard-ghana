@@ -514,6 +514,84 @@ async function sendDailySafetyTipEmail({
   return sendEmail({ to: toEmail, subject, html, text, headers: extraHeaders, clientOrigin });
 }
 
+/**
+ * Send OTP Verification Email during student registration
+ * @param {string} toEmail - Recipient email
+ * @param {string} otpCode - 6-digit verification code
+ * @param {Object} [options] - { clientOrigin }
+ */
+async function sendOtpVerificationEmail(toEmail, otpCode, options = {}) {
+  const clientOrigin = resolveClientOrigin(options.clientOrigin);
+  const subject = `${otpCode} is your CyberGuard verification code`;
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${otpCode} — Verify Your Email</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 0; }
+        .wrapper { max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); }
+        .header { background-color: #001E3C; padding: 30px 32px; text-align: center; border-bottom: 4px solid #0056D2; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
+        .header p { color: #93c5fd; margin: 6px 0 0 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .content { padding: 36px 32px; text-align: left; }
+        .greeting { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+        .text { font-size: 14px; line-height: 1.6; color: #334155; margin-bottom: 20px; }
+        .code-box { text-align: center; margin: 28px 0; }
+        .code-value { display: inline-block; background-color: #001E3C; color: #38BDF8; font-family: 'SF Mono', Consolas, 'Courier New', monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; padding: 16px 28px; border-radius: 12px; border: 2px solid #0056D2; }
+        .alert-box { background: #f0fdf4; border-left: 4px solid #16a34a; padding: 12px 16px; border-radius: 6px; font-size: 12px; color: #166534; margin: 20px 0; }
+        .security-note { font-size: 12px; color: #64748b; line-height: 1.5; margin-top: 24px; padding-top: 18px; border-top: 1px solid #f1f5f9; }
+        .footer { background-color: #f1f5f9; padding: 20px 32px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="header">
+          <h1>CyberGuard Ghana</h1>
+          <p>National Child Online Protection Academy</p>
+        </div>
+
+        <div class="content">
+          <div class="greeting">Verify Your Email Address</div>
+          <p class="text">
+            Welcome to <strong>CyberGuard Ghana</strong>. To verify your email and complete your registration, enter this 6-digit security code on the signup screen:
+          </p>
+
+          <div class="code-box">
+            <div class="code-value">${otpCode}</div>
+          </div>
+
+          <div class="alert-box">
+            <strong>Time-Sensitive:</strong> This verification code is valid for <strong>10 minutes</strong>.
+          </div>
+
+          <p class="text">
+            Once verified, we'll guide you to choose your profile avatar, set up your learning preferences, and automatically allocate your age-appropriate cybersecurity courses.
+          </p>
+
+          <div class="security-note">
+            <strong>Security Notice:</strong> Never share this 6-digit code with anyone. CyberGuard officers and mentors will never ask for your verification code. If you did not attempt to sign up, you can safely disregard this email.
+          </div>
+        </div>
+
+        <div class="footer">
+          <p><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
+          <p>Governed in accordance with the Ghana Cybersecurity Act, 2020 (Act 1038)</p>
+          <p style="margin-top: 10px; font-size: 10px;">Sent to ${toEmail}. This is an automated security dispatch.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `CyberGuard Ghana Email Verification Code: ${otpCode}\n\nYour 6-digit verification code is: ${otpCode}\n\nEnter this code on the registration page to verify your email. This code will expire in 10 minutes.\n\nNever share this code with anyone.\nCyberGuard Ghana • National Child Online Protection`;
+
+  return sendEmail({ to: toEmail, subject, html, text, clientOrigin });
+}
+
 module.exports = {
   transporter,
   setClientOriginHint,
@@ -521,5 +599,6 @@ module.exports = {
   sendEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,
+  sendOtpVerificationEmail,
   sendDailySafetyTipEmail,
 };
