@@ -526,7 +526,7 @@ router.delete("/users/:id", requireAuth, requireRole("ADMIN"), async (req, res, 
   }
 });
 
-// Password Change Endpoint with strict policy validation
+// Authenticated Change Password — verifies current password, sets new password, rotates tokenVersion, and issues a fresh session JWT
 router.post(
   "/change-password",
   requireAuth,
@@ -543,79 +543,20 @@ router.post(
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
-      const { currentPassword, newPassword } = req.body;
-      const user = await prisma.user.findUnique({ where: { id: req.user.id } });
-      if (!user) return res.status(404).json({ error: "User not found." });
-
-      const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-      if (!valid) {
-        return res.status(401).json({ error: "Current password is incorrect." });
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          error: errors.array()[0]?.msg || "Please check your new password requirements.",
+          errors: errors.array(),
+        });
       }
 
-      const newPasswordHash = await bcrypt.hash(newPassword, 12);
-      await prisma.user.update({
-        where: { id: req.user.id },
-        data: {
-          passwordHash: newPasswordHash,
-          tokenVersion: { increment: 1 },
-        },
-      });
-
-      res.json({ message: "Password updated successfully. All other active sessions have been revoked." });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// 2FA Security Pin Verification Endpoint
-router.post("/2fa/verify", requireAuth, async (req, res, next) => {
-  try {
-    const { code } = req.body;
-    if (!code || typeof code !== "string" || !/^\d{6}$/.test(code.trim())) {
-      return res.status(400).json({ error: "Please enter a valid 6-digit numeric security PIN." });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, email: true },
-    });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found." });
-    }
-
-    // Cryptographic proof validation: in current deployment, MFA security enrollment is optional
-    res.json({ verified: true, message: "Security PIN verified successfully." });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// Authenticated Change Password — verifies current password, sets new password, increments tokenVersion to revoke all sessions
-router.post(
-  "/change-password",
-  requireAuth,
-  [
-    body("currentPassword").notEmpty().withMessage("Current password is required."),
-    body("newPassword")
-      .isLength({ min: 8 })
-      .withMessage("Password must be at least 8 characters."),
-  ],
-  async (req, res, next) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-
       const { currentPassword, newPassword } = req.body;
       const user = await prisma.user.findUnique({ where: { id: req.user.id } });
       if (!user) return res.status(404).json({ error: "User not found." });
 
       const valid = await bcrypt.compare(currentPassword, user.passwordHash);
       if (!valid) {
-        return res.status(400).json({ error: "Incorrect current password." });
+        return res.status(400).json({ error: "Current password is incorrect." });
       }
 
       const newPasswordHash = await bcrypt.hash(newPassword, 12);
@@ -630,7 +571,7 @@ router.post(
       const newToken = signToken(updatedUser);
       res.json({
         success: true,
-        message: "Password updated successfully. All previous sessions have been invalidated.",
+        message: "Password updated. Other active sessions have been signed out.",
         token: newToken,
       });
     } catch (err) {

@@ -83,6 +83,8 @@ export default function CsaPortal() {
   const [certSearch, setCertSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [actionStatus, setActionStatus] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
 
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [searchCategory, setSearchCategory] = useState("all");
@@ -251,18 +253,23 @@ export default function CsaPortal() {
     }
   }
 
-  async function deleteUser(userId, name) {
-    if (!confirm(`Are you sure you want to permanently delete user "${name}"? This action cannot be undone.`)) {
-      return;
-    }
-    try {
-      await api.delete(`/auth/users/${userId}`);
-      setActionStatus(`User account "${name}" removed.`);
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      await loadStats();
-    } catch (err) {
-      setActionStatus(err.response?.data?.error || "Failed to delete user account.");
-    }
+  function deleteUser(userId, name) {
+    setConfirmDialog({
+      title: `Delete user "${name}"?`,
+      message:
+        "This permanently deletes the user's profile, course enrollments, mentorship bookings, and certificates. This action cannot be undone.",
+      confirmLabel: "Delete user",
+      onConfirm: async () => {
+        try {
+          await api.delete(`/auth/users/${userId}`);
+          setActionStatus(`User account "${name}" removed.`);
+          setUsers((prev) => prev.filter((u) => u.id !== userId));
+          await loadStats();
+        } catch (err) {
+          setActionStatus(err.response?.data?.error || "Failed to delete user account.");
+        }
+      },
+    });
   }
 
   async function loadOverview() {
@@ -329,7 +336,7 @@ export default function CsaPortal() {
       a.download = `case-brief-${refCode}.pdf`;
       a.click();
     } catch (e) {
-      alert("Error exporting PDF case brief.");
+      setActionStatus("Error exporting PDF case brief.");
     }
   }
 
@@ -341,21 +348,43 @@ export default function CsaPortal() {
     await loadStats();
   }
 
-  async function removeTutor(tutorId) {
-    if (!confirm("Revoke tutor accreditation and revert user role?")) return;
-    await api.delete(`/tutors/${tutorId}`);
-    setActionStatus("Tutor accreditation revoked.");
-    await loadTutors();
-    await loadPendingTutors();
-    await loadStats();
+  function removeTutor(tutorId) {
+    setConfirmDialog({
+      title: "Revoke tutor verification?",
+      message:
+        "This removes the tutor's verified mentor profile and reverts their account role back to standard learner.",
+      confirmLabel: "Revoke tutor",
+      onConfirm: async () => {
+        try {
+          await api.delete(`/tutors/${tutorId}`);
+          setActionStatus("Tutor verification revoked.");
+          await loadTutors();
+          await loadPendingTutors();
+          await loadStats();
+        } catch (err) {
+          setActionStatus(err.response?.data?.error || "Failed to revoke tutor.");
+        }
+      },
+    });
   }
 
-  async function removeCourse(courseId) {
-    if (!confirm("Permanently delete this course? This action cannot be undone.")) return;
-    await api.delete(`/courses/${courseId}`);
-    setActionStatus("Course removed from catalog.");
-    await loadCourses();
-    await loadStats();
+  function removeCourse(courseId) {
+    setConfirmDialog({
+      title: "Delete course permanently?",
+      message:
+        "This removes the course and its modules, lessons, and quizzes from the catalog. This action cannot be undone.",
+      confirmLabel: "Delete course",
+      onConfirm: async () => {
+        try {
+          await api.delete(`/courses/${courseId}`);
+          setActionStatus("Course removed from catalog.");
+          await loadCourses();
+          await loadStats();
+        } catch (err) {
+          setActionStatus(err.response?.data?.error || "Failed to remove course.");
+        }
+      },
+    });
   }
 
   const filteredCerts = certificates.filter((c) =>
@@ -1655,6 +1684,76 @@ export default function CsaPortal() {
 
         </main>
       </div>
+
+      {/* IN-APP CONFIRMATION DIALOG */}
+      {confirmDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-2xs"
+          onClick={() => {
+            if (!confirmBusy) setConfirmDialog(null);
+          }}
+        >
+          <div
+            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {confirmDialog.title}
+                </h3>
+              </div>
+              <button
+                type="button"
+                disabled={confirmBusy}
+                onClick={() => setConfirmDialog(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {confirmDialog.message}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={confirmBusy}
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={confirmBusy}
+                onClick={async () => {
+                  setConfirmBusy(true);
+                  try {
+                    await confirmDialog.onConfirm?.();
+                    setConfirmDialog(null);
+                  } finally {
+                    setConfirmBusy(false);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+              >
+                {confirmBusy ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Trash2 className="w-3.5 h-3.5" />
+                )}
+                <span>{confirmDialog.confirmLabel || "Confirm"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

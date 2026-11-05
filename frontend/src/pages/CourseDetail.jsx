@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
-import { CheckCircle2, PlayCircle, FileText, HelpCircle, Award, ChevronLeft, ChevronRight, Sparkles, BookOpen, Shield, Lock, Eye, ArrowRight, Clock, RotateCcw } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  PlayCircle,
+  FileText,
+  HelpCircle,
+  Award,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  Shield,
+  Lock,
+  ArrowRight,
+  RotateCcw,
+} from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import CyberSpinner from "../components/CyberSpinner";
@@ -8,18 +21,35 @@ import FormattedLessonContent from "../components/FormattedLessonContent";
 import CertificateModal from "../components/CertificateModal";
 import CourseraVideoPlayer from "../components/CourseraVideoPlayer";
 
+function getInitials(name) {
+  if (!name) return "CG";
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || "")
+    .join("");
+}
+
 export default function CourseDetail() {
   const { slug } = useParams();
   const { user } = useAuth();
   const location = useLocation();
+  const prefersReducedMotion = useReducedMotion();
+
   const [course, setCourse] = useState(null);
   const [activeLesson, setActiveLesson] = useState(null);
   const [message, setMessage] = useState("");
   const [enrolling, setEnrolling] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
+  const [enrollment, setEnrollment] = useState(null);
+  const [earnedCert, setEarnedCert] = useState(null);
   const [showCertModal, setShowCertModal] = useState(false);
 
-  // Callback when a lesson is transcribed or updated dynamically
+  const [testPassword, setTestPassword] = useState("");
+  const [phishInput, setPhishInput] = useState("");
+  const [phishAnalysis, setPhishAnalysis] = useState(null);
+
   function handleLessonUpdated(updatedLesson) {
     setActiveLesson(updatedLesson);
     setCourse((prevCourse) => {
@@ -32,15 +62,10 @@ export default function CourseDetail() {
     });
   }
 
-  // Interactive Widget States
-  const [testPassword, setTestPassword] = useState("");
-  const [phishInput, setPhishInput] = useState("");
-  const [phishAnalysis, setPhishAnalysis] = useState(null);
-
-  const [enrollment, setEnrollment] = useState(null);
-
   useEffect(() => {
+    let cancelled = false;
     api.get(`/courses/${slug}`).then(async (res) => {
+      if (cancelled) return;
       setCourse(res.data);
       const firstLesson = res.data.modules?.[0]?.lessons?.[0];
       setActiveLesson(firstLesson || null);
@@ -48,53 +73,77 @@ export default function CourseDetail() {
 
       if (user && res.data?.id) {
         try {
-          const enrollRes = await api.get(`/courses/${res.data.id}/enrollment`);
-          setEnrolled(!!enrollRes.data?.enrolled);
+          const [enrollRes, certsRes] = await Promise.all([
+            api.get(`/courses/${res.data.id}/enrollment`),
+            api.get("/courses/my-certificates").catch(() => ({ data: [] })),
+          ]);
+          if (cancelled) return;
+          setEnrolled(Boolean(enrollRes.data?.enrolled));
           setEnrollment(enrollRes.data?.enrollment || null);
-        } catch (e) {
-          setEnrolled(false);
-          setEnrollment(null);
+          const matchingCert = (certsRes.data || []).find(
+            (c) => (c.courseId || c.course?.id) === res.data.id
+          );
+          setEarnedCert(matchingCert || null);
+        } catch {
+          if (!cancelled) {
+            setEnrolled(false);
+            setEnrollment(null);
+          }
         }
       } else {
         setEnrolled(false);
         setEnrollment(null);
+        setEarnedCert(null);
       }
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [slug, user]);
 
   async function handleEnroll() {
     if (!user) {
-      setMessage("Please log in or create an account to enroll.");
+      setMessage("Please sign in or create an account to enroll.");
       return;
     }
     if (!course) return;
     setEnrolling(true);
     try {
-      await api.post(`/courses/${course.id}/enroll`);
+      const res = await api.post(`/courses/${course.id}/enroll`);
       setEnrolled(true);
-      setMessage("Enrolled successfully! You now have full access to all lessons and quizzes.");
+      setEnrollment(res.data || { progressPct: 0 });
+      setMessage("Enrolled. You now have access to all lessons and quizzes.");
     } catch (error) {
-      setMessage("Unable to enroll. Please try again.");
+      setMessage(error.response?.data?.error || "Unable to enroll right now. Please try again.");
     } finally {
       setEnrolling(false);
     }
   }
 
   function analyzePhishingUrl() {
-    if (!phishInput) return;
-    const lower = phishInput.toLowerCase();
+    if (!phishInput.trim()) return;
+    const lower = phishInput.trim().toLowerCase();
     let isPhish = false;
-    let reason = "This URL appears to match expected domain structures.";
+    let reason = "No obvious URL formatting red flags found — still verify before entering any PIN.";
 
-    if (lower.includes("free") || lower.includes("bonus") || lower.includes("login-") || lower.includes("verify-")) {
+    if (
+      lower.includes("free") ||
+      lower.includes("bonus") ||
+      lower.includes("login-") ||
+      lower.includes("verify-")
+    ) {
       isPhish = true;
-      reason = "Suspicious keywords detected ('free', 'bonus', 'verify'). High risk of phishing!";
-    } else if (lower.includes("192.168") || lower.includes(".xyz") || lower.includes(".top")) {
+      reason =
+        "Deceptive lure or hyphenated login keywords detected — common in SMS phishing links.";
+    } else if (
+      lower.startsWith("http://") ||
+      /\b\d{1,3}(\.\d{1,3}){3}\b/.test(lower) ||
+      lower.includes(".xyz") ||
+      lower.includes(".top")
+    ) {
       isPhish = true;
-      reason = "Unsafe domain extension or raw IP address detected!";
-    } else if (lower.includes("mtn.com.gh") || lower.includes("ecobank.com")) {
-      isPhish = false;
-      reason = "Legitimate verified domain structure.";
+      reason = "Unencrypted HTTP, raw IP address, or high-risk domain extension detected.";
     }
 
     setPhishAnalysis({ isPhish, reason });
@@ -108,156 +157,167 @@ export default function CourseDetail() {
     if (/[A-Z]/.test(pwd) && /[0-9]/.test(pwd)) score += 25;
     if (/[^A-Za-z0-9]/.test(pwd)) score += 25;
 
-    if (score < 50) return { score, label: "Weak", color: "bg-red-500" };
+    if (score < 50) return { score, label: "Weak", color: "bg-rose-500" };
     if (score < 75) return { score, label: "Moderate", color: "bg-amber-500" };
-    return { score, label: "Unbreakable Fortress", color: "bg-emerald-500" };
+    return { score, label: "Strong", color: "bg-emerald-600" };
   }
 
   if (!course) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-paper">
-        <CyberSpinner size="lg" label="Loading Interactive Learning Experience..." />
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+        <CyberSpinner size="lg" label="Loading course..." />
       </div>
     );
   }
 
   const pwdRating = evaluatePasswordStrength(testPassword);
+  const totalLessons =
+    course.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || 0;
+  const authorName = course.author?.displayName || "CyberGuard Curriculum Team";
+  const authorRole =
+    course.author?.role === "TUTOR" ? "Verified Tutor" : "CyberGuard Curriculum Team";
+  const isCourseCompleted =
+    (enrollment?.progressPct || 0) >= 100 || enrollment?.status === "COMPLETED";
 
   return (
-    <div className="min-h-screen bg-paper pb-16">
-      {/* Full-Width Course Cover Photo Header Banner */}
-      <div className="relative overflow-hidden bg-slate-950 text-white min-h-[420px] flex items-center border-b border-slate-200">
-        {/* Full Course Cover Background Photo Layer */}
+    <div className="min-h-screen bg-[#F8FAFC] pb-16">
+      {/* Course Header Banner */}
+      <div className="relative overflow-hidden bg-[#001E3C] text-white min-h-[360px] flex items-center border-b border-slate-200">
         {course.coverImageUrl && (
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-85 scale-105 transition-transform duration-1000"
+            className="absolute inset-0 bg-cover bg-center opacity-35"
             style={{ backgroundImage: `url('${course.coverImageUrl}')` }}
           />
         )}
-        
-        {/* Dark High-Contrast Gradient Readability Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/85 to-slate-950/50" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#001E3C]/95 via-[#001E3C]/90 to-[#001E3C]/70" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 relative z-10 w-full grid lg:grid-cols-[1fr_360px] gap-8 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 relative z-10 w-full grid lg:grid-cols-[1fr_350px] gap-8 items-center">
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-xs font-semibold text-blue-300">
-              <Link to="/courses" className="hover:underline">Courses</Link>
+            <div className="flex items-center gap-2 text-xs font-semibold text-sky-300">
+              <Link to="/courses" className="hover:underline">
+                Courses
+              </Link>
               <span>/</span>
-              <span>{course.category}</span>
+              <span>{course.category || "Cyber Safety"}</span>
               <span>/</span>
               <span>{course.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}</span>
             </div>
 
-            <div>
-              <span className="text-xs font-semibold text-blue-300 block mb-1">
-                CyberGuard National COP Academy
-              </span>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight drop-shadow-md">
-                {course.title}
-              </h1>
-            </div>
+            <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-tight">
+              {course.title}
+            </h1>
 
-            <p className="text-slate-200 text-sm sm:text-base max-w-2xl leading-relaxed font-medium drop-shadow-sm">
+            <p className="text-slate-200 text-sm sm:text-base max-w-2xl leading-relaxed">
               {course.description}
             </p>
-            
-            <div className="pt-2 flex flex-wrap items-center gap-6 text-xs text-slate-200 font-medium">
-              <span className="flex items-center gap-1.5 font-bold text-amber-400">
-                4.9 ★ <span className="text-slate-300 font-normal">(420 ratings)</span>
+
+            <div className="pt-1 flex flex-wrap items-center gap-5 text-xs text-slate-200 font-medium">
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="w-4 h-4 text-sky-300" />
+                {course.modules?.length || 0}{" "}
+                {course.modules?.length === 1 ? "module" : "modules"} ({totalLessons}{" "}
+                {totalLessons === 1 ? "lesson" : "lessons"})
               </span>
-              <span className="flex items-center gap-1.5"><Clock className="w-4 h-4 text-blue-400" /> Approx. 45 Mins</span>
-              <span className="flex items-center gap-1.5"><BookOpen className="w-4 h-4 text-emerald-400" /> {course.modules?.length || 0} Modules</span>
-              <span className="flex items-center gap-1.5"><Award className="w-4 h-4 text-amber-400" /> Certificate Included</span>
+              <span className="flex items-center gap-1.5">
+                <Award className="w-4 h-4 text-amber-300" />
+                Verifiable completion certificate
+              </span>
             </div>
 
             <div className="pt-2 flex items-center gap-3 text-xs text-slate-300">
-              <div className="w-8 h-8 rounded-full bg-[#0056D2] text-white flex items-center justify-center font-bold text-xs shadow-md">
-                AB
+              <div className="w-8 h-8 rounded-full bg-[#0056D2] text-white flex items-center justify-center font-bold text-xs">
+                {getInitials(authorName)}
               </div>
               <div>
-                <span className="text-white font-bold block">Instructor: Ama Boateng</span>
-                <span className="text-[11px] text-slate-300">Senior Cybersecurity Specialist</span>
+                <span className="text-white font-semibold block">{authorName}</span>
+                <span className="text-[11px] text-slate-300">{authorRole}</span>
               </div>
             </div>
           </div>
 
-          {/* Standalone Enroll/Continue CTA Section */}
-          <div className="space-y-4 bg-slate-950/80 p-6 sm:p-8 rounded-3xl border border-white/10 backdrop-blur-md shadow-2xl">
+          {/* Enroll / Progress Card */}
+          <div className="space-y-4 bg-white/10 p-6 rounded-2xl border border-white/15 backdrop-blur-md">
             <div className="space-y-1">
-              <span className="text-xs font-semibold text-emerald-400">
-                {enrolled ? "Enrolled & Active" : "Free Enrollment Active"}
+              <span className="text-xs font-semibold text-sky-300">
+                {enrolled ? "Enrolled" : "Free course"}
               </span>
               <h3 className="text-lg font-bold text-white">
-                {enrolled ? "My Course Progress" : "Start Learning Today"}
+                {enrolled ? "Your progress" : "Start learning"}
               </h3>
-              <p className="text-xs text-slate-300">
+              <p className="text-xs text-slate-200 leading-relaxed">
                 {enrolled
-                  ? "Access interactive modules, complete quiz challenges, or retake lessons."
-                  : "Gain instant access to interactive modules & official COP certificate."}
+                  ? "Work through each module and pass the final quiz to earn your certificate."
+                  : "Free access to all lessons, practice checks, and a verifiable certificate."}
               </p>
             </div>
 
             {enrolled ? (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <button
+                  type="button"
                   onClick={() => {
                     const firstLesson = course.modules?.[0]?.lessons?.[0];
                     if (firstLesson) setActiveLesson(firstLesson);
                   }}
-                  className="w-full bg-[#0056D2] hover:bg-[#00419E] text-white font-bold py-3.5 rounded-xl shadow-xl shadow-blue-600/30 transition hover:scale-[1.02] flex items-center justify-center gap-2 text-sm"
+                  className="w-full bg-[#0056D2] hover:bg-[#00419E] text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 text-xs cursor-pointer"
                 >
-                  <RotateCcw className="w-4 h-4" /> {enrollment?.progressPct >= 100 ? "Retake Course / Review Content" : "Continue Course"}
+                  <RotateCcw className="w-4 h-4" />
+                  <span>{isCourseCompleted ? "Review lessons" : "Continue lessons"}</span>
                 </button>
 
-                {enrollment?.progressPct >= 100 || enrollment?.status === "COMPLETED" ? (
+                {isCourseCompleted ? (
                   <button
+                    type="button"
                     onClick={() => setShowCertModal(true)}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-xs"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs cursor-pointer"
                   >
-                    <Award className="w-4 h-4" /> View & Export Certificate (Unlocked)
+                    <Award className="w-4 h-4" />
+                    <span>View Certificate</span>
                   </button>
                 ) : (
-                  <div className="p-3 rounded-xl bg-slate-900/90 border border-amber-500/40 text-amber-300 text-xs font-bold text-center flex items-center justify-center gap-2">
-                    <Lock className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>Certificate Locked ({enrollment?.progressPct || 0}% Complete)</span>
+                  <div className="p-2.5 rounded-xl bg-slate-950/60 border border-white/10 text-slate-200 text-xs font-medium text-center flex items-center justify-center gap-2">
+                    <Lock className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                    <span>Certificate unlocks at 100% ({enrollment?.progressPct || 0}%)</span>
                   </div>
                 )}
               </div>
             ) : (
               <button
+                type="button"
                 onClick={handleEnroll}
                 disabled={enrolling}
-                className="w-full bg-[#0056D2] hover:bg-[#00419E] text-white font-bold py-4 rounded-xl shadow-xl shadow-blue-600/30 transition hover:scale-[1.02] disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-[#0056D2] hover:bg-[#00419E] text-white font-bold py-3.5 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm cursor-pointer"
               >
-                {enrolling ? "Enrolling…" : "Enroll Now in Course (Free)"}
+                {enrolling ? "Enrolling..." : "Enroll for Free"}
               </button>
             )}
 
-            {message && <p className="text-xs text-emerald-400 font-bold text-center mt-2">{message}</p>}
-            <p className="text-[11px] text-slate-400 text-center">100% Free · Flexible Schedule · Verifiable Certificate</p>
+            {message && (
+              <p className="text-xs text-sky-200 font-semibold text-center pt-1">{message}</p>
+            )}
           </div>
         </div>
       </div>
 
       {/* Main Course Player Area */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-[340px_1fr] gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-[320px_1fr] gap-6 items-start">
         {/* Left Sidebar: Curriculum Navigator */}
-        <aside className="glass-card rounded-3xl p-5 space-y-6 h-fit border border-line shadow-lg">
-          <div className="flex items-center justify-between border-b border-line pb-3">
-            <h3 className="text-base font-bold text-slate-900 tracking-tight">Course Content</h3>
-            <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
-              {course.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0)} Lessons
+        <aside className="bg-white rounded-2xl p-5 space-y-5 border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h3 className="text-sm font-bold text-slate-900">Course Outline</h3>
+            <span className="text-xs font-medium text-slate-500">
+              {totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}
             </span>
           </div>
 
           <div className="space-y-4">
             {course.modules?.map((mod, mIdx) => (
               <div key={mod.id} className="space-y-2">
-                <div className="text-xs font-bold text-mist uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-5 h-5 rounded-md bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-mono text-[10px]">
+                <div className="text-xs font-bold text-slate-500 flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-md bg-blue-50 text-[#0056D2] flex items-center justify-center font-mono text-[10px] shrink-0">
                     {mIdx + 1}
                   </span>
-                  {mod.title}
+                  <span className="text-slate-800">{mod.title}</span>
                 </div>
 
                 <div className="space-y-1">
@@ -268,27 +328,44 @@ export default function CourseDetail() {
                     return (
                       <button
                         key={lesson.id}
+                        type="button"
                         onClick={() => setActiveLesson(lesson)}
-                        className={`w-full text-left p-3 rounded-xl transition-all flex items-center justify-between text-xs font-semibold ${
+                        className={`w-full text-left p-2.5 rounded-xl transition flex items-center justify-between text-xs font-semibold cursor-pointer ${
                           isActive
-                            ? "bg-blue-600 text-white shadow-md shadow-blue-600/20"
-                            : "bg-paper hover:bg-black/5 dark:hover:bg-white/5 text-ink border border-line/50"
+                            ? "bg-[#0056D2] text-white"
+                            : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70"
                         }`}
                       >
                         <div className="flex items-center gap-2.5 truncate">
                           {isQuiz ? (
-                            <HelpCircle className={`w-4 h-4 shrink-0 ${isActive ? "text-amber-300" : "text-amber-500"}`} />
+                            <HelpCircle
+                              className={`w-4 h-4 shrink-0 ${
+                                isActive ? "text-amber-200" : "text-amber-600"
+                              }`}
+                            />
                           ) : lesson.type === "VIDEO" ? (
-                            <PlayCircle className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-blue-500"}`} />
+                            <PlayCircle
+                              className={`w-4 h-4 shrink-0 ${
+                                isActive ? "text-white" : "text-[#0056D2]"
+                              }`}
+                            />
                           ) : (
-                            <FileText className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-emerald-500"}`} />
+                            <FileText
+                              className={`w-4 h-4 shrink-0 ${
+                                isActive ? "text-white" : "text-emerald-600"
+                              }`}
+                            />
                           )}
                           <span className="truncate">{lesson.title}</span>
                         </div>
                         {isQuiz && (
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            isActive ? "bg-amber-400/30 text-amber-200" : "bg-amber-500/10 text-amber-600"
-                          }`}>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                              isActive
+                                ? "bg-white/20 text-white"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
                             Quiz
                           </span>
                         )}
@@ -302,231 +379,285 @@ export default function CourseDetail() {
         </aside>
 
         {/* Right Main Viewer */}
-        <main className="glass-card rounded-3xl p-6 sm:p-8 space-y-6 border border-line shadow-xl">
+        <main className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/90 shadow-2xs">
           {!user ? (
-            /* Unauthenticated Lock Screen */
-            <div className="text-center py-16 px-4 space-y-6 max-w-md mx-auto">
-              <div className="w-16 h-16 rounded-3xl bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center mx-auto shadow-lg">
-                <Lock className="w-8 h-8" />
+            <div className="text-center py-14 px-4 space-y-5 max-w-md mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center mx-auto">
+                <Lock className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-xs font-mono uppercase tracking-widest text-blue-600 dark:text-blue-400 font-bold">
-                  Sign In Required
-                </span>
-                <h2 className="text-2xl font-black text-ink mt-1">Sign In to Access Course</h2>
-                <p className="text-sm text-mist mt-2 leading-relaxed">
-                  Please log in or create a student account to access full course lessons, interactive tools, and quiz challenges.
+                <h2 className="text-xl font-extrabold text-slate-900">
+                  Sign in to start this course
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                  Sign in or create a free account to read lessons, track your progress, and earn your completion certificate.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
                 <Link
                   to="/login"
                   state={{ from: location, intercepted: true }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl shadow-lg shadow-blue-600/30 transition text-sm flex items-center justify-center gap-2"
+                  className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-5 py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2"
                 >
-                  Sign In to Access <ArrowRight className="w-4 h-4" />
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
                 <Link
                   to="/register"
                   state={{ from: location, intercepted: true }}
-                  className="border border-line bg-paper text-ink font-bold px-6 py-3 rounded-xl hover:border-slate-400 transition text-sm flex items-center justify-center"
+                  className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-bold px-5 py-2.5 rounded-xl transition text-xs flex items-center justify-center"
                 >
-                  Create Account
+                  Create Free Account
                 </Link>
               </div>
             </div>
           ) : !enrolled ? (
-            /* Authenticated but Not Enrolled Lock Screen */
-            <div className="text-center py-16 px-4 space-y-6 max-w-md mx-auto">
-              <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 border border-amber-500/30 flex items-center justify-center mx-auto shadow-lg">
-                <BookOpen className="w-8 h-8" />
+            <div className="text-center py-14 px-4 space-y-5 max-w-md mx-auto">
+              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto">
+                <BookOpen className="w-6 h-6" />
               </div>
               <div>
-                <span className="text-xs font-mono uppercase tracking-widest text-amber-600 dark:text-amber-400 font-bold">
-                  Enrollment Required
-                </span>
-                <h2 className="text-2xl font-black text-ink mt-1">Enroll to Unlock Lessons</h2>
-                <p className="text-sm text-mist mt-2 leading-relaxed">
-                  Enroll in <span className="font-bold text-ink">{course.title}</span> to gain access to all modules, hands-on simulators, and certificates.
+                <h2 className="text-xl font-extrabold text-slate-900">
+                  Enroll to unlock lessons
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                  Enroll in <span className="font-semibold text-slate-900">{course.title}</span> for free to access every module and assessment quiz.
                 </p>
               </div>
 
               <button
+                type="button"
                 onClick={handleEnroll}
                 disabled={enrolling}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-xl shadow-blue-600/30 transition hover:scale-[1.02] disabled:opacity-60 flex items-center justify-center gap-2 text-sm"
+                className="w-full bg-[#0056D2] hover:bg-[#00419E] text-white font-bold py-3 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 text-xs cursor-pointer"
               >
-                {enrolling ? "Enrolling..." : "Enroll Now in Course (Free)"} <ArrowRight className="w-4 h-4" />
+                <span>{enrolling ? "Enrolling..." : "Enroll for Free"}</span>
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           ) : !activeLesson ? (
-            <p className="text-mist text-center py-12">Select a lesson from the sidebar to begin.</p>
-          ) : activeLesson.type === "QUIZ" && activeLesson.quiz ? (
-            /* Dedicated Quiz Launcher Card */
-            <div className="text-center py-10 space-y-6 max-w-xl mx-auto">
-              <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-500 border border-amber-500/30 flex items-center justify-center mx-auto shadow-lg">
-                <HelpCircle className="w-8 h-8" />
-              </div>
-              <div>
-                <span className="text-xs font-mono uppercase tracking-widest text-amber-600 dark:text-amber-400 font-bold">
-                  Interactive Assessment
-                </span>
-                <h2 className="text-3xl font-black text-ink mt-1">{activeLesson.title}</h2>
-                <p className="text-sm text-mist mt-2">
-                  Test your cybersecurity instincts in our dedicated fullscreen quiz challenge.
-                </p>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-paper border border-line text-left text-xs space-y-2">
-                <div className="flex justify-between text-ink font-bold">
-                  <span>Pass Threshold:</span>
-                  <span>{activeLesson.quiz.passMarkPct}% Score</span>
-                </div>
-                <div className="flex justify-between text-ink font-bold">
-                  <span>Questions Count:</span>
-                  <span>{activeLesson.quiz.questions?.length || 5} Questions</span>
-                </div>
-                <div className="flex justify-between text-ink font-bold">
-                  <span>XP Reward:</span>
-                  <span className="text-amber-500">+100 Points</span>
-                </div>
-              </div>
-
-              <Link
-                to={`/courses/${slug}/quiz/${activeLesson.quiz.id}`}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold px-8 py-4 rounded-2xl shadow-xl shadow-blue-600/30 transition hover:scale-105"
-              >
-                Launch Dedicated Quiz Challenge <ArrowRight className="w-5 h-5" />
-              </Link>
-            </div>
+            <p className="text-slate-500 text-sm text-center py-12">
+              Select a lesson from the outline to begin.
+            </p>
           ) : (
-            /* Regular Text or Video Lesson Content */
-            <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-line pb-4">
-                <div>
-                  <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest">
-                    Lesson Content
-                  </span>
-                  <h2 className="text-2xl font-black text-ink mt-1">{activeLesson.title}</h2>
-                </div>
-              </div>
-
-              {activeLesson.type === "VIDEO" ? (
-                <CourseraVideoPlayer
-                  lesson={activeLesson}
-                  onLessonUpdate={handleLessonUpdated}
-                />
-              ) : (
-                <FormattedLessonContent content={activeLesson.textContent} />
-              )}
-
-              {/* Embedded Interactive Hands-On Simulator Widgets */}
-              {activeLesson.title?.toLowerCase().includes("momo") || activeLesson.title?.toLowerCase().includes("url") ? (
-                <div className="mt-8 p-6 rounded-3xl bg-blue-500/5 border border-blue-500/20 space-y-4">
-                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-sm">
-                    <Shield className="w-5 h-5" />
-                    Interactive Hands-On Tool: URL Phishing Analyzer
-                  </div>
-                  <p className="text-xs text-mist">Test suspicious SMS or website links to detect typosquatting tricks.</p>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. http://mtn-free-bonus.xyz"
-                      value={phishInput}
-                      onChange={(e) => setPhishInput(e.target.value)}
-                      className="flex-1 px-4 py-2.5 rounded-xl border border-line bg-paper text-sm text-ink focus:outline-none"
-                    />
-                    <button
-                      onClick={analyzePhishingUrl}
-                      className="bg-blue-600 text-white font-bold px-5 py-2.5 rounded-xl text-xs"
-                    >
-                      Analyze Link
-                    </button>
-                  </div>
-                  {phishAnalysis && (
-                    <div className={`p-3 rounded-xl text-xs font-bold ${phishAnalysis.isPhish ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"}`}>
-                      {phishAnalysis.reason}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeLesson.id}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+                transition={{ duration: 0.18 }}
+              >
+                {activeLesson.type === "QUIZ" && activeLesson.quiz ? (
+                  <div className="text-center py-10 space-y-6 max-w-lg mx-auto">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto">
+                      <HelpCircle className="w-7 h-7" />
                     </div>
-                  )}
-                </div>
-              ) : activeLesson.title?.toLowerCase().includes("password") ? (
-                <div className="mt-8 p-6 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 space-y-4">
-                  <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
-                    <Lock className="w-5 h-5" />
-                    Interactive Hands-On Tool: Password Strength Tester
-                  </div>
-                  <p className="text-xs text-mist">Type a passphrase to test its brute-force resistance score.</p>
-                  <input
-                    type="text"
-                    placeholder="Type a sample passphrase..."
-                    value={testPassword}
-                    onChange={(e) => setTestPassword(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-line bg-paper text-sm text-ink focus:outline-none font-mono"
-                  />
-                  {testPassword && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-xs font-bold">
-                        <span>Strength Score:</span>
-                        <span>{pwdRating.label}</span>
+                    <div>
+                      <span className="text-xs font-semibold text-amber-700">
+                        Course Assessment
+                      </span>
+                      <h2 className="text-2xl font-extrabold text-slate-900 mt-1">
+                        {activeLesson.title}
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-600 mt-2">
+                        Pass this assessment to verify your understanding and unlock your course certificate.
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-left text-xs space-y-2.5">
+                      <div className="flex justify-between text-slate-700">
+                        <span className="font-medium">Passing score</span>
+                        <span className="font-bold text-slate-900">
+                          {activeLesson.quiz.passMarkPct}%
+                        </span>
                       </div>
-                      <div className="w-full bg-slate-200 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                        <div className={`h-full transition-all duration-300 ${pwdRating.color}`} style={{ width: `${pwdRating.score}%` }} />
+                      <div className="flex justify-between text-slate-700">
+                        <span className="font-medium">Questions</span>
+                        <span className="font-bold text-slate-900">
+                          {activeLesson.quiz.questions?.length || 0}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-slate-700">
+                        <span className="font-medium">Credential</span>
+                        <span className="font-semibold text-emerald-700">
+                          Verifiable Certificate
+                        </span>
                       </div>
                     </div>
-                  )}
-                </div>
-              ) : null}
 
-              {/* Slide Navigation Control Bar with Next/Prev Buttons */}
-              {(() => {
-                const allLessons = course.modules?.flatMap((m) => m.lessons || []) || [];
-                const currentLessonIdx = allLessons.findIndex((l) => l.id === activeLesson?.id);
-                const prevLesson = currentLessonIdx > 0 ? allLessons[currentLessonIdx - 1] : null;
-                const nextLesson = currentLessonIdx < allLessons.length - 1 ? allLessons[currentLessonIdx + 1] : null;
-                const quizLesson = allLessons.find((l) => l.type === "QUIZ" && l.quiz);
-
-                return (
-                  <div className="pt-6 border-t border-line flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <button
-                      type="button"
-                      onClick={() => prevLesson && setActiveLesson(prevLesson)}
-                      disabled={!prevLesson}
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-line bg-paper text-sm font-bold text-ink hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-xs"
+                    <Link
+                      to={`/courses/${slug}/quiz/${activeLesson.quiz.id}`}
+                      className="inline-flex items-center gap-2 bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-6 py-3.5 rounded-xl transition text-sm"
                     >
-                      <ChevronLeft className="w-4 h-4" /> Previous Slide
-                    </button>
+                      <span>Start Assessment Quiz</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="border-b border-slate-100 pb-4">
+                      <span className="text-xs font-semibold text-[#0056D2]">Lesson</span>
+                      <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">
+                        {activeLesson.title}
+                      </h2>
+                    </div>
 
-                    <span className="text-xs font-mono font-bold text-mist">
-                      Slide {currentLessonIdx + 1} of {allLessons.length}
-                    </span>
+                    {activeLesson.type === "VIDEO" ? (
+                      <CourseraVideoPlayer
+                        lesson={activeLesson}
+                        onLessonUpdate={handleLessonUpdated}
+                      />
+                    ) : (
+                      <FormattedLessonContent content={activeLesson.textContent} />
+                    )}
 
-                    {nextLesson ? (
-                      <button
-                        type="button"
-                        onClick={() => setActiveLesson(nextLesson)}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#0056D2] hover:bg-[#00419E] text-white text-sm font-bold shadow-md transition hover:scale-[1.02]"
-                      >
-                        Next Slide <ChevronRight className="w-4 h-4" />
-                      </button>
-                    ) : quizLesson?.quiz ? (
-                      <Link
-                        to={`/courses/${slug}/quiz/${quizLesson.quiz.id}`}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-sm font-bold shadow-md transition hover:scale-[1.02]"
-                      >
-                        Proceed to Quiz Challenge <ArrowRight className="w-4 h-4" />
-                      </Link>
+                    {/* Hands-on Lesson Mini-Check */}
+                    {activeLesson.title?.toLowerCase().includes("momo") ||
+                    activeLesson.title?.toLowerCase().includes("url") ? (
+                      <div className="mt-8 p-5 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-3">
+                        <div className="flex items-center gap-2 text-[#0056D2] font-bold text-sm">
+                          <Shield className="w-4 h-4" />
+                          <span>Practice Check: Inspect a Link</span>
+                        </div>
+                        <p className="text-xs text-slate-600">
+                          Paste a sample SMS or website link to spot common phishing red flags.
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            placeholder="e.g. http://mtn-free-bonus.xyz"
+                            value={phishInput}
+                            onChange={(e) => setPhishInput(e.target.value)}
+                            className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-none focus:border-[#0056D2]"
+                          />
+                          <button
+                            type="button"
+                            onClick={analyzePhishingUrl}
+                            className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-4 py-2.5 rounded-xl text-xs transition cursor-pointer"
+                          >
+                            Check Link
+                          </button>
+                        </div>
+                        {phishAnalysis && (
+                          <div
+                            className={`p-3 rounded-xl text-xs font-semibold ${
+                              phishAnalysis.isPhish
+                                ? "bg-rose-50 text-rose-800 border border-rose-200"
+                                : "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                            }`}
+                          >
+                            {phishAnalysis.reason}
+                          </div>
+                        )}
+                      </div>
+                    ) : activeLesson.title?.toLowerCase().includes("password") ? (
+                      <div className="mt-8 p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                        <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                          <Lock className="w-4 h-4 text-[#0056D2]" />
+                          <span>Practice Check: Passphrase Strength</span>
+                        </div>
+                        <p className="text-xs text-slate-600">
+                          Type a sample passphrase (never enter a real password you use elsewhere).
+                        </p>
+                        <input
+                          type="text"
+                          placeholder="Try a 4-word passphrase..."
+                          value={testPassword}
+                          onChange={(e) => setTestPassword(e.target.value)}
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-mono text-slate-900 focus:outline-none focus:border-[#0056D2]"
+                        />
+                        {testPassword && (
+                          <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs font-semibold text-slate-700">
+                              <span>Strength</span>
+                              <span>{pwdRating.label}</span>
+                            </div>
+                            <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-300 ${pwdRating.color}`}
+                                style={{ width: `${pwdRating.score}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ) : null}
+
+                    {/* Lesson Navigation Bar */}
+                    {(() => {
+                      const allLessons =
+                        course.modules?.flatMap((m) => m.lessons || []) || [];
+                      const currentLessonIdx = allLessons.findIndex(
+                        (l) => l.id === activeLesson?.id
+                      );
+                      const prevLesson =
+                        currentLessonIdx > 0 ? allLessons[currentLessonIdx - 1] : null;
+                      const nextLesson =
+                        currentLessonIdx < allLessons.length - 1
+                          ? allLessons[currentLessonIdx + 1]
+                          : null;
+                      const quizLesson = allLessons.find(
+                        (l) => l.type === "QUIZ" && l.quiz
+                      );
+
+                      return (
+                        <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                          <button
+                            type="button"
+                            onClick={() => prevLesson && setActiveLesson(prevLesson)}
+                            disabled={!prevLesson}
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                            <span>Previous Lesson</span>
+                          </button>
+
+                          <span className="text-xs font-medium text-slate-500">
+                            Lesson {currentLessonIdx + 1} of {allLessons.length}
+                          </span>
+
+                          {nextLesson ? (
+                            <button
+                              type="button"
+                              onClick={() => setActiveLesson(nextLesson)}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#0056D2] hover:bg-[#00419E] text-white text-xs font-bold transition cursor-pointer"
+                            >
+                              <span>Next Lesson</span>
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          ) : quizLesson?.quiz ? (
+                            <Link
+                              to={`/courses/${slug}/quiz/${quizLesson.quiz.id}`}
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition"
+                            >
+                              <span>Start Assessment Quiz</span>
+                              <ArrowRight className="w-4 h-4" />
+                            </Link>
+                          ) : null}
+                        </div>
+                      );
+                    })()}
                   </div>
-                );
-              })()}
-            </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           )}
         </main>
       </div>
 
       {showCertModal && (
         <CertificateModal
+          certificate={
+            earnedCert
+              ? {
+                  certRef: earnedCert.certRef,
+                  courseTitle: course?.title,
+                  issuedAt: earnedCert.issuedAt,
+                }
+              : undefined
+          }
           studentName={user?.displayName}
           courseTitle={course?.title}
           onClose={() => setShowCertModal(false)}
@@ -535,5 +666,3 @@ export default function CourseDetail() {
     </div>
   );
 }
-
-

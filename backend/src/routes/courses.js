@@ -23,7 +23,7 @@ router.get("/", async (req, res, next) => {
         coverImageUrl: true,
         ageBand: true,
         category: true,
-        _count: { select: { enrollments: true } },
+        _count: { select: { enrollments: true, modules: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -355,6 +355,9 @@ router.get("/:slug", async (req, res, next) => {
     const course = await prisma.course.findUnique({
       where: { slug: req.params.slug },
       include: {
+        author: {
+          select: { displayName: true, role: true },
+        },
         modules: {
           orderBy: { order: "asc" },
           include: {

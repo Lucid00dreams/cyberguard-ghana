@@ -78,7 +78,7 @@ export default function DeleteAccountSection({ compact = false }) {
     <>
       <div
         className={`bg-white border border-rose-200/90 shadow-xs ${
-          compact ? "rounded-xl p-6 max-w-xl" : "rounded-3xl p-6 sm:p-7"
+          compact ? "rounded-xl p-6 max-w-xl" : "rounded-2xl p-6"
         }`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">

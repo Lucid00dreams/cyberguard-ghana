@@ -1,10 +1,9 @@
 import { useEffect, useState, useRef } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Shield,
   ShieldAlert,
-  Sun,
-  Moon,
   BookOpen,
   Users,
   LayoutDashboard,
@@ -13,21 +12,15 @@ import {
   X,
   Sparkles,
   PhoneCall,
-  Zap,
-  Award,
-  Search,
   SlidersHorizontal,
   Lock,
-  Store,
+  Wrench,
   ChevronDown,
   LogOut,
   MessageSquare,
-  Smartphone
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
 import { useNotifications } from "../context/NotificationContext";
-import CyberSpinner from "../components/CyberSpinner";
 import UserAvatar from "../components/UserAvatar";
 import SessionTimeoutModal from "../components/SessionTimeoutModal";
 import CyberGodChatbot from "../components/CyberGodChatbot";
@@ -44,7 +37,6 @@ export default function MainLayout() {
   const { unreadCount } = useNotifications();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [routeLoading, setRouteLoading] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const userDropdownRef = useRef(null);
@@ -55,15 +47,9 @@ export default function MainLayout() {
   };
 
   useEffect(() => {
-    // Show custom CyberSpinner loading screen on route changes
-    setRouteLoading(true);
     setUserDropdownOpen(false);
     setMobileMenuOpen(false);
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    const timer = setTimeout(() => {
-      setRouteLoading(false);
-    }, 320);
-    return () => clearTimeout(timer);
   }, [location.pathname]);
 
   // Click outside to close user dropdown
@@ -93,9 +79,6 @@ export default function MainLayout() {
         onClose={dismissSessionTimeoutModal}
         onLogin={handleLoginAgain}
       />
-      {routeLoading && (
-        <CyberSpinner fullScreen label="Loading CyberGuard Ghana..." />
-      )}
       {!isDashboardRoute && (
         <>
           {/* Top National Incident Helpline Notice Bar */}
@@ -130,7 +113,7 @@ export default function MainLayout() {
                   <BookOpen className="w-3.5 h-3.5" /> Courses
                 </NavLink>
                 <NavLink to="/extensions" className={navLinkClass}>
-                  <Store className="w-3.5 h-3.5 text-[#0056D2]" /> Extensions
+                  <Wrench className="w-3.5 h-3.5 text-[#0056D2]" /> Safety Tools
                 </NavLink>
                 <NavLink to="/tutors" className={navLinkClass}>
                   <Users className="w-3.5 h-3.5" /> Mentors
@@ -140,7 +123,7 @@ export default function MainLayout() {
                     <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
                     <span className="text-emerald-700 font-semibold">CyberChat</span>
                     {unreadCount > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-rose-600 animate-pulse shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
                     )}
                   </NavLink>
                 )}
@@ -173,21 +156,28 @@ export default function MainLayout() {
                   <div className="relative" ref={userDropdownRef}>
                     <button
                       onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                      className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition shadow-2xs"
+                      className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
                     >
                       <UserAvatar user={user} size="sm" rounded="rounded-lg" />
                       <span className="hidden sm:inline-block text-xs font-bold text-slate-800 max-w-[90px] truncate text-left">
                         {user.displayName}
                       </span>
                       <ChevronDown
-                        className={`w-3.5 h-3.5 text-slate-400 transition-transform ${userDropdownOpen ? "rotate-180" : ""
+                        className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-150 ${userDropdownOpen ? "rotate-180" : ""
                           }`}
                       />
                     </button>
 
                     {/* Clean User Dropdown Popover */}
-                    {userDropdownOpen && (
-                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-slate-200/90 shadow-xl py-1.5 z-50 animate-in fade-in-50 zoom-in-95 duration-150">
+                    <AnimatePresence>
+                      {userDropdownOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                          transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+                          className="absolute right-0 mt-2 w-56 bg-white rounded-xl border border-slate-200/90 shadow-lg py-1.5 z-50"
+                        >
                         <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center gap-2.5">
                           <UserAvatar user={user} size="md" rounded="rounded-xl" />
                           <div className="min-w-0 flex-1">
@@ -247,14 +237,15 @@ export default function MainLayout() {
                               setUserDropdownOpen(false);
                               logout();
                             }}
-                            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition"
+                            className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition cursor-pointer"
                           >
                             <LogOut className="w-4 h-4 text-rose-500" />
                             <span>Sign out</span>
                           </button>
                         </div>
-                      </div>
-                    )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 ) : (
                   <div className="hidden sm:flex items-center gap-1.5">
@@ -326,15 +317,15 @@ export default function MainLayout() {
                     className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
                   >
                     <BookOpen className="w-4 h-4 text-[#0056D2]" />
-                    <span>Courses & Curriculums</span>
+                    <span>Safety Courses</span>
                   </NavLink>
                   <NavLink
                     to="/extensions"
                     onClick={() => setMobileMenuOpen(false)}
                     className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
                   >
-                    <Store className="w-4 h-4 text-[#0056D2]" />
-                    <span>Extensions Store</span>
+                    <Wrench className="w-4 h-4 text-[#0056D2]" />
+                    <span>Browser Safety Tools</span>
                   </NavLink>
                   <NavLink
                     to="/tutors"
@@ -473,10 +464,7 @@ export default function MainLayout() {
               }`
             }
           >
-            <div className="relative">
-              <ShieldAlert className="w-4 h-4" />
-              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-rose-600 rounded-full animate-ping" />
-            </div>
+            <ShieldAlert className="w-4 h-4" />
             <span className="text-[10px] font-bold mt-0.5">Report</span>
           </NavLink>
 
@@ -548,7 +536,7 @@ export default function MainLayout() {
                 </li>
                 <li>
                   <Link to="/extensions" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
-                    <span className="text-[#38BDF8]">›</span> Browser Extension Store
+                    <span className="text-[#38BDF8]">›</span> Browser Safety Tools
                   </Link>
                 </li>
                 <li>

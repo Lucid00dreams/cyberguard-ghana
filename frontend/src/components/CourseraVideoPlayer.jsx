@@ -54,6 +54,7 @@ export default function CourseraVideoPlayer({ lesson, onLessonUpdate }) {
   const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
+  const [transcribeError, setTranscribeError] = useState("");
 
   // Parse segments from lesson
   const rawSegments = lesson?.transcriptSegments;
@@ -209,6 +210,7 @@ export default function CourseraVideoPlayer({ lesson, onLessonUpdate }) {
   async function handleAITranscribe() {
     if (!lesson?.id) return;
     setTranscribing(true);
+    setTranscribeError("");
     try {
       const res = await api.post(`/courses/lessons/${lesson.id}/transcribe`);
       if (onLessonUpdate) {
@@ -216,7 +218,7 @@ export default function CourseraVideoPlayer({ lesson, onLessonUpdate }) {
       }
     } catch (err) {
       console.error("Transcription error:", err);
-      alert("Unable to transcribe video. Please verify your connection or try again.");
+      setTranscribeError("Unable to transcribe video right now. Please try again.");
     } finally {
       setTranscribing(false);
     }
@@ -403,7 +405,7 @@ export default function CourseraVideoPlayer({ lesson, onLessonUpdate }) {
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 Interactive Transcript
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/80 text-[#0056D2] dark:text-blue-400 font-semibold border border-blue-200 dark:border-blue-900">
-                  Coursera Synced
+                  Timestamped
                 </span>
               </h3>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -483,6 +485,11 @@ export default function CourseraVideoPlayer({ lesson, onLessonUpdate }) {
           ref={transcriptContainerRef}
           className="p-4 sm:p-6 max-h-96 overflow-y-auto space-y-2.5 custom-scrollbar text-xs leading-relaxed"
         >
+          {transcribeError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
+              {transcribeError}
+            </div>
+          )}
           {segments.length === 0 ? (
             <div className="py-12 text-center space-y-4 max-w-md mx-auto">
               <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 text-[#0056D2] dark:text-blue-400 flex items-center justify-center mx-auto">
@@ -492,7 +499,7 @@ export default function CourseraVideoPlayer({ lesson, onLessonUpdate }) {
                 <h4 className="font-bold text-slate-900 dark:text-white text-sm">No Transcript Available Yet</h4>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {lesson?.videoUrl
-                    ? "Generate Coursera-style synchronized timestamps with Gemini AI."
+                    ? "Generate synchronized timestamps for this video lesson."
                     : "Upload a video file in Course Studio to generate automatic transcripts."}
                 </p>
               </div>

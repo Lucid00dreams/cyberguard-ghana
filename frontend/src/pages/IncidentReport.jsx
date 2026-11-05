@@ -99,39 +99,51 @@ export default function IncidentReport() {
 
   if (refCode) {
     return (
-      <div className="max-w-lg mx-auto px-6 py-24 text-center">
-        <CheckCircle2 className="w-12 h-12 text-guard mx-auto mb-4" />
-        <h1 className="text-2xl font-semibold mb-2">Report submitted</h1>
-        <p className="text-mist mb-6">
-          Your report has been received with zero personal data attached. Save this reference
-          code — it is the only way to check your report's status later.
-        </p>
-        <div className="font-mono text-2xl bg-ink text-signal rounded-lg py-4 tracking-widest">
-          {refCode}
+      <div className="min-h-[70vh] bg-[#F8FAFC] flex items-center justify-center px-4 py-16">
+        <div className="max-w-lg w-full bg-white rounded-2xl border border-slate-200 p-8 text-center shadow-xs space-y-5">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">
+              Report submitted
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Save this reference code in a safe place. You can use it anytime to check updates from CSA officers without signing in.
+            </p>
+          </div>
+          <div className="font-mono text-xl sm:text-2xl font-bold bg-[#001E3C] text-white rounded-xl py-4 px-4 tracking-wider select-all">
+            {refCode}
+          </div>
+          <div className="pt-1">
+            <Link
+              to="/report/status"
+              className="inline-flex items-center justify-center bg-[#0056D2] hover:bg-[#00419E] text-white text-xs font-bold px-5 py-2.5 rounded-xl transition"
+            >
+              Check report status →
+            </Link>
+          </div>
         </div>
-        <Link to="/report/status" className="inline-block mt-6 text-guard font-semibold">
-          Check a report's status →
-        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6">
+    <div className="min-h-screen bg-[#F8FAFC] py-8 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Clean Header */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-xs">
+        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/80 shadow-xs">
           <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-50 text-red-700 text-[11px] font-bold mb-2">
             <ShieldAlert className="w-3.5 h-3.5" />
-            <span>Confidential COP Incident Portal</span>
+            <span>Confidential Incident Desk</span>
             <span className="text-red-300">•</span>
-            <span>Zero-Knowledge</span>
+            <span>No Account Required</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            Report Online Abuse or Exploitation
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Report Online Abuse or Fraud
           </h1>
-          <p className="text-slate-500 text-xs mt-1 leading-relaxed">
-            Your privacy is completely protected under Ghana Act 1038. No account is required. Media metadata (GPS/camera) is automatically stripped locally before sending.
+          <p className="text-slate-600 text-xs sm:text-sm mt-1.5 leading-relaxed">
+            Submit an anonymous or follow-up report under Ghana&apos;s Cybersecurity Act, 2020 (Act 1038). Camera and GPS EXIF metadata are stripped locally from uploaded images before submission.
           </p>
         </div>
 
@@ -149,11 +161,10 @@ export default function IncidentReport() {
                     type="button"
                     key={c.value}
                     onClick={() => setCategory(c.value)}
-                    className={`text-xs px-3 py-2.5 rounded-xl font-bold transition border text-center ${
-                      category === c.value
+                    className={`text-xs px-3 py-2.5 rounded-xl font-bold transition border text-center ${category === c.value
                         ? "bg-slate-900 text-white border-slate-900 shadow-xs"
                         : "border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700"
-                    }`}
+                      }`}
                   >
                     {c.label}
                   </button>
@@ -284,8 +295,8 @@ export default function IncidentReport() {
               {submitting
                 ? "Submitting Report..."
                 : wantFollowup
-                ? "Submit Report with Contact Info"
-                : "Submit 100% Anonymous Report"}
+                  ? "Submit Report with Contact Info"
+                  : "Submit 100% Anonymous Report"}
             </button>
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left text-[11px] text-slate-500 pt-2 border-t border-slate-100">

@@ -151,7 +151,7 @@ export default function CourseStudio() {
     setStatus(null);
     setUploadProgressText(
       autoTranscribe
-        ? "Uploading video & extracting Coursera-style AI transcripts with Google Gemini..."
+        ? "Uploading video and generating synchronized timestamps..."
         : "Uploading video..."
     );
 
@@ -177,7 +177,7 @@ export default function CourseStudio() {
           setPreviewSegments(res.data.transcriptSegments);
           setStatus({
             type: "success",
-            message: `Video uploaded successfully! ${res.data.transcriptSegments.length} synchronized Coursera-style transcript segments generated.`,
+            message: `Video uploaded successfully. ${res.data.transcriptSegments.length} synchronized transcript segments generated.`,
           });
         } else {
           setStatus({
@@ -201,7 +201,7 @@ export default function CourseStudio() {
   async function handleTranscribeExistingUrl() {
     if (!lessonForm.videoUrl) return;
     setVideoUploading(true);
-    setUploadProgressText("Analyzing audio and generating Coursera-style timestamps with Gemini AI...");
+    setUploadProgressText("Analyzing audio and generating synchronized timestamps...");
     try {
       const res = await api.post("/uploads/transcribe", {
         videoUrl: lessonForm.videoUrl,
@@ -647,7 +647,7 @@ export default function CourseStudio() {
                               Video Lecture & Automatic Transcription
                             </span>
                             <span className="text-[11px] font-mono text-blue-600 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-0.5 rounded-full font-bold">
-                              Coursera Style
+                              Timestamped Sync
                             </span>
                           </div>
 
@@ -700,7 +700,7 @@ export default function CourseStudio() {
                               />
                               <label htmlFor="autoTranscribe" className="text-xs text-slate-600 dark:text-slate-300 cursor-pointer flex items-center gap-1 font-medium">
                                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                                Auto-transcribe audio with Google Gemini AI (Coursera timestamps)
+                                Auto-transcribe audio with synchronized timestamps
                               </label>
                             </div>
 
