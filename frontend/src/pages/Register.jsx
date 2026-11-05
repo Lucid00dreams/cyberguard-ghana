@@ -879,7 +879,7 @@ export default function Register() {
                       </div>
 
                       {/* Preset avatar grid */}
-                      <div className="grid grid-cols-6 gap-2 pt-1">
+                      <div className="grid grid-cols-6 gap-1.5 sm:gap-2 pt-1">
                         {PRESET_AVATARS.map((p) => {
                           const isSelected = avatarUrl === p.url;
                           return (
@@ -888,13 +888,13 @@ export default function Register() {
                               type="button"
                               onClick={() => setAvatarUrl(p.url)}
                               title={p.label}
-                              className={`w-11 h-11 rounded-xl overflow-hidden border-2 p-0.5 transition cursor-pointer ${
+                              className={`w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl overflow-hidden border-2 p-0.5 transition cursor-pointer ${
                                 isSelected
                                   ? "border-[#0056D2] ring-2 ring-blue-500/20 scale-105"
                                   : "border-slate-200 hover:border-slate-300"
                               }`}
                             >
-                              <img src={p.url} alt={p.label} className="w-full h-full object-cover rounded-lg" />
+                              <img src={p.url} alt={p.label} className="w-full h-full object-cover rounded-md sm:rounded-lg" />
                             </button>
                           );
                         })}

@@ -212,7 +212,7 @@ export default function IncidentReport() {
                       <div className="truncate max-w-[70%]">
                         <span className="font-bold text-slate-800 truncate block">{f.file.name}</span>
                         {f.status === "ready" && (
-                          <span className="font-mono text-[10px] text-slate-500">
+                          <span className="font-mono text-[10px] text-slate-500 block truncate">
                             Metadata stripped • sha256:{f.sha256Hash?.slice(0, 16)}…
                           </span>
                         )}

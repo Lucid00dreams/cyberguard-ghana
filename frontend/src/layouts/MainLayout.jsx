@@ -419,7 +419,11 @@ export default function MainLayout() {
 
       <main
         className={`flex-1 relative z-10 ${
-          isDashboardRoute ? "min-h-0 h-full overflow-hidden flex flex-col" : "pb-16 md:pb-0"
+          isDashboardRoute
+            ? "min-h-0 h-full overflow-hidden flex flex-col"
+            : location.pathname.startsWith("/cyberchat")
+            ? "min-h-0 h-full overflow-hidden flex flex-col pb-14 md:pb-0"
+            : "pb-16 md:pb-0"
         }`}
       >
         <Outlet />
@@ -583,7 +587,7 @@ export default function MainLayout() {
             </div>
           </div>
 
-          <div className="border-t border-slate-800/80 py-5 text-center text-xs text-slate-400 font-mono">
+          <div className="border-t border-slate-800/80 py-5 pb-20 md:pb-5 px-4 text-center text-xs text-slate-400 font-mono">
             © {new Date().getFullYear()} CyberGuard Ghana. Built for National Child Online Protection (COP). All rights reserved.
           </div>
         </footer>

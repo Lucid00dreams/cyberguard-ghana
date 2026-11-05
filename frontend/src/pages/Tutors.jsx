@@ -118,24 +118,24 @@ export default function Tutors() {
                 className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs hover:border-slate-300 transition flex flex-col justify-between space-y-4"
               >
                 <div className="space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5 sm:gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <UserAvatar
                         user={t.user}
                         name={t.user?.displayName}
                         size="lg"
                         rounded="rounded-xl"
                       />
-                      <div>
-                        <h3 className="font-bold text-base text-slate-900 leading-tight">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-base text-slate-900 leading-tight truncate">
                           {t.user?.displayName}
                         </h3>
-                        <p className="text-xs text-[#0056D2] font-semibold mt-0.5">
+                        <p className="text-xs text-[#0056D2] font-semibold mt-0.5 truncate">
                           {t.headline}
                         </p>
                       </div>
                     </div>
-                    <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg shrink-0">
+                    <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg shrink-0 self-start">
                       GH₵ {Number(t.hourlyRateGHS).toFixed(2)}/hr
                     </span>
                   </div>

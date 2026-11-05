@@ -626,7 +626,7 @@ export default function CyberChat() {
     : false;
 
   return (
-    <div className="h-[calc(100dvh-5.75rem)] bg-[#F8FAFC] text-slate-900 flex flex-col font-sans">
+    <div className="h-full flex-1 min-h-0 bg-[#F8FAFC] text-slate-900 flex flex-col font-sans overflow-hidden">
       {/* Top Mentorship Safety Header */}
       <div className="bg-white border-b border-slate-200/90 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 text-xs shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">

@@ -59,7 +59,7 @@ export default function VerifyCertificate() {
           </p>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="max-w-xl mx-auto pt-2 flex gap-2">
+          <form onSubmit={handleSearch} className="max-w-xl mx-auto pt-2 flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
               <Search className="w-5 h-5 text-slate-400 absolute left-4 top-3.5" />
               <input
@@ -73,7 +73,7 @@ export default function VerifyCertificate() {
             <button
               type="submit"
               disabled={loading || !inputRef.trim()}
-              className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-6 py-3.5 rounded-xl shadow-lg transition text-xs shrink-0 flex items-center gap-2"
+              className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-6 py-3.5 rounded-xl shadow-lg transition text-xs shrink-0 flex items-center justify-center gap-2 cursor-pointer"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Verify Code"}
             </button>
@@ -82,7 +82,7 @@ export default function VerifyCertificate() {
 
         {/* Results Area */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-3xl p-8 text-center space-y-3">
+          <div className="bg-red-50 border border-red-200 rounded-2xl sm:rounded-3xl p-6 sm:p-8 text-center space-y-3">
             <XCircle className="w-10 h-10 text-red-500 mx-auto" />
             <h3 className="text-lg font-bold text-red-900">Certificate Verification Failed</h3>
             <p className="text-xs text-red-700 max-w-md mx-auto">{error}</p>
@@ -90,7 +90,7 @@ export default function VerifyCertificate() {
         )}
 
         {certData && (
-          <div className="bg-white rounded-3xl p-8 sm:p-12 border border-slate-200 shadow-2xl space-y-8 relative overflow-hidden">
+          <div className="bg-white rounded-2xl sm:rounded-3xl p-5 sm:p-12 border border-slate-200 shadow-2xl space-y-6 sm:space-y-8 relative overflow-hidden">
             {/* Accreditation Badge Overlay */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-100 pb-6 gap-4">
               <div className="flex items-center gap-3">

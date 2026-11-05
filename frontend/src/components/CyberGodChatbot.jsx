@@ -258,7 +258,7 @@ export default function CyberGodChatbot() {
               prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.98 }
             }
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="pointer-events-auto absolute bottom-16 right-3 md:bottom-5 md:right-5 w-[94vw] sm:w-[410px] h-[550px] max-h-[80vh] bg-white text-slate-900 rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden z-50"
+            className="pointer-events-auto absolute bottom-16 left-2.5 right-2.5 w-auto sm:left-auto sm:right-5 sm:w-[410px] h-[550px] max-h-[78vh] bg-white text-slate-900 rounded-2xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden z-50"
           >
             {/* HEADER BAR (DRAG HANDLE) */}
             <div

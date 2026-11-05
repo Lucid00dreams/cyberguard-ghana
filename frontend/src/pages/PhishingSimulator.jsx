@@ -657,11 +657,11 @@ export default function PhishingSimulator() {
             </div>
 
             {/* Main Scenario Card */}
-            <div className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-xl space-y-8">
+            <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-10 border border-slate-200 shadow-xl space-y-6 sm:space-y-8">
               
               {/* Scenario Title & Interactive Artifact */}
               <div className="space-y-4 border-b border-slate-100 pb-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
                   <span className="text-xs font-mono font-black uppercase bg-blue-100 text-[#0056D2] px-3 py-1 rounded-md">
                     SCENARIO #{scenario.id} — {scenario.artifactType}
                   </span>
@@ -676,13 +676,13 @@ export default function PhishingSimulator() {
                   </button>
                 </div>
 
-                <h2 className="text-2xl font-black text-slate-900 leading-tight">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
                   {scenario.title}
                 </h2>
                 
                 {/* Suspicious Artifact Card */}
-                <div className="p-5 rounded-2xl bg-slate-950 text-white border border-slate-800 space-y-3 font-mono text-xs shadow-inner">
-                  <div className="flex items-center justify-between text-slate-400 border-b border-slate-800 pb-2 text-[11px]">
+                <div className="p-3.5 sm:p-5 rounded-2xl bg-slate-950 text-white border border-slate-800 space-y-3 font-mono text-xs shadow-inner">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-slate-400 border-b border-slate-800 pb-2 text-[11px]">
                     <span>SENDER / SOURCE: <strong className="text-amber-400">{scenario.artifactSender}</strong></span>
                     <span className="text-red-400 font-extrabold">INCOMING PAYLOAD</span>
                   </div>

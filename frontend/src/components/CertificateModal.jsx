@@ -81,62 +81,68 @@ export default function CertificateModal({ certificate, studentName, courseTitle
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="bg-white text-slate-900 rounded-3xl max-w-5xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 relative my-auto max-h-[96vh] flex flex-col justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+      <div className="bg-white text-slate-900 rounded-2xl sm:rounded-3xl max-w-5xl w-full p-3 sm:p-6 shadow-2xl border border-slate-200 relative my-auto max-h-[96vh] flex flex-col justify-between">
 
         {/* Top Control Header Bar (Hidden during print) */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-200 print:hidden shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold">
-              <Award className="w-5 h-5" />
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-slate-200 print:hidden shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center font-bold shrink-0">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-base leading-tight">Accredited National COP Certificate</h3>
-              <p className="text-xs text-slate-500">Official Landscape Credential • Republic of Ghana</p>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base leading-tight">Accredited National COP Certificate</h3>
+              <p className="text-[11px] sm:text-xs text-slate-500">Official Landscape Credential • Republic of Ghana</p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             {exportSuccess && (
-              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg flex items-center gap-1">
-                <CheckCircle2 className="w-4 h-4" /> {exportSuccess}
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> {exportSuccess}
               </span>
             )}
 
             <button
               onClick={handleExportPDF}
               disabled={exporting}
-              className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-3.5 py-2 rounded-xl text-xs shadow-md transition flex items-center gap-1.5 disabled:opacity-50"
+              className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs shadow-md transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
-              <FileText className="w-4 h-4" /> Export PDF
+              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Export PDF
             </button>
 
             <button
               onClick={handleExportImage}
               disabled={exporting}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-2 rounded-xl text-xs shadow-md transition flex items-center gap-1.5 disabled:opacity-50"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs shadow-md transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
-              <ImageIcon className="w-4 h-4" /> Export Image (PNG)
+              <ImageIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Image (PNG)
             </button>
 
             <button
               onClick={handlePrint}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3.5 py-2 rounded-xl text-xs transition flex items-center gap-1.5"
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer"
             >
-              <Printer className="w-4 h-4" /> Print
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Print
             </button>
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+              className="p-1.5 sm:p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+              aria-label="Close modal"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
+        {/* Mobile Landscape Hint */}
+        <div className="sm:hidden flex items-center justify-center gap-1.5 py-1 px-3 bg-slate-100 rounded-lg text-[11px] text-slate-500 font-sans mb-2">
+          <span>💡 Scroll horizontally or rotate phone to view full certificate</span>
+        </div>
+
         {/* LANDSCAPE CERTIFICATE CONTAINER */}
-        <div className="overflow-x-auto overflow-y-hidden flex justify-center items-center py-1">
+        <div className="overflow-x-auto overflow-y-hidden flex justify-start sm:justify-center items-center py-1">
           <div
             ref={certRef}
             className="w-[900px] h-[580px] bg-[#FAFBFD] border-[10px] border-double border-[#001E3C] rounded-2xl p-8 relative overflow-hidden shadow-xl text-center flex flex-col justify-between font-serif select-none shrink-0"

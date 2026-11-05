@@ -210,13 +210,13 @@ export default function QuizPage() {
 
         {/* Main Quiz Card */}
         {!result ? (
-          <div className="glass-card rounded-3xl p-6 sm:p-8 space-y-8 shadow-xl">
+          <div className="glass-card rounded-2xl sm:rounded-3xl p-4 sm:p-8 space-y-6 sm:space-y-8 shadow-xl">
             {/* Question Tracker Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span className="text-xs font-mono uppercase tracking-widest text-mist font-semibold">
                 Question {currentIdx + 1} of {totalQ}
               </span>
-              <div className="flex gap-1.5">
+              <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 scrollbar-none">
                 {questions.map((q, idx) => (
                   <button
                     key={q.id}
@@ -274,23 +274,23 @@ export default function QuizPage() {
             </div>
 
             {/* Navigation & Submit Buttons */}
-            <div className="flex items-center justify-between gap-4 pt-4 border-t border-line">
+            <div className="flex items-center justify-between gap-2 sm:gap-4 pt-4 border-t border-line">
               <button
                 type="button"
                 onClick={() => setCurrentIdx((prev) => Math.max(0, prev - 1))}
                 disabled={currentIdx === 0}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-line bg-paper text-sm font-semibold text-mist hover:text-ink hover:border-slate-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-line bg-paper text-xs sm:text-sm font-semibold text-mist hover:text-ink hover:border-slate-400 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                <ArrowLeft className="w-4 h-4" /> Previous
+                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Previous
               </button>
 
               {currentIdx < totalQ - 1 ? (
                 <button
                   type="button"
                   onClick={() => setCurrentIdx((prev) => Math.min(totalQ - 1, prev + 1))}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold shadow-md shadow-blue-600/20 transition"
+                  className="inline-flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-md shadow-blue-600/20 transition"
                 >
-                  Next Question <ArrowRight className="w-4 h-4" />
+                  Next Question <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               ) : (
                 <button

@@ -302,7 +302,7 @@ export default function CourseDetail() {
       {/* Main Course Player Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-[320px_1fr] gap-6 items-start">
         {/* Left Sidebar: Curriculum Navigator */}
-        <aside className="bg-white rounded-2xl p-5 space-y-5 border border-slate-200/90 shadow-2xs">
+        <aside className="order-2 lg:order-1 bg-white rounded-2xl p-4 sm:p-5 space-y-5 border border-slate-200/90 shadow-2xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-900">Course Outline</h3>
             <span className="text-xs font-medium text-slate-500">
@@ -379,7 +379,7 @@ export default function CourseDetail() {
         </aside>
 
         {/* Right Main Viewer */}
-        <main className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200/90 shadow-2xs">
+        <main className="order-1 lg:order-2 bg-white rounded-2xl p-4 sm:p-8 border border-slate-200/90 shadow-2xs">
           {!user ? (
             <div className="text-center py-14 px-4 space-y-5 max-w-md mx-auto">
               <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center mx-auto">
