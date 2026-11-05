@@ -403,21 +403,29 @@ export default function ExtensionsStorePage() {
         };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-10">
-        {/* Page Header */}
-        <motion.div {...fadeUp(0)} className="space-y-3 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-[#0056D2] text-xs font-semibold">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Practical Browser Defense</span>
-          </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            Browser Safety Tools
-          </h1>
-          <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-            Generate high-entropy passwords locally on your device, check unfamiliar links for phishing red flags, and install reputable open-source and nonprofit security extensions directly from the official Chrome Web Store.
-          </p>
-        </motion.div>
+    <div className="min-h-screen bg-[#F8FAFC] pb-14 sm:pb-16">
+      {/* Full-Bleed Quarter-Page Hero */}
+      <section className="bg-slate-950 text-white relative overflow-hidden py-12 sm:py-16 px-4 sm:px-6 min-h-[26vh] sm:min-h-[28vh] flex items-center border-b border-slate-800">
+        <div
+          className="absolute inset-0 bg-cover bg-[center_28%] opacity-85"
+          style={{ backgroundImage: "url('/hero-threat.png?v=1038')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 via-50% to-slate-950/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-slate-950/35" />
+
+        <div className="max-w-7xl mx-auto relative z-10 w-full">
+          <motion.div {...fadeUp(0)} className="max-w-2xl space-y-2.5">
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+              Browser Safety Tools
+            </h1>
+            <p className="text-slate-200 text-sm sm:text-base leading-relaxed font-normal">
+              Generate high-entropy passwords locally on your device, check unfamiliar links for phishing red flags, and install reputable open-source security extensions from the official Chrome Web Store.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10 space-y-10">
 
         {/* Interactive Local Utilities Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">

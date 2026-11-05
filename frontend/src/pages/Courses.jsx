@@ -44,30 +44,34 @@ export default function Courses() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] py-10 sm:py-12 px-4 sm:px-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header Banner */}
-        <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: EASE_OUT }}
-          className="bg-[#001E3C] rounded-2xl p-7 sm:p-10 relative overflow-hidden text-white border border-slate-800 shadow-lg min-h-[176px] flex items-center"
-        >
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-80 scale-105"
-            style={{ backgroundImage: "url('/hero-courses.png?v=1038')" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/85 to-slate-950/50" />
+    <div className="min-h-screen bg-[#F8FAFC] pb-14 sm:pb-16">
+      {/* Full-Bleed Quarter-Page Hero */}
+      <section className="bg-slate-950 text-white relative overflow-hidden py-12 sm:py-16 px-4 sm:px-6 min-h-[26vh] sm:min-h-[28vh] flex items-center border-b border-slate-800">
+        <div
+          className="absolute inset-0 bg-cover bg-[center_55%] opacity-85"
+          style={{ backgroundImage: "url('/hero-courses.png?v=1038')" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/80 via-45% to-slate-950/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-transparent to-slate-950/35" />
 
-          <div className="relative z-10 max-w-2xl space-y-2">
-            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+        <div className="max-w-7xl mx-auto relative z-10 w-full">
+          <motion.div
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: EASE_OUT }}
+            className="max-w-2xl space-y-2.5"
+          >
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
               Learn to Protect Yourself &amp; Your Accounts
             </h1>
-            <p className="text-slate-200 text-sm leading-relaxed font-normal">
+            <p className="text-slate-200 text-sm sm:text-base leading-relaxed font-normal">
               Practical, self-paced lessons built for everyday internet safety in Ghana. Complete modules and assessments to earn verifiable certificates.
             </p>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-8 sm:pt-10 space-y-8">
 
         {/* Search & Filter Bar */}
         <div className="space-y-4">
