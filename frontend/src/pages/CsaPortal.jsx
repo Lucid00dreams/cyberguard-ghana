@@ -579,7 +579,7 @@ export default function CsaPortal() {
       title: "Shortcuts",
       items: [
         { key: "studio", label: "Course Studio", icon: Plus, isLink: true, to: "/course-studio" },
-        { key: "cyberchat", label: "CyberChat", icon: Lock, isLink: true, to: "/cyberchat" },
+        { key: "cyberchat", label: "Mentor Chat", icon: Lock, isLink: true, to: "/cyberchat" },
         {
           key: "reportPortal",
           label: "Public report form",

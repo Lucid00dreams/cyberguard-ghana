@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { Video, Users, AlertCircle } from "lucide-react";
+import { Video, Users, AlertCircle, MessageSquare } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import CyberSpinner from "../components/CyberSpinner";
@@ -155,14 +156,25 @@ export default function Tutors() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-3 space-y-2">
-                  <div className="flex items-center justify-between">
+                <div className="border-t border-slate-100 pt-3 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-semibold text-slate-700">Available slots</span>
-                    {!user && (
-                      <span className="text-[11px] text-slate-500 font-medium">
-                        Sign in to book
-                      </span>
-                    )}
+                    {user && t.user?.id && t.user.id !== user.id ? (
+                      <Link
+                        to={`/cyberchat?mentor=${encodeURIComponent(t.user.id)}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 hover:text-slate-900 transition"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Message mentor</span>
+                      </Link>
+                    ) : !user ? (
+                      <Link
+                        to="/login"
+                        className="text-[11px] text-slate-500 hover:text-slate-800 font-medium"
+                      >
+                        Sign in to book or message
+                      </Link>
+                    ) : null}
                   </div>
 
                   {!t.availability || t.availability.length === 0 ? (

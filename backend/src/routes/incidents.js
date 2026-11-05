@@ -186,26 +186,44 @@ router.get(
   }
 );
 
+const reviewStatusValidation = [
+  body("status").isIn(["SUBMITTED", "UNDER_REVIEW", "ESCALATED", "RESOLVED", "DISMISSED"]),
+];
+
+async function handleIncidentStatusUpdate(req, res, next) {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    const { status, reviewNotes } = req.body;
+    const updated = await prisma.incidentReport.update({
+      where: { id: req.params.id },
+      data: {
+        status,
+        ...(reviewNotes !== undefined ? { reviewNotes } : {}),
+        reviewedById: req.user.id,
+      },
+    });
+    res.json(updated);
+  } catch (err) {
+    next(err);
+  }
+}
+
 router.patch(
   "/:id/review",
   requireAuth,
   requireRole("ADMIN", "CSA_OFFICER"),
-  [body("status").isIn(["SUBMITTED", "UNDER_REVIEW", "ESCALATED", "RESOLVED", "DISMISSED"])],
-  async (req, res, next) => {
-    try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+  reviewStatusValidation,
+  handleIncidentStatusUpdate
+);
 
-      const { status, reviewNotes } = req.body;
-      const updated = await prisma.incidentReport.update({
-        where: { id: req.params.id },
-        data: { status, reviewNotes, reviewedById: req.user.id },
-      });
-      res.json(updated);
-    } catch (err) {
-      next(err);
-    }
-  }
+router.patch(
+  "/:id/status",
+  requireAuth,
+  requireRole("ADMIN", "CSA_OFFICER"),
+  reviewStatusValidation,
+  handleIncidentStatusUpdate
 );
 
 router.get(

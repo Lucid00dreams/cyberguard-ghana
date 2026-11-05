@@ -213,7 +213,7 @@ export default function Dashboard() {
       title: "Quick resources",
       items: [
         { label: "Course catalog", icon: Globe, isLink: true, to: "/courses" },
-        { label: "CyberChat", icon: MessageSquare, isLink: true, to: "/cyberchat" },
+        { label: "Mentor chat", icon: MessageSquare, isLink: true, to: "/cyberchat" },
         { label: "Report incident", icon: ShieldAlert, isLink: true, to: "/report" },
       ],
     },
@@ -775,15 +775,26 @@ export default function Dashboard() {
                           </p>
                         </div>
 
-                        <a
-                          href={b.jitsiUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 bg-[#0056D2] hover:bg-[#00419E] text-white font-medium px-4 py-2 rounded-lg text-xs transition"
-                        >
-                          <Video className="w-3.5 h-3.5" />
-                          <span>Join video room</span>
-                        </a>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {b.tutor?.user?.id && (
+                            <Link
+                              to={`/cyberchat?mentor=${encodeURIComponent(b.tutor.user.id)}`}
+                              className="inline-flex items-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-medium px-3.5 py-2 rounded-lg text-xs transition"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 text-slate-500" />
+                              <span>Message mentor</span>
+                            </Link>
+                          )}
+                          <a
+                            href={b.jitsiUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 bg-[#0056D2] hover:bg-[#00419E] text-white font-medium px-4 py-2 rounded-lg text-xs transition"
+                          >
+                            <Video className="w-3.5 h-3.5" />
+                            <span>Join video room</span>
+                          </a>
+                        </div>
                       </div>
                     ))}
                   </div>

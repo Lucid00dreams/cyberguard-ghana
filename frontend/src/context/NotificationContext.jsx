@@ -162,8 +162,8 @@ export function NotificationProvider({ children }) {
               ) {
                 addNotification({
                   type: "message",
-                  title: peer.displayName || "Cyber Guard",
-                  message: "Sent you an encrypted message",
+                  title: peer.displayName || "Mentor Chat",
+                  message: "Sent you an encrypted mentorship message",
                   avatarUrl: peer.avatarUrl,
                   link: `/cyberchat?conv=${c.id}`,
                   convId: c.id,
@@ -178,26 +178,6 @@ export function NotificationProvider({ children }) {
           setUnreadMessagesCount(unreadTotal);
         }
 
-        // 2. Check Friend Requests
-        const reqRes = await api.get("/cyberchat/friend-requests").catch(() => null);
-        if (reqRes?.data && isMounted) {
-          const incoming = reqRes.data.incoming || [];
-          setPendingRequestsCount(incoming.length);
-
-          incoming.forEach((r) => {
-            if (initialFetchDoneRef.current && !knownFriendRequestIdsRef.current.has(r.id)) {
-              addNotification({
-                type: "friend_request",
-                title: "Friend Request",
-                message: `${r.sender?.displayName || "A cyber guard"} wants to connect on CyberChat`,
-                avatarUrl: r.sender?.avatarUrl,
-                link: "/cyberchat?tab=requests",
-              });
-            }
-            knownFriendRequestIdsRef.current.add(r.id);
-          });
-        }
-
         initialFetchDoneRef.current = true;
       } catch (_) {}
     }
@@ -205,8 +185,8 @@ export function NotificationProvider({ children }) {
     // Initial check immediately
     checkUpdates();
 
-    // Poll every 6 seconds
-    const interval = setInterval(checkUpdates, 6000);
+    // Poll every 10 seconds
+    const interval = setInterval(checkUpdates, 10000);
     return () => {
       isMounted = false;
       clearInterval(interval);

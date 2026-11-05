@@ -12,7 +12,7 @@ router.get("/", async (req, res, next) => {
     const tutors = await prisma.tutorProfile.findMany({
       where: { vetted: true },
       include: {
-        user: { select: { displayName: true, avatarUrl: true } },
+        user: { select: { id: true, displayName: true, avatarUrl: true } },
         availability: { where: { isBooked: false, startsAt: { gte: new Date() } }, orderBy: { startsAt: "asc" } },
       },
     });
@@ -174,7 +174,7 @@ router.get("/bookings/mine", requireAuth, async (req, res, next) => {
   try {
     const bookings = await prisma.booking.findMany({
       where: { studentId: req.user.id },
-      include: { slot: true, tutor: { include: { user: { select: { displayName: true } } } } },
+      include: { slot: true, tutor: { include: { user: { select: { id: true, displayName: true } } } } },
       orderBy: { createdAt: "desc" },
     });
     res.json(bookings.map((b) => ({ ...b, jitsiUrl: `https://meet.jit.si/${b.jitsiRoomId}` })));

@@ -120,10 +120,10 @@ export default function MainLayout() {
                 </NavLink>
                 {user && (
                   <NavLink to="/cyberchat" className={navLinkClass}>
-                    <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-emerald-700 font-semibold">CyberChat</span>
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Mentor Chat</span>
                     {unreadCount > 0 && (
-                      <span className="w-2 h-2 rounded-full bg-rose-600 shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-[#0056D2] shrink-0" />
                     )}
                   </NavLink>
                 )}
@@ -196,7 +196,7 @@ export default function MainLayout() {
                             className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
                           >
                             <LayoutDashboard className="w-4 h-4 text-blue-600" />
-                            <span>{user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "Command Center" : "Student Dashboard"}</span>
+                            <span>{user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "Admin Console" : "Student Dashboard"}</span>
                           </Link>
 
                           <Link
@@ -342,11 +342,11 @@ export default function MainLayout() {
                       className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
                     >
                       <span className="flex items-center gap-3">
-                        <Lock className="w-4 h-4 text-emerald-600" />
-                        <span>CyberChat (E2EE)</span>
+                        <MessageSquare className="w-4 h-4 text-slate-600" />
+                        <span>Mentor Chat</span>
                       </span>
                       {unreadCount > 0 && (
-                        <span className="px-2 py-0.5 text-[10px] font-bold text-white bg-rose-600 rounded-full animate-pulse">
+                        <span className="px-2 py-0.5 text-[10px] font-bold text-white bg-[#0056D2] rounded-full">
                           {unreadCount}
                         </span>
                       )}
@@ -370,7 +370,7 @@ export default function MainLayout() {
                       className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-800 hover:bg-slate-50 transition"
                     >
                       <LayoutDashboard className="w-4 h-4 text-blue-600" />
-                      <span>{user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "Command Center" : "Student Dashboard"}</span>
+                      <span>{user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "Admin Console" : "Student Dashboard"}</span>
                     </NavLink>
                     <NavLink
                       to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin?tab=settings" : "/dashboard?tab=settings"}

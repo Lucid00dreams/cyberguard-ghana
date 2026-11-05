@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useSearchParams, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
 import api from "../utils/api";
 import UserAvatar from "../components/UserAvatar";
+import CyberSpinner from "../components/CyberSpinner";
 import {
   initializeUserE2EE,
   deriveSharedAesKey,
@@ -15,10 +16,9 @@ import {
   computeSafetyVerification,
   exportEncryptedKeyBackup,
   importEncryptedKeyBackup,
-  deleteLocalKeys,
+  MAX_ATTACHMENT_BYTES,
 } from "../utils/e2eeCrypto";
 import {
-  Shield,
   ShieldCheck,
   ShieldAlert,
   Lock,
@@ -26,194 +26,56 @@ import {
   Paperclip,
   Mic,
   Square,
-  Clock,
   Send,
   Search,
   Users,
   CheckCheck,
-  Check,
   X,
   Copy,
   ChevronLeft,
-  ChevronRight,
-  ArrowLeft,
-  Database,
   FileText,
   Download,
-  UserPlus,
-  UserCheck,
-  AtSign,
-  Camera,
   MessageSquare,
-  Sparkles,
-  Heart,
-  Smile,
-  RefreshCw,
-  SlidersHorizontal,
-  Zap,
   Bell,
-  BellOff,
+  Ban,
+  Flag,
+  CheckCircle2,
+  Loader2,
+  Upload,
 } from "lucide-react";
-import CyberSpinner from "../components/CyberSpinner";
 
-// CyberGuard Ghana Curated Sticker Set
-const CYBER_STICKERS = [
-  {
-    id: "shield_active",
-    name: "Shield Active",
-    emoji: "🛡️",
-    title: "Secure",
-    tagline: "Perimeter protected",
-    bg: "bg-blue-50 border-blue-200 text-[#0056D2]",
-  },
-  {
-    id: "e2ee_locked",
-    name: "Locked",
-    emoji: "🔒",
-    title: "End-to-End Encrypted",
-    tagline: "Private on-device keys",
-    bg: "bg-emerald-50 border-emerald-200 text-emerald-800",
-  },
-  {
-    id: "threat_alert",
-    name: "Phishing Alert",
-    emoji: "🚨",
-    title: "Watch Out!",
-    tagline: "Suspicious message or link",
-    bg: "bg-red-50 border-red-200 text-red-700",
-  },
-  {
-    id: "hacker_terminal",
-    name: "Terminal",
-    emoji: "💻",
-    title: "All Clear",
-    tagline: "No issues reported",
-    bg: "bg-indigo-50 border-indigo-200 text-indigo-800",
-  },
-  {
-    id: "ghana_guard",
-    name: "Ghana Guard",
-    emoji: "🇬🇭",
-    title: "CyberGuard Ghana",
-    tagline: "Digital safety community",
-    bg: "bg-amber-50 border-amber-300 text-amber-950",
-  },
-  {
-    id: "cybergod_ai",
-    name: "Assistant",
-    emoji: "🤖",
-    title: "Safety Assistant",
-    tagline: "Help & protection guidance",
-    bg: "bg-sky-50 border-sky-200 text-sky-800",
-  },
-  {
-    id: "mission_launch",
-    name: "Ready",
-    emoji: "🚀",
-    title: "Ready to Learn",
-    tagline: "Course underway",
-    bg: "bg-purple-50 border-purple-200 text-purple-800",
-  },
-  {
-    id: "guards_united",
-    name: "Connected",
-    emoji: "🤝",
-    title: "Connected",
-    tagline: "Fellow learner online",
-    bg: "bg-teal-50 border-teal-200 text-teal-800",
-  },
-  {
-    id: "certified_pro",
-    name: "Accredited",
-    emoji: "🏆",
-    title: "Verified Defender",
-    tagline: "Certificate earned",
-    bg: "bg-yellow-50 border-yellow-300 text-yellow-900",
-  },
-  {
-    id: "flawless_defense",
-    name: "Great Job",
-    emoji: "🔥",
-    title: "On Point",
-    tagline: "Great cyber habits",
-    bg: "bg-orange-50 border-orange-200 text-orange-800",
-  },
-  {
-    id: "secops_coffee",
-    name: "Study Break",
-    emoji: "☕",
-    title: "Study Break",
-    tagline: "Taking five",
-    bg: "bg-stone-100 border-stone-300 text-stone-800",
-  },
-  {
-    id: "approved_safe",
-    name: "Verified",
-    emoji: "👍",
-    title: "Verified Safe",
-    tagline: "Signed & checked",
-    bg: "bg-emerald-50 border-emerald-200 text-emerald-800",
-  },
-];
-
-// Categorized Emoji Dataset
-const EMOJI_CATEGORIES = {
-  smileys: {
-    label: "Smileys",
-    emojis: ["😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇", "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😋", "😛", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩", "🥳", "😏", "😴", "🤔", "🫡", "🤫", "🤯", "🥳"],
-  },
-  tech: {
-    label: "Cyber & Tech",
-    emojis: ["🛡️", "🔒", "🔓", "🔑", "🗝️", "💻", "🖥️", "⌨️", "🖱️", "📱", "📡", "🔋", "🔌", "💡", "🌐", "🛰️", "⚙️", "🔧", "🛠️", "🚨", "⚠️", "🤖", "🧠", "🕵️", "🕶️", "📄", "📊", "🏷️"],
-  },
-  hands: {
-    label: "Hands & Hearts",
-    emojis: ["👍", "👎", "👏", "🙌", "🫶", "🤝", "👊", "✌️", "🤞", "🤟", "🤘", "👌", "🤌", "👈", "👉", "☝️", "✋", "👋", "✍️", "❤️", "💙", "💚", "💛", "💜", "🖤", "🤍", "💔", "❤️‍🔥", "✨"],
-  },
-  symbols: {
-    label: "Badges & Symbols",
-    emojis: ["🇬🇭", "🎯", "🚀", "⚡", "🔥", "💯", "🌟", "⭐", "🎉", "🎊", "🏆", "🥇", "🎖️", "👑", "☕", "🍕", "🍿", "☕", "🌍", "💬", "📦", "✉️"],
-  },
+const ROLE_BADGES = {
+  TUTOR: "Verified Mentor",
+  CSA_OFFICER: "CSA Officer",
+  ADMIN: "Support",
+  STUDENT: "Learner",
 };
 
-const QUICK_REACTION_EMOJIS = ["👍", "❤️", "🛡️", "🔥", "😂", "🚀", "🔒", "🤝"];
-
 export default function CyberChat() {
-  const { user, updateUser } = useAuth();
-  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { permission, requestPermission, playChime } = useNotifications();
 
-  // Local User Profile & Cryptographic State
-  const [profile, setProfile] = useState(null);
   const [e2eeKeys, setE2eeKeys] = useState(null);
   const [publicMeta, setPublicMeta] = useState(null);
   const [isKeyInitializing, setIsKeyInitializing] = useState(true);
 
-  // Active Tab: "chats" | "friends" | "requests"
+  // Sidebar Tabs: "chats" | "mentors"
   const [activeTab, setActiveTab] = useState("chats");
-
-  // Conversations & Peer State
   const [conversations, setConversations] = useState([]);
+  const [mentorsDirectory, setMentorsDirectory] = useState([]);
   const [activeConv, setActiveConv] = useState(null);
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [friendsList, setFriendsList] = useState([]);
-  const [friendRequests, setFriendRequests] = useState({ incoming: [], outgoing: [], pendingCount: 0 });
   const [searchQuery, setSearchQuery] = useState("");
   const [loadingConversations, setLoadingConversations] = useState(true);
 
-  // Active Chat Message State
+  // Active Thread State
   const [decryptedMessages, setDecryptedMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [messageText, setMessageText] = useState("");
   const [sending, setSending] = useState(false);
-  const [selfDestructSeconds, setSelfDestructSeconds] = useState(0);
+  const [statusNotice, setStatusNotice] = useState(null);
 
-  // Emoji & Sticker Picker State
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [emojiPickerTab, setEmojiPickerTab] = useState("emojis"); // "emojis" | "stickers"
-  const [emojiCategory, setEmojiCategory] = useState("smileys");
-
-  // Cached derived shared keys and verify keys for active peer
+  // Derived Session Keys
   const [activeSharedKey, setActiveSharedKey] = useState(null);
   const [activePeerVerifyKey, setActivePeerVerifyKey] = useState(null);
   const [peerKeyMissing, setPeerKeyMissing] = useState(false);
@@ -227,89 +89,56 @@ export default function CyberChat() {
   const audioTimerRef = useRef(null);
   const audioChunksRef = useRef([]);
   const fileInputRef = useRef(null);
-  const avatarInputRef = useRef(null);
   const textInputRef = useRef(null);
+  const objectUrlsRef = useRef([]);
 
-  // Modals & Action States
-  const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [newUsernameInput, setNewUsernameInput] = useState("");
-  const [usernameError, setUsernameError] = useState("");
-  const [usernameSaving, setUsernameSaving] = useState(false);
-
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-
+  // Verification, Key Backup, & Safety Reporting Modals
   const [showSafetyModal, setShowSafetyModal] = useState(false);
   const [safetyInfo, setSafetyInfo] = useState(null);
   const [verifiedPeers, setVerifiedPeers] = useState({});
 
-  const [showAdminBlindedModal, setShowAdminBlindedModal] = useState(false);
-  const [rawServerMessages, setRawServerMessages] = useState([]);
-
   const [showKeyModal, setShowKeyModal] = useState(false);
+  const [keyModalMode, setKeyModalMode] = useState("export"); // "export" | "import"
   const [backupPassphrase, setBackupPassphrase] = useState("");
   const [exportedBackup, setExportedBackup] = useState("");
-  const [keyActionMsg, setKeyActionMsg] = useState("");
+  const [importBackupString, setImportBackupString] = useState("");
+  const [keyActionMsg, setKeyActionMsg] = useState(null);
+
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportCategory, setReportCategory] = useState("GROOMING");
+  const [reportReason, setReportReason] = useState("");
+  const [includeTranscript, setIncludeTranscript] = useState(true);
+  const [blockOnReport, setBlockOnReport] = useState(true);
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [submittedReportRef, setSubmittedReportRef] = useState("");
 
   const messagesEndRef = useRef(null);
-  const emojiPickerRef = useRef(null);
+  const handledMentorParamRef = useRef(null);
 
-  // Close emoji picker when clicking outside
+  const isLearner = user?.role === "STUDENT";
+
+  // Clean up decrypted blob URLs on unmount
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target)) {
-        setShowEmojiPicker(false);
-      }
-    }
-    if (showEmojiPicker) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
     };
-  }, [showEmojiPicker]);
+  }, []);
 
-  // Load verified peers from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(`cyberguard_verified_peers_${user?.id}`);
       if (saved) setVerifiedPeers(JSON.parse(saved));
-    } catch (_) {}
+    } catch {
+      // ignore
+    }
   }, [user?.id]);
 
-  // Deep-linking via query parameters (?tab=requests or ?conv=id)
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam && ["chats", "friends", "requests"].includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const convIdParam = searchParams.get("conv");
-    if (convIdParam && conversations.length > 0) {
-      const match = conversations.find((c) => c.id === convIdParam);
-      if (match && (!activeConv || activeConv.id !== match.id)) {
-        selectConversation(match);
-      }
-    }
-  }, [searchParams, conversations, activeConv]);
-
-  // Periodic background polling for conversation updates & friend requests
+  // Initialize E2EE Keys & Initial Data
   useEffect(() => {
     if (!user?.id) return;
-    const pollInterval = setInterval(() => {
-      fetchConversations();
-      fetchFriendRequests();
-    }, 6000);
-    return () => clearInterval(pollInterval);
-  }, [user?.id]);
-
-  // 1. Initialize E2EE Keys for Logged-In User
-  useEffect(() => {
-    if (!user?.id) return;
-
     let isMounted = true;
+
     async function setupCrypto() {
       setIsKeyInitializing(true);
       try {
@@ -319,17 +148,15 @@ export default function CyberChat() {
         setE2eeKeys(keys);
         setPublicMeta(publicPayload);
 
-        // Synchronize public keys with server
-        await api.post("/cyberchat/keys", publicPayload).catch((err) => {
-          console.warn("Public key registration sync:", err.message);
-        });
-
-        await fetchUserProfile();
-        await fetchConversations();
-        await fetchFriends();
-        await fetchFriendRequests();
-      } catch (err) {
-        console.error("E2EE Cryptographic Setup Error:", err);
+        await api.post("/cyberchat/keys", publicPayload).catch(() => {});
+        await Promise.all([fetchConversations(), fetchMentorsDirectory("")]);
+      } catch {
+        if (isMounted) {
+          setStatusNotice({
+            type: "error",
+            text: "Could not initialize browser encryption keys. Ensure IndexedDB is enabled.",
+          });
+        }
       } finally {
         if (isMounted) setIsKeyInitializing(false);
       }
@@ -341,101 +168,118 @@ export default function CyberChat() {
     };
   }, [user?.id]);
 
-  // 2. Profile & Relationship Fetchers
-  const fetchUserProfile = async () => {
-    try {
-      const res = await api.get("/cyberchat/profile");
-      setProfile(res.data.profile);
-      if (res.data.profile?.username) {
-        setNewUsernameInput(res.data.profile.username);
-      }
-    } catch (err) {
-      console.error("Error fetching cyberchat profile:", err);
-    }
-  };
+  // Poll conversation list every 8 seconds
+  useEffect(() => {
+    if (!user?.id || isKeyInitializing) return;
+    const pollInterval = setInterval(() => {
+      fetchConversations();
+    }, 8000);
+    return () => clearInterval(pollInterval);
+  }, [user?.id, isKeyInitializing]);
 
-  const fetchConversations = async () => {
+  // Handle ?conv= or ?mentor= deep links
+  useEffect(() => {
+    if (isKeyInitializing || !e2eeKeys) return;
+
+    const convIdParam = searchParams.get("conv");
+    if (convIdParam && conversations.length > 0) {
+      const match = conversations.find((c) => c.id === convIdParam);
+      if (match && activeConv?.id !== match.id) {
+        selectConversation(match);
+      }
+    }
+
+    const mentorIdParam = searchParams.get("mentor");
+    if (mentorIdParam && handledMentorParamRef.current !== mentorIdParam) {
+      handledMentorParamRef.current = mentorIdParam;
+      handleStartChatById(mentorIdParam);
+    }
+  }, [searchParams, conversations, isKeyInitializing, e2eeKeys]);
+
+  async function fetchConversations() {
     try {
       const res = await api.get("/cyberchat/conversations");
-      setConversations(res.data.conversations || []);
-    } catch (err) {
-      console.error("Error fetching conversations:", err);
+      const list = res.data?.conversations || [];
+      setConversations(list);
+
+      if (activeConv) {
+        const updatedActive = list.find((c) => c.id === activeConv.id);
+        if (updatedActive) {
+          setActiveConv((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  isBlocked: updatedActive.isBlocked,
+                  blockedByMe: updatedActive.blockedByMe,
+                }
+              : prev
+          );
+        }
+      }
+    } catch {
+      // ignore transient network errors
     } finally {
       setLoadingConversations(false);
     }
-  };
+  }
 
-  const fetchFriends = async () => {
+  async function fetchMentorsDirectory(query = "") {
     try {
-      const res = await api.get("/cyberchat/friends");
-      setFriendsList(res.data.friends || []);
-    } catch (err) {
-      console.error("Error fetching friends:", err);
+      const res = await api.get("/cyberchat/mentors", {
+        params: query.trim() ? { search: query.trim() } : {},
+      });
+      setMentorsDirectory(res.data?.mentors || res.data?.users || []);
+    } catch {
+      setMentorsDirectory([]);
     }
-  };
+  }
 
-  const fetchFriendRequests = async () => {
+  async function handleStartChatById(recipientId, peerFallback = null) {
     try {
-      const res = await api.get("/cyberchat/friend-requests");
-      setFriendRequests(res.data);
+      const res = await api.post("/cyberchat/conversations", { recipientId });
+      const conv = res.data?.conversation;
+      if (!conv) return;
+
+      const hydratedConv = {
+        ...conv,
+        peer: conv.peer || peerFallback,
+      };
+
+      setActiveTab("chats");
+      setSearchParams({ conv: hydratedConv.id }, { replace: true });
+      await fetchConversations();
+      await selectConversation(hydratedConv);
     } catch (err) {
-      console.error("Error fetching friend requests:", err);
+      setStatusNotice({
+        type: "error",
+        text:
+          err.response?.data?.error ||
+          "Unable to start conversation. Only Verified Mentors and CSA Officers can be messaged.",
+      });
     }
-  };
+  }
 
-  const fetchUsersDirectory = async (query = "") => {
-    try {
-      const res = await api.get(`/cyberchat/users?search=${encodeURIComponent(query)}`);
-      setAvailableUsers(res.data.users || []);
-    } catch (err) {
-      console.error("Error searching users directory:", err);
-    }
-  };
+  async function selectConversation(conv) {
+    if (!conv || !e2eeKeys) return;
 
-  // 3. Select Conversation & Derive Shared Secret
-  const selectConversation = async (conv) => {
-    if (!conv) return;
-
-    if (!e2eeKeys) {
-      alert("Please wait for your cryptographic keys to initialize.");
-      return;
-    }
-
-    // Safely guarantee conv has peer
-    let targetPeer = conv.peer;
-    if (!targetPeer && conv.participants) {
-      const peerP = conv.participants.find((p) => p.userId !== user?.id);
-      if (peerP?.user) targetPeer = peerP.user;
-    }
-
-    const safeConv = {
-      ...conv,
-      peer: targetPeer || conv.peer,
-    };
-
-    setActiveConv(safeConv);
+    setActiveConv(conv);
     setLoadingMessages(true);
     setDecryptedMessages([]);
-    setShowEmojiPicker(false);
     setPeerKeyMissing(false);
 
-    if (!safeConv.peer?.id) {
-      console.warn("Peer information not available for conversation:", safeConv);
+    if (!conv.peer?.id) {
       setLoadingMessages(false);
       return;
     }
 
     try {
-      const keyRes = await api.get(`/cyberchat/keys/${safeConv.peer.id}`).catch((err) => {
-        if (err.response?.status === 404) {
-          return { data: null };
-        }
+      const keyRes = await api.get(`/cyberchat/keys/${conv.peer.id}`).catch((err) => {
+        if (err.response?.status === 404) return { data: null };
         throw err;
       });
 
       const peerKeys = keyRes?.data?.key || keyRes?.data;
-
-      if (!peerKeys || !peerKeys.ecdhPublicKey || !peerKeys.ecdsaPublicKey) {
+      if (!peerKeys?.ecdhPublicKey || !peerKeys?.ecdsaPublicKey) {
         setPeerKeyMissing(true);
         setActiveSharedKey(null);
         setActivePeerVerifyKey(null);
@@ -443,41 +287,39 @@ export default function CyberChat() {
         return;
       }
 
-      // Derive AES-256-GCM Shared Session Key via ECDH
       const sharedKey = await deriveSharedAesKey(
         e2eeKeys.ecdhPair.privateKey,
         peerKeys.ecdhPublicKey
       );
       setActiveSharedKey(sharedKey);
 
-      // Import peer's ECDSA signing public key
       const peerVerifyKey = await importPeerEcdsaPublicKey(peerKeys.ecdsaPublicKey);
       setActivePeerVerifyKey(peerVerifyKey);
 
-      // Calculate Verification Emojis for Identity Safety Check
       const safety = await computeSafetyVerification(
-        publicMeta.fingerprint,
+        publicMeta?.fingerprint,
         peerKeys.fingerprint
       );
       setSafetyInfo(safety);
 
-      await loadAndDecryptMessages(safeConv.id, sharedKey, peerVerifyKey);
-    } catch (err) {
-      console.warn("Peer cryptographic session pending or uninitialized:", err.message || err);
+      await loadAndDecryptMessages(conv.id, sharedKey, peerVerifyKey);
+    } catch {
       setPeerKeyMissing(true);
       setActiveSharedKey(null);
       setActivePeerVerifyKey(null);
     } finally {
       setLoadingMessages(false);
     }
-  };
+  }
 
-  // 4. Load & Decrypt Messages
-  const loadAndDecryptMessages = async (convId, sharedKey, peerVerifyKey) => {
+  async function loadAndDecryptMessages(convId, sharedKey, peerVerifyKey) {
     try {
       const res = await api.get(`/cyberchat/conversations/${convId}/messages`);
-      const rawMessages = res.data.messages || [];
-      setRawServerMessages(rawMessages);
+      const rawMessages = res.data?.messages || [];
+
+      // Release prior temporary blob URLs before creating fresh ones
+      objectUrlsRef.current.forEach((u) => URL.revokeObjectURL(u));
+      objectUrlsRef.current = [];
 
       const decrypted = await Promise.all(
         rawMessages.map(async (msg) => {
@@ -499,8 +341,9 @@ export default function CyberChat() {
                 result.payload.attachment.mimeType,
                 sharedKey
               );
-            } catch (err) {
-              console.warn("Failed to decrypt attachment blob:", err);
+              if (attachmentUrl) objectUrlsRef.current.push(attachmentUrl);
+            } catch {
+              attachmentUrl = null;
             }
           }
 
@@ -509,17 +352,14 @@ export default function CyberChat() {
             senderId: msg.senderId,
             recipientId: msg.recipientId,
             createdAt: msg.createdAt,
-            expiresAt: msg.expiresAt,
-            selfDestructSeconds: msg.selfDestructSeconds,
             decryptedText: result.success
-              ? result.payload?.text
-              : "Encrypted message (peer keys updated)",
-            sticker: result.success ? result.payload?.sticker : null,
+              ? result.payload?.text || ""
+              : "Encrypted message (key rotation occurred)",
             attachment: result.payload?.attachment
               ? { ...result.payload.attachment, url: attachmentUrl }
               : null,
             signatureValid: result.signatureValid,
-            tampered: Boolean(result.success && !result.signatureValid && !isMine && msg.signature),
+            tampered: Boolean(result.success && !result.signatureValid),
             isMine,
           };
         })
@@ -528,38 +368,56 @@ export default function CyberChat() {
       setDecryptedMessages((prev) => {
         if (prev.length > 0 && decrypted.length > prev.length) {
           const lastMsg = decrypted[decrypted.length - 1];
-          if (!lastMsg?.isMine) {
-            playChime("message");
-          }
+          if (!lastMsg?.isMine) playChime("message");
         }
         return decrypted;
       });
-    } catch (err) {
-      console.error("Error loading messages:", err);
+    } catch {
+      // ignore transient poll errors
     }
-  };
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [decryptedMessages]);
+  }, [decryptedMessages.length]);
 
-  // Polling for active conversation messages
   useEffect(() => {
-    if (!activeConv || !activeSharedKey || !activePeerVerifyKey) return;
-
+    if (!activeConv?.id || !activeSharedKey || !activePeerVerifyKey) return;
     const interval = setInterval(() => {
       loadAndDecryptMessages(activeConv.id, activeSharedKey, activePeerVerifyKey);
-    }, 4000);
-
+    }, 5000);
     return () => clearInterval(interval);
   }, [activeConv?.id, activeSharedKey, activePeerVerifyKey]);
 
-  // 5. Send Encrypted Text / Attachment Message
-  const handleSendMessage = async (e) => {
+  function handleFileSelection(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      setStatusNotice({
+        type: "error",
+        text: "File exceeds the 2 MB maximum size limit.",
+      });
+      e.target.value = "";
+      return;
+    }
+    setSelectedFile(file);
+    e.target.value = "";
+  }
+
+  async function handleSendMessage(e) {
     e?.preventDefault();
-    if ((!messageText.trim() && !selectedFile && !audioBlob) || sending || !activeConv || !activeSharedKey) return;
+    if (
+      (!messageText.trim() && !selectedFile && !audioBlob) ||
+      sending ||
+      !activeConv ||
+      !activeSharedKey ||
+      activeConv.isBlocked
+    ) {
+      return;
+    }
 
     setSending(true);
+    setStatusNotice(null);
     try {
       let attachmentPayload = null;
 
@@ -567,7 +425,7 @@ export default function CyberChat() {
         attachmentPayload = await encryptFileBlob(selectedFile, activeSharedKey);
       } else if (audioBlob) {
         attachmentPayload = await encryptFileBlob(
-          new File([audioBlob], "voice-memo.webm", { type: "audio/webm" }),
+          new File([audioBlob], "voice-note.webm", { type: "audio/webm" }),
           activeSharedKey
         );
         attachmentPayload.isVoiceMemo = true;
@@ -592,189 +450,26 @@ export default function CyberChat() {
         iv,
         signature,
         hasAttachment: Boolean(attachmentPayload),
-        selfDestructSeconds: Number(selfDestructSeconds) || 0,
       });
 
       setMessageText("");
       setSelectedFile(null);
       setAudioBlob(null);
       setAudioDuration(0);
-      setShowEmojiPicker(false);
 
       await loadAndDecryptMessages(activeConv.id, activeSharedKey, activePeerVerifyKey);
       fetchConversations();
     } catch (err) {
-      console.error("Error sending encrypted message:", err);
-      alert("Failed to encrypt and send message. Ensure your cryptographic keys are ready.");
+      setStatusNotice({
+        type: "error",
+        text: err.response?.data?.error || err.message || "Failed to encrypt and send message.",
+      });
     } finally {
       setSending(false);
     }
-  };
+  }
 
-  // 6. Send Encrypted Sticker Message
-  const handleSendSticker = async (sticker) => {
-    if (sending || !activeConv || !activeSharedKey) return;
-    setSending(true);
-    try {
-      const payload = {
-        text: `[Sticker: ${sticker.name}]`,
-        sticker: {
-          id: sticker.id,
-          name: sticker.name,
-          emoji: sticker.emoji,
-          title: sticker.title,
-          tagline: sticker.tagline,
-          bg: sticker.bg,
-        },
-        timestamp: Date.now(),
-        attachment: null,
-      };
-
-      const { ciphertext, iv, signature } = await encryptAndSignMessage({
-        sharedKey: activeSharedKey,
-        myEcdsaPrivateKey: e2eeKeys.ecdsaPair.privateKey,
-        payload,
-      });
-
-      await api.post(`/cyberchat/conversations/${activeConv.id}/messages`, {
-        recipientId: activeConv.peer.id,
-        ciphertext,
-        iv,
-        signature,
-        hasAttachment: false,
-        selfDestructSeconds: Number(selfDestructSeconds) || 0,
-      });
-
-      setShowEmojiPicker(false);
-      await loadAndDecryptMessages(activeConv.id, activeSharedKey, activePeerVerifyKey);
-      fetchConversations();
-    } catch (err) {
-      console.error("Error sending sticker:", err);
-      alert("Failed to send encrypted sticker.");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  // 7. Insert Emoji into message input
-  const handleInsertEmoji = (emoji) => {
-    setMessageText((prev) => prev + emoji);
-    textInputRef.current?.focus();
-  };
-
-  // 8. Username Claiming Handler
-  const handleSaveUsername = async (e) => {
-    e.preventDefault();
-    if (!newUsernameInput.trim()) return;
-
-    setUsernameSaving(true);
-    setUsernameError("");
-
-    try {
-      const res = await api.put("/cyberchat/profile/username", {
-        username: newUsernameInput.trim(),
-      });
-      setProfile(res.data.profile);
-      setShowUsernameModal(false);
-      alert(`Username @${res.data.profile.username} claimed successfully!`);
-    } catch (err) {
-      setUsernameError(err.response?.data?.error || "Failed to update username");
-    } finally {
-      setUsernameSaving(false);
-    }
-  };
-
-  // 9. Profile Photo Upload Handler
-  const handleAvatarUpload = async (file) => {
-    if (!file) return;
-    setAvatarUploading(true);
-
-    try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const base64Data = reader.result;
-          await api.put("/cyberchat/profile/avatar", {
-            avatarUrl: base64Data,
-          });
-          await fetchUserProfile();
-          updateUser?.({ ...user, avatarUrl: base64Data });
-          setShowAvatarModal(false);
-        } catch (uploadErr) {
-          alert("Failed to update profile picture: " + (uploadErr.response?.data?.error || uploadErr.message));
-        } finally {
-          setAvatarUploading(false);
-        }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setAvatarUploading(false);
-      alert("Error reading photo: " + err.message);
-    }
-  };
-
-  // 10. Friend Request Handlers
-  const handleSendFriendRequest = async (targetUser) => {
-    try {
-      await api.post("/cyberchat/friend-requests", {
-        recipientId: targetUser.id,
-      });
-      alert(`Friend request sent to ${targetUser.displayName}!`);
-      fetchFriendRequests();
-      fetchUsersDirectory(searchQuery);
-    } catch (err) {
-      alert(err.response?.data?.error || "Failed to dispatch friend request.");
-    }
-  };
-
-  const handleRespondFriendRequest = async (requestId, action) => {
-    try {
-      const res = await api.put(`/cyberchat/friend-requests/${requestId}`, { action });
-      fetchFriendRequests();
-      fetchFriends();
-      fetchUsersDirectory(searchQuery);
-
-      if (action === "ACCEPT" && res.data.conversation) {
-        const updatedConvs = await api.get("/cyberchat/conversations");
-        setConversations(updatedConvs.data.conversations || []);
-        selectConversation(res.data.conversation);
-      }
-    } catch (err) {
-      alert(err.response?.data?.error || "Failed to process friend request.");
-    }
-  };
-
-  const handleStartChatWithUser = async (targetUser) => {
-    try {
-      const res = await api.post("/cyberchat/conversations", {
-        recipientId: targetUser.id,
-      });
-      let conv = res.data.conversation;
-      if (!conv.peer) {
-        conv = {
-          ...conv,
-          peer: {
-            id: targetUser.id,
-            displayName: targetUser.displayName,
-            username: targetUser.username,
-            email: targetUser.email,
-            role: targetUser.role,
-            avatarUrl: targetUser.avatarUrl,
-          },
-        };
-      }
-      setActiveTab("chats");
-      setSearchQuery("");
-      await fetchConversations();
-      await selectConversation(conv);
-    } catch (err) {
-      console.error("Could not start encrypted chat:", err);
-      alert(err.response?.data?.error || "Could not start encrypted chat.");
-    }
-  };
-
-  // 11. Voice Note Recording
-  const startVoiceRecording = async () => {
+  async function startVoiceRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -787,7 +482,11 @@ export default function CyberChat() {
 
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        setAudioBlob(blob);
+        if (blob.size <= MAX_ATTACHMENT_BYTES) {
+          setAudioBlob(blob);
+        } else {
+          setStatusNotice({ type: "error", text: "Voice note exceeds 2 MB limit." });
+        }
         stream.getTracks().forEach((t) => t.stop());
       };
 
@@ -797,653 +496,659 @@ export default function CyberChat() {
       audioTimerRef.current = setInterval(() => {
         setAudioDuration((d) => d + 1);
       }, 1000);
-    } catch (err) {
-      alert("Microphone permission is required to record encrypted voice memos.");
+    } catch {
+      setStatusNotice({
+        type: "error",
+        text: "Microphone permission is required to record a voice note.",
+      });
     }
-  };
+  }
 
-  const stopVoiceRecording = () => {
+  function stopVoiceRecording() {
     if (mediaRecorderRef.current && isRecordingVoice) {
       mediaRecorderRef.current.stop();
       setIsRecordingVoice(false);
       clearInterval(audioTimerRef.current);
     }
-  };
+  }
 
-  const cancelVoiceRecording = () => {
+  function cancelVoiceRecording() {
     stopVoiceRecording();
     setAudioBlob(null);
     setAudioDuration(0);
-  };
+  }
 
-  const togglePeerVerification = (peerId) => {
+  async function handleToggleBlockPeer() {
+    if (!activeConv?.peer?.id) return;
+    const peerId = activeConv.peer.id;
+    try {
+      if (activeConv.blockedByMe) {
+        await api.delete(`/cyberchat/blocks/${peerId}`);
+        setActiveConv((prev) => (prev ? { ...prev, blockedByMe: false, isBlocked: false } : prev));
+        setStatusNotice({ type: "info", text: `Unblocked ${activeConv.peer.displayName}.` });
+      } else {
+        await api.post("/cyberchat/blocks", { targetUserId: peerId });
+        setActiveConv((prev) => (prev ? { ...prev, blockedByMe: true, isBlocked: true } : prev));
+        setStatusNotice({
+          type: "info",
+          text: `Blocked ${activeConv.peer.displayName}. They can no longer message you.`,
+        });
+      }
+      fetchConversations();
+      fetchMentorsDirectory(searchQuery);
+    } catch (err) {
+      setStatusNotice({
+        type: "error",
+        text: err.response?.data?.error || "Could not update block preference.",
+      });
+    }
+  }
+
+  async function handleSubmitSafetyReport(e) {
+    e.preventDefault();
+    if (!activeConv?.id || submittingReport) return;
+
+    const cleanReason = reportReason.trim();
+    if (cleanReason.length < 10) {
+      setStatusNotice({
+        type: "error",
+        text: "Please describe the concern in at least 10 characters.",
+      });
+      return;
+    }
+
+    setSubmittingReport(true);
+    try {
+      const disclosedMessages = includeTranscript
+        ? decryptedMessages.slice(-15).map((m) => ({
+            id: m.id,
+            text: m.decryptedText || (m.attachment ? `[Attachment: ${m.attachment.name}]` : ""),
+          }))
+        : [];
+
+      const res = await api.post(`/cyberchat/conversations/${activeConv.id}/report`, {
+        category: reportCategory,
+        reason: cleanReason,
+        disclosedMessages,
+        blockPeer: blockOnReport,
+      });
+
+      setSubmittedReportRef(res.data?.refCode || "SUBMITTED");
+      if (blockOnReport) {
+        setActiveConv((prev) => (prev ? { ...prev, blockedByMe: true, isBlocked: true } : prev));
+      }
+      fetchConversations();
+    } catch (err) {
+      setStatusNotice({
+        type: "error",
+        text: err.response?.data?.error || "Could not submit safety report.",
+      });
+    } finally {
+      setSubmittingReport(false);
+    }
+  }
+
+  function togglePeerVerification(peerId) {
     setVerifiedPeers((prev) => {
       const next = { ...prev, [peerId]: !prev[peerId] };
-      localStorage.setItem(`cyberguard_verified_peers_${user?.id}`, JSON.stringify(next));
+      try {
+        localStorage.setItem(`cyberguard_verified_peers_${user?.id}`, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
       return next;
     });
-  };
+  }
 
-  const handleVerifyPeerSafety = () => {
-    setShowSafetyModal(true);
-  };
+  const filteredConversations = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter(
+      (c) =>
+        c.peer?.displayName?.toLowerCase().includes(q) ||
+        c.peer?.headline?.toLowerCase().includes(q)
+    );
+  }, [conversations, searchQuery]);
 
-  const isCurrentPeerVerified = activeConv?.peer ? Boolean(verifiedPeers[activeConv.peer.id]) : false;
+  const filteredMentors = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return mentorsDirectory;
+    return mentorsDirectory.filter(
+      (m) =>
+        m.displayName?.toLowerCase().includes(q) ||
+        m.headline?.toLowerCase().includes(q) ||
+        (m.specialties || []).some((s) => s.toLowerCase().includes(q))
+    );
+  }, [mentorsDirectory, searchQuery]);
+
+  const isCurrentPeerVerified = activeConv?.peer
+    ? Boolean(verifiedPeers[activeConv.peer.id])
+    : false;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#F1F5F9] text-slate-900 flex flex-col font-sans">
-      {/* Top Header: Telegram clean header */}
-      <div className="bg-white border-b border-slate-200/80 px-4 py-2 flex items-center justify-between text-xs shrink-0 z-20">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span className="font-bold text-sm text-slate-900 tracking-tight">CyberChat</span>
-          <span className="text-slate-300">•</span>
-          <span className="text-slate-500 text-xs flex items-center gap-1 font-medium">
-            <Lock className="w-3 h-3 text-emerald-600" /> End-to-End Encrypted
+    <div className="h-[calc(100dvh-5.75rem)] bg-[#F8FAFC] text-slate-900 flex flex-col font-sans">
+      {/* Top Mentorship Safety Header */}
+      <div className="bg-white border-b border-slate-200/90 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3 text-xs shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span className="font-semibold text-slate-900">Mentorship &amp; CSA Support Chat</span>
+          <span className="hidden sm:inline text-slate-300">·</span>
+          <span className="hidden sm:inline text-slate-500 truncate">
+            End-to-end encrypted · Verified mentors &amp; CSA officers only
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowKeyModal(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition text-xs font-medium"
-            title="Manage encryption keys"
-          >
-            <Key className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Encryption Keys</span>
-          </button>
-        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setKeyActionMsg(null);
+            setShowKeyModal(true);
+          }}
+          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition text-xs font-medium shrink-0 cursor-pointer"
+        >
+          <Key className="w-3.5 h-3.5 text-slate-400" />
+          <span className="hidden sm:inline">Key backup</span>
+        </button>
       </div>
 
-      {/* Main Two-Pane Layout */}
+      {/* Inline Status Notice */}
+      {statusNotice && (
+        <div
+          className={`px-4 py-2.5 border-b text-xs font-medium flex items-center justify-between gap-3 shrink-0 ${
+            statusNotice.type === "error"
+              ? "bg-rose-50/90 border-rose-200 text-rose-900"
+              : "bg-slate-100 border-slate-200 text-slate-800"
+          }`}
+        >
+          <span>{statusNotice.text}</span>
+          <button
+            type="button"
+            onClick={() => setStatusNotice(null)}
+            className="text-slate-400 hover:text-slate-700 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Main Two-Pane Workspace */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar: Telegram clean list */}
-        <div className={`w-full md:w-88 lg:w-96 border-r border-slate-200/80 bg-white flex flex-col shadow-xs z-10 shrink-0 ${
-          activeConv ? "hidden md:flex" : "flex"
-        }`}>
-          {/* User Profile Card */}
-          <div className="p-3 border-b border-slate-100 bg-white">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="relative group cursor-pointer shrink-0" onClick={() => setShowAvatarModal(true)}>
-                  <UserAvatar
-                    src={profile?.avatarUrl}
-                    name={profile?.displayName}
-                    size="md"
-                    rounded="rounded-full"
-                    className="w-10 h-10 group-hover:opacity-85 transition"
-                  />
-                  <div className="absolute inset-0 rounded-full bg-black/25 flex items-center justify-center opacity-0 group-hover:opacity-100 transition text-white">
-                    <Camera className="w-3.5 h-3.5" />
-                  </div>
-                </div>
-
-                <div className="min-w-0">
-                  <div className="font-semibold text-sm text-slate-900 flex items-center gap-1.5">
-                    <span className="truncate max-w-[130px]">{user?.displayName}</span>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded font-mono font-semibold bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
-                      {user?.role}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {profile?.username ? (
-                      <button
-                        onClick={() => setShowUsernameModal(true)}
-                        className="text-xs text-slate-500 hover:text-[#0056D2] font-medium transition"
-                      >
-                        @{profile.username}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => setShowUsernameModal(true)}
-                        className="text-[11px] text-[#0056D2] hover:underline font-semibold flex items-center gap-0.5"
-                      >
-                        <AtSign className="w-3 h-3" /> Set @username
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowUsernameModal(true)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
-                title="Edit @username"
-              >
-                <AtSign className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-
-          {/* Notification Permission Banner */}
+        {/* Left Sidebar */}
+        <aside
+          className={`w-full md:w-84 lg:w-96 border-r border-slate-200/90 bg-white flex flex-col shrink-0 ${
+            activeConv ? "hidden md:flex" : "flex"
+          }`}
+        >
+          {/* Notification Opt-In */}
           {permission === "default" && (
-            <div className="px-3.5 py-2 bg-blue-50/80 border-b border-blue-100 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs text-[#0056D2] min-w-0">
-                <Bell className="w-3.5 h-3.5 shrink-0 text-[#0056D2]" />
-                <span className="font-medium text-[11px] truncate">Enable message notifications</span>
+            <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs text-slate-700 min-w-0">
+                <Bell className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                <span className="truncate">Desktop alerts for mentor replies</span>
               </div>
               <button
                 type="button"
                 onClick={requestPermission}
-                className="px-2.5 py-0.5 text-[11px] font-semibold rounded-lg bg-[#0056D2] hover:bg-blue-700 text-white transition shrink-0 shadow-xs"
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition shrink-0 cursor-pointer"
               >
                 Enable
               </button>
             </div>
           )}
 
-          {/* Navigation Tabs: Chats | Contacts | Requests */}
-          <div className="grid grid-cols-3 border-b border-slate-100 bg-white text-xs font-semibold text-center">
+          {/* Sidebar Tabs: Conversations | Verified Mentors */}
+          <div className="grid grid-cols-2 border-b border-slate-200/80 bg-white text-xs">
             <button
+              type="button"
               onClick={() => setActiveTab("chats")}
-              className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition ${
+              className={`py-3 flex items-center justify-center gap-1.5 border-b-2 transition cursor-pointer ${
                 activeTab === "chats"
-                  ? "border-[#0056D2] text-[#0056D2] font-bold"
+                  ? "border-slate-900 text-slate-900 font-semibold"
                   : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
               }`}
             >
               <MessageSquare className="w-3.5 h-3.5" />
-              <span>Chats</span>
+              <span>Conversations</span>
+              {conversations.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-[10px] text-slate-600 font-mono">
+                  {conversations.length}
+                </span>
+              )}
             </button>
+
             <button
-              onClick={() => setActiveTab("friends")}
-              className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition ${
-                activeTab === "friends"
-                  ? "border-[#0056D2] text-[#0056D2] font-bold"
+              type="button"
+              onClick={() => {
+                setActiveTab("mentors");
+                fetchMentorsDirectory(searchQuery);
+              }}
+              className={`py-3 flex items-center justify-center gap-1.5 border-b-2 transition cursor-pointer ${
+                activeTab === "mentors"
+                  ? "border-slate-900 text-slate-900 font-semibold"
                   : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
               }`}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Contacts</span>
-              {friendsList.length > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-[10px] text-slate-600 font-medium">
-                  {friendsList.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab("requests")}
-              className={`py-2.5 flex items-center justify-center gap-1.5 border-b-2 transition relative ${
-                activeTab === "requests"
-                  ? "border-[#0056D2] text-[#0056D2] font-bold"
-                  : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50"
-              }`}
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Requests</span>
-              {friendRequests.pendingCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-red-500 text-[10px] text-white font-bold">
-                  {friendRequests.pendingCount}
+              <span>{isLearner ? "Mentors & CSA" : "Contacts"}</span>
+              {mentorsDirectory.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-slate-100 text-[10px] text-slate-600 font-mono">
+                  {mentorsDirectory.length}
                 </span>
               )}
             </button>
           </div>
 
-          {/* Search Contacts Bar - Telegram Pill Style */}
-          <div className="px-3 py-2 border-b border-slate-100 bg-white">
+          {/* Search Filter */}
+          <div className="p-3 border-b border-slate-100 bg-white">
             <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-2 text-slate-400 pointer-events-none" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => {
                   setSearchQuery(e.target.value);
-                  fetchUsersDirectory(e.target.value);
+                  if (activeTab === "mentors") {
+                    fetchMentorsDirectory(e.target.value);
+                  }
                 }}
-                placeholder="Search"
-                className="w-full bg-slate-100 hover:bg-slate-150 border-0 rounded-full pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1.5 focus:ring-[#0056D2]/60 focus:bg-white transition"
+                placeholder={
+                  activeTab === "chats"
+                    ? "Filter conversations..."
+                    : isLearner
+                    ? "Search verified mentors or CSA officers..."
+                    : "Search booked mentees or officers..."
+                }
+                className="w-full bg-slate-50 border border-slate-200/90 rounded-xl pl-8 pr-3 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
               />
             </div>
           </div>
 
-          {/* Tab Content */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100 bg-white">
-            {/* If actively searching */}
-            {searchQuery.trim() ? (
-              <div className="p-2 space-y-1.5">
-                <div className="text-[10px] uppercase text-[#0056D2] font-bold px-2 py-1">
-                  Directory Results ({availableUsers.length})
+          {/* List Body */}
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
+            {activeTab === "chats" ? (
+              loadingConversations ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  Loading conversations...
                 </div>
-                {availableUsers.length === 0 ? (
-                  <div className="text-center py-6 text-xs text-slate-500">No cyber guards found matching "{searchQuery}"</div>
-                ) : (
-                  availableUsers.map((u) => (
-                    <div
-                      key={u.id}
-                      className="p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50/50 border border-slate-200 flex items-center justify-between transition"
+              ) : filteredConversations.length === 0 ? (
+                <div className="p-8 text-center space-y-2.5">
+                  <p className="text-xs font-semibold text-slate-800">No mentorship chats yet</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    {isLearner
+                      ? "Start a secure conversation with a CSA-vetted cybersecurity mentor or CSA support officer."
+                      : "Conversations with learners who book your mentorship sessions or reach out for guidance will appear here."}
+                  </p>
+                  {isLearner && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("mentors")}
+                      className="mt-1 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <UserAvatar user={u} size="md" rounded="rounded-xl" />
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">{u.displayName}</div>
-                          <div className="text-[11px] text-[#0056D2] flex items-center gap-1 font-medium">
-                            {u.username ? (
-                              <span>@{u.username}</span>
-                            ) : (
-                              <span className="text-slate-500 capitalize">{u.role?.toLowerCase()}</span>
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Browse verified mentors</span>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredConversations.map((conv) => {
+                  const isSelected = activeConv?.id === conv.id;
+                  const peer = conv.peer;
+
+                  return (
+                    <button
+                      key={conv.id}
+                      type="button"
+                      onClick={() => {
+                        setSearchParams({ conv: conv.id }, { replace: true });
+                        selectConversation(conv);
+                      }}
+                      className={`w-full p-3.5 flex items-center justify-between text-left transition cursor-pointer ${
+                        isSelected ? "bg-slate-100/90" : "hover:bg-slate-50/80"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <UserAvatar
+                          src={peer?.avatarUrl}
+                          name={peer?.displayName}
+                          size="md"
+                          rounded="rounded-full"
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-900 truncate">
+                              {peer?.displayName || "Mentor"}
+                            </span>
+                            {conv.lastMessage && (
+                              <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </span>
                             )}
                           </div>
-                        </div>
-                      </div>
 
-                      <div>
-                        {u.friendshipStatus === "FRIENDS" ? (
-                          <button
-                            onClick={() => handleStartChatWithUser(u)}
-                            className="px-2.5 py-1 rounded-lg bg-[#0056D2] hover:bg-blue-700 text-white text-[11px] font-bold transition flex items-center gap-1 shadow-xs"
-                          >
-                            <MessageSquare className="w-3 h-3" /> Chat
-                          </button>
-                        ) : u.friendshipStatus === "REQUEST_SENT" ? (
-                          <span className="text-[10px] px-2 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-600 font-medium">
-                            Pending ⏳
-                          </span>
-                        ) : u.friendshipStatus === "REQUEST_RECEIVED" ? (
-                          <button
-                            onClick={() => handleRespondFriendRequest(u.requestId, "ACCEPT")}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition shadow-xs"
-                          >
-                            Accept
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleSendFriendRequest(u)}
-                            className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 text-[#0056D2] text-[11px] font-semibold transition flex items-center gap-1"
-                          >
-                            <UserPlus className="w-3 h-3" /> Add
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            ) : activeTab === "chats" ? (
-              /* Chats Tab */
-              <div>
-                {loadingConversations ? (
-                  <div className="p-8 text-center text-xs text-slate-500">Loading conversations...</div>
-                ) : conversations.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <Shield className="w-8 h-8 text-blue-500/40 mx-auto mb-2" />
-                    <p className="text-xs font-semibold text-slate-700">No active chats yet</p>
-                    <p className="text-[11px] text-slate-500 mt-1">Search or add cyber guards to start a secure conversation</p>
-                  </div>
-                ) : (
-                  conversations.map((conv) => {
-                    const isSelected = activeConv?.id === conv.id;
-                    const peer = conv.peer;
-
-                    return (
-                      <button
-                        key={conv.id}
-                        onClick={() => selectConversation(conv)}
-                        className={`w-full p-3 flex items-center justify-between text-left transition border-b border-slate-100/80 ${
-                          isSelected
-                            ? "bg-[#EBF2FA] border-l-3 border-[#0056D2]"
-                            : "hover:bg-slate-50/80"
-                        }`}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <UserAvatar
-                            src={peer?.avatarUrl}
-                            name={peer?.displayName}
-                            size="lg"
-                            rounded="rounded-full"
-                            showOnlineStatus
-                          />
-
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-slate-900 truncate">
-                                {peer?.displayName || "Cyber Guard"}
-                              </span>
-                              {conv.lastMessage && (
-                                <span className="text-[11px] text-slate-400 font-normal shrink-0 ml-1">
-                                  {new Date(conv.lastMessage.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 truncate">
-                              <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span className="truncate">
-                                {conv.lastMessage
-                                  ? (conv.lastMessage.isMine ? "You: " : "") +
-                                    (conv.lastMessage.hasAttachment ? "📎 Attachment" : "🔒 Message")
-                                  : "Secret chat initiated"}
-                              </span>
-                            </div>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 border border-slate-200/80 text-slate-600 font-medium shrink-0">
+                              {ROLE_BADGES[peer?.role] || peer?.role}
+                            </span>
+                            <span className="text-[11px] text-slate-500 truncate">
+                              {conv.isBlocked
+                                ? "Blocked"
+                                : conv.lastMessage
+                                ? (conv.lastMessage.isMine ? "You: " : "") +
+                                  (conv.lastMessage.hasAttachment
+                                    ? "Encrypted attachment"
+                                    : "Encrypted message")
+                                : peer?.headline || "Ready to chat"}
+                            </span>
                           </div>
                         </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            ) : activeTab === "friends" ? (
-              /* Friends Tab */
-              <div className="p-3 space-y-2">
-                <div className="text-[10px] uppercase text-[#0056D2] font-bold px-1">
-                  Connected Cyber Guards ({friendsList.length})
-                </div>
-                {friendsList.length === 0 ? (
-                  <div className="text-center py-10 text-xs text-slate-500">
-                    You haven't connected with any friends yet. Search someone above to send a request!
-                  </div>
-                ) : (
-                  friendsList.map((friend) => (
-                    <div
-                      key={friend.id}
-                      className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <UserAvatar user={friend} size="md" rounded="rounded-xl" />
-                        <div>
-                          <div className="text-xs font-bold text-slate-900">{friend.displayName}</div>
-                          <div className="text-[11px] text-[#0056D2] font-medium">{friend.username ? `@${friend.username}` : `@${friend.role?.toLowerCase()}`}</div>
-                        </div>
                       </div>
-
-                      <button
-                        onClick={() => handleStartChatWithUser(friend)}
-                        className="px-2.5 py-1 rounded-lg bg-[#0056D2] hover:bg-blue-700 text-white text-xs font-bold transition flex items-center gap-1 shadow-xs"
-                      >
-                        <MessageSquare className="w-3 h-3" /> Chat
-                      </button>
-                    </div>
-                  ))
+                    </button>
+                  );
+                })
+              )
+            ) : filteredMentors.length === 0 ? (
+              <div className="p-8 text-center space-y-2">
+                <p className="text-xs font-semibold text-slate-700">No contacts available</p>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  {isLearner
+                    ? "Verified mentors and CSA officers will appear here as soon as they are accredited."
+                    : "Learners who book a 1-on-1 mentorship session with you appear here automatically."}
+                </p>
+                {isLearner && (
+                  <Link
+                    to="/tutors"
+                    className="inline-block text-xs font-semibold text-slate-700 underline pt-1"
+                  >
+                    View mentorship slots
+                  </Link>
                 )}
               </div>
             ) : (
-              /* Requests Tab */
-              <div className="p-3 space-y-4">
-                <div>
-                  <div className="text-[10px] uppercase text-[#0056D2] font-bold px-1 mb-2">
-                    Incoming Friend Requests ({friendRequests.incoming.length})
-                  </div>
-                  {friendRequests.incoming.length === 0 ? (
-                    <div className="text-center py-4 text-xs text-slate-500">No incoming friend requests</div>
-                  ) : (
-                    friendRequests.incoming.map((req) => (
-                      <div
-                        key={req.id}
-                        className="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col gap-2.5 mb-2 shadow-xs"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <UserAvatar user={req.user} size="md" rounded="rounded-xl" />
-                          <div>
-                            <div className="text-xs font-bold text-slate-900">{req.user.displayName}</div>
-                            <div className="text-[11px] text-[#0056D2] font-medium">{req.user.username ? `@${req.user.username}` : `@${req.user.role?.toLowerCase()}`}</div>
-                          </div>
+              <div className="p-3 space-y-2">
+                {filteredMentors.map((mentor) => (
+                  <div
+                    key={mentor.id}
+                    className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 transition flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <UserAvatar
+                        src={mentor.avatarUrl}
+                        name={mentor.displayName}
+                        size="md"
+                        rounded="rounded-full"
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-semibold text-slate-900 truncate">
+                            {mentor.displayName}
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 border border-slate-200 text-slate-700">
+                            {ROLE_BADGES[mentor.role] || mentor.role}
+                          </span>
                         </div>
-
-                        <div className="flex items-center gap-2 pt-1 border-t border-slate-200">
-                          <button
-                            onClick={() => handleRespondFriendRequest(req.id, "ACCEPT")}
-                            className="flex-1 py-1.5 rounded-lg bg-[#0056D2] hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs"
-                          >
-                            Accept
-                          </button>
-                          <button
-                            onClick={() => handleRespondFriendRequest(req.id, "DECLINE")}
-                            className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold transition"
-                          >
-                            Decline
-                          </button>
-                        </div>
+                        <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {mentor.headline}
+                        </p>
                       </div>
-                    ))
-                  )}
-                </div>
+                    </div>
 
-                <div>
-                  <div className="text-[10px] uppercase text-slate-500 font-bold px-1 mb-2">
-                    Sent Requests ({friendRequests.outgoing.length})
+                    <button
+                      type="button"
+                      onClick={() => handleStartChatById(mentor.id, mentor)}
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition shrink-0 cursor-pointer"
+                    >
+                      Message
+                    </button>
                   </div>
-                  {friendRequests.outgoing.length === 0 ? (
-                    <div className="text-center py-3 text-xs text-slate-500">No sent requests pending</div>
-                  ) : (
-                    friendRequests.outgoing.map((req) => (
-                      <div
-                        key={req.id}
-                        className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between mb-1.5"
-                      >
-                        <div className="flex items-center gap-2">
-                          <UserAvatar user={req.user} size="xs" rounded="rounded-lg" />
-                          <div>
-                            <div className="text-xs font-medium text-slate-800">{req.user.displayName}</div>
-                            <div className="text-[10px] text-slate-500">{req.user.username}</div>
-                          </div>
-                        </div>
-                        <span className="text-[10px] text-slate-400 font-medium">Waiting...</span>
-                      </div>
-                    ))
-                  )}
-                </div>
+                ))}
               </div>
             )}
           </div>
-        </div>
+        </aside>
 
-        {/* Right Main Pane: Telegram Clean Encrypted Thread */}
+        {/* Right Thread Pane */}
         {activeConv ? (
-          <div className="flex-1 flex flex-col relative bg-[#F1F5F9] w-full">
-            {/* Chat Thread Header - Telegram Style */}
-            <div className="h-15 px-3 sm:px-5 border-b border-slate-200/80 bg-white/95 backdrop-blur-md flex items-center justify-between shadow-xs z-10 shrink-0">
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                {/* Mobile Back Button to return to chats list */}
+          <div className="flex-1 flex flex-col bg-[#F8FAFC] w-full min-w-0">
+            {/* Thread Header */}
+            <div className="h-15 px-3 sm:px-5 border-b border-slate-200/90 bg-white flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <button
                   type="button"
-                  onClick={() => setActiveConv(null)}
-                  className="md:hidden p-1.5 -ml-1 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition shrink-0"
-                  title="Back to conversations"
+                  onClick={() => {
+                    setActiveConv(null);
+                    setSearchParams({}, { replace: true });
+                  }}
+                  className="md:hidden p-1.5 -ml-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition shrink-0 cursor-pointer"
+                  aria-label="Back to conversations"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
+
                 <UserAvatar
                   src={activeConv.peer?.avatarUrl}
                   name={activeConv.peer?.displayName}
                   size="md"
                   rounded="rounded-full"
-                  showOnlineStatus
                 />
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-slate-900 truncate">{activeConv.peer?.displayName}</span>
-                    {activeConv.peer?.username && (
-                      <span className="text-xs text-slate-500 font-normal truncate">@{activeConv.peer.username}</span>
-                    )}
+                    <span className="font-semibold text-sm text-slate-900 truncate">
+                      {activeConv.peer?.displayName}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-700 shrink-0">
+                      {ROLE_BADGES[activeConv.peer?.role] || activeConv.peer?.role}
+                    </span>
                   </div>
-                  <div className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.2">
-                    {isCurrentPeerVerified ? (
-                      <span className="text-emerald-600 font-medium flex items-center gap-1 text-[11px]">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                        Verified secret chat
-                      </span>
-                    ) : (
-                      <span className="text-slate-500 flex items-center gap-1 text-[11px]">
-                        <Lock className="w-2.5 h-2.5 text-emerald-600" />
-                        End-to-end encrypted
-                      </span>
-                    )}
-                    <span className="text-slate-300">•</span>
-                    <span className="text-[#0056D2] font-medium text-[11px]">online</span>
+
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1.5 truncate">
+                    <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="truncate">
+                      {isCurrentPeerVerified
+                        ? "Keys verified"
+                        : activeConv.peer?.headline || "End-to-end encrypted"}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Header Actions */}
+              {/* Safety & Cryptographic Controls */}
               <div className="flex items-center gap-1.5 shrink-0">
-                {/* Self-Destruct Disappearing Messages */}
-                <div className="flex items-center gap-1 bg-slate-100/90 hover:bg-slate-100 border border-slate-200/80 rounded-full px-2.5 py-1 text-xs text-slate-600 transition">
-                  <Clock className="w-3 h-3 text-slate-500" />
-                  <select
-                    value={selfDestructSeconds}
-                    onChange={(e) => setSelfDestructSeconds(Number(e.target.value))}
-                    className="bg-transparent text-slate-700 text-xs focus:outline-none cursor-pointer font-medium"
-                    title="Auto-delete message timer"
-                  >
-                    <option value={0}>Off</option>
-                    <option value={30}>30s</option>
-                    <option value={300}>5m</option>
-                    <option value={3600}>1h</option>
-                    <option value={86400}>24h</option>
-                  </select>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSafetyModal(true)}
+                  disabled={peerKeyMissing}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 transition disabled:opacity-40 cursor-pointer"
+                  title="Verify encryption fingerprint"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden lg:inline">Verify keys</span>
+                </button>
 
                 <button
-                  onClick={handleVerifyPeerSafety}
-                  className="p-2 rounded-full text-slate-500 hover:text-[#0056D2] hover:bg-slate-100 transition"
-                  title="Verify security fingerprint"
+                  type="button"
+                  onClick={handleToggleBlockPeer}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700 transition cursor-pointer"
+                  title={activeConv.blockedByMe ? "Unblock contact" : "Block contact"}
                 >
-                  <ShieldCheck className="w-4 h-4" />
+                  <Ban className="w-3.5 h-3.5 text-slate-500" />
+                  <span className="hidden lg:inline">
+                    {activeConv.blockedByMe ? "Unblock" : "Block"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubmittedReportRef("");
+                    setReportReason("");
+                    setShowReportModal(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 text-xs font-medium text-slate-700 transition cursor-pointer"
+                  title="Report concern to CSA Officers"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Report</span>
                 </button>
               </div>
             </div>
 
-            {/* Message Stream with Telegram Wallpaper Pattern */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-2.5 chat-wallpaper-doodle">
-              {/* E2EE Secret Chat Card */}
+            {/* Messages Stream */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
+              {/* Mentorship Safety Banner */}
               {peerKeyMissing ? (
-                <div className="max-w-sm mx-auto my-3 p-3.5 rounded-2xl bg-amber-50/95 border border-amber-200/80 text-center shadow-xs backdrop-blur-xs">
-                  <ShieldAlert className="w-4 h-4 text-amber-600 mx-auto mb-1" />
-                  <div className="text-xs font-bold text-amber-900">Key Exchange Pending</div>
-                  <p className="text-[11px] text-amber-800 mt-1 leading-relaxed">
-                    {activeConv.peer?.displayName || "This user"} will automatically sync their encryption keys upon opening CyberChat.
+                <div className="max-w-md mx-auto my-2 p-4 rounded-xl bg-amber-50/80 border border-amber-200 text-center space-y-1">
+                  <ShieldAlert className="w-4 h-4 text-amber-700 mx-auto" />
+                  <p className="text-xs font-semibold text-amber-900">Encryption keys pending</p>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    {activeConv.peer?.displayName || "This mentor"} has not opened CyberChat on
+                    their device yet. Messaging unlocks automatically as soon as their keys sync.
                   </p>
                 </div>
               ) : (
-                <div className="max-w-xs sm:max-w-sm mx-auto my-3 p-3.5 rounded-2xl bg-white/95 border border-slate-200/80 shadow-xs text-center backdrop-blur-xs">
-                  <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-1.5">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <div className="text-xs font-bold text-slate-900">CyberChat Secret Session</div>
-                  <div className="text-[11px] text-slate-500 mt-1.5 space-y-0.5 text-left pl-3">
-                    <p>• 256-bit AES client-side encryption</p>
-                    <p>• Verified ECDSA cryptographic signatures</p>
-                    <p>• Leaves zero unencrypted data on servers</p>
-                    <p>• Self-destruct message timers supported</p>
-                  </div>
+                <div className="max-w-lg mx-auto my-1 p-3.5 rounded-xl bg-white border border-slate-200/80 text-center space-y-1">
+                  <p className="text-xs font-semibold text-slate-800">
+                    Protected Mentorship Channel
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Messages are end-to-end encrypted with AES-256-GCM and signed with ECDSA. Never
+                    share passwords, Mobile Money PINs, or one-time verification codes.
+                  </p>
                 </div>
               )}
 
               {loadingMessages ? (
                 <div className="flex justify-center py-12">
-                  <CyberSpinner label="Loading conversation..." />
+                  <CyberSpinner label="Decrypting messages..." />
                 </div>
               ) : decryptedMessages.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 text-xs bg-white/80 backdrop-blur-xs rounded-2xl max-w-xs mx-auto p-5 border border-slate-200/70 shadow-xs">
-                  <p className="font-semibold text-slate-700 text-xs">No messages here yet...</p>
-                  <p className="text-[11px] text-slate-500 mt-1">Send a greeting to start this private conversation.</p>
+                <div className="text-center py-10 text-slate-500 text-xs">
+                  No messages yet. Introduce yourself or ask your cybersecurity question below.
                 </div>
               ) : (
                 decryptedMessages.map((msg) => {
                   const isMine = msg.isMine;
-
                   return (
                     <div
                       key={msg.id}
-                      className={`flex items-end gap-1.5 ${isMine ? "justify-end" : "justify-start"}`}
+                      className={`flex items-end gap-2 ${isMine ? "justify-end" : "justify-start"}`}
                     >
                       {!isMine && (
-                        activeConv.peer?.avatarUrl ? (
-                          <img
-                            src={activeConv.peer.avatarUrl}
-                            alt=""
-                            className="w-7 h-7 rounded-full object-cover border border-slate-200 shadow-2xs mb-0.5"
-                          />
-                        ) : (
-                          <div className="w-7 h-7 rounded-full bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center text-sm mb-0.5">
-                            <i className="fa-solid fa-circle-user"></i>
-                          </div>
-                        )
+                        <UserAvatar
+                          src={activeConv.peer?.avatarUrl}
+                          name={activeConv.peer?.displayName}
+                          size="xs"
+                          rounded="rounded-full"
+                          className="mb-1"
+                        />
                       )}
 
                       <div
-                        className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-3.5 py-2 shadow-[0_1px_2px_rgba(0,0,0,0.06)] relative group ${
+                        className={`max-w-[85%] sm:max-w-[68%] rounded-2xl px-4 py-2.5 border ${
                           isMine
-                            ? "bg-[#EEFFDE] text-slate-900 border border-[#DCF4C2] rounded-tr-xs"
-                            : "bg-white text-slate-900 border border-slate-200/80 rounded-tl-xs"
+                            ? "bg-slate-900 text-white border-slate-900 rounded-br-xs"
+                            : "bg-white text-slate-900 border-slate-200/90 rounded-bl-xs"
                         }`}
                       >
                         {msg.tampered && (
-                          <div className="mb-1.5 p-1.5 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-1.5 font-bold">
-                            <ShieldAlert className="w-3.5 h-3.5 text-red-500" />
-                            <span>Message signature failed verification.</span>
+                          <div className="mb-1.5 p-2 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-[11px] flex items-center gap-1.5 font-semibold">
+                            <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            <span>Signature could not be verified (key changed or altered).</span>
                           </div>
                         )}
 
-                        {/* Sticker Rendering */}
-                        {msg.sticker ? (
-                          <div className="py-1 text-center">
-                            <div className="text-5xl filter drop-shadow-sm hover:scale-105 transition-transform cursor-pointer">
-                              {msg.sticker.emoji}
-                            </div>
-                            <div className="font-semibold text-xs text-slate-800 mt-1">
-                              {msg.sticker.title || msg.sticker.name}
-                            </div>
+                        {msg.decryptedText && (
+                          <div className="text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap break-words">
+                            {msg.decryptedText}
                           </div>
-                        ) : (
-                          msg.decryptedText && (
-                            <div className="text-[13.5px] leading-relaxed whitespace-pre-wrap break-words">
-                              {msg.decryptedText}
-                            </div>
-                          )
                         )}
 
                         {msg.attachment && (
-                          <div className="mt-2 pt-1.5 border-t border-black/5">
-                            {msg.attachment.isVoiceMemo ? (
-                              <div className="flex items-center gap-2.5 p-2 rounded-xl bg-black/5 text-slate-800">
-                                <audio controls src={msg.attachment.url} className="h-8 max-w-[200px]" />
-                                <span className="text-[10px] text-slate-500 font-mono">
+                          <div
+                            className={`mt-2 pt-2 border-t ${
+                              isMine ? "border-white/15" : "border-slate-100"
+                            }`}
+                          >
+                            {msg.attachment.isVoiceMemo && msg.attachment.url ? (
+                              <div className="flex items-center gap-2">
+                                <audio
+                                  controls
+                                  src={msg.attachment.url}
+                                  className="h-8 max-w-[210px]"
+                                />
+                                <span
+                                  className={`text-[10px] font-mono ${
+                                    isMine ? "text-slate-300" : "text-slate-500"
+                                  }`}
+                                >
                                   {msg.attachment.duration || 0}s
                                 </span>
                               </div>
-                            ) : msg.attachment.mimeType?.startsWith("image/") ? (
-                              <div>
+                            ) : msg.attachment.mimeType?.startsWith("image/") &&
+                              msg.attachment.url ? (
+                              <div className="space-y-1">
                                 <img
                                   src={msg.attachment.url}
-                                  alt="Decrypted file"
-                                  className="rounded-xl max-h-60 object-cover border border-slate-200/80"
+                                  alt={msg.attachment.name || "Attachment"}
+                                  className="rounded-xl max-h-60 object-cover border border-slate-200/40"
                                 />
-                                <div className="text-[10px] mt-1 flex items-center justify-between text-slate-500">
-                                  <span className="truncate max-w-[140px]">{msg.attachment.name}</span>
+                                <div
+                                  className={`text-[10px] flex items-center justify-between ${
+                                    isMine ? "text-slate-300" : "text-slate-500"
+                                  }`}
+                                >
+                                  <span className="truncate max-w-[160px]">
+                                    {msg.attachment.name}
+                                  </span>
                                   <a
                                     href={msg.attachment.url}
-                                    download={msg.attachment.name}
-                                    className="font-medium hover:underline flex items-center gap-0.5 ml-2 text-[#0056D2]"
+                                    download={msg.attachment.name || "image"}
+                                    rel="noopener noreferrer"
+                                    className="underline inline-flex items-center gap-1 ml-2"
                                   >
                                     <Download className="w-2.5 h-2.5" /> Save
                                   </a>
                                 </div>
                               </div>
-                            ) : (
+                            ) : msg.attachment.url ? (
                               <a
                                 href={msg.attachment.url}
-                                download={msg.attachment.name}
-                                className="flex items-center gap-2 p-2 rounded-xl transition text-xs bg-black/5 hover:bg-black/10 text-slate-800"
+                                download={msg.attachment.name || "document"}
+                                rel="noopener noreferrer"
+                                className={`flex items-center gap-2 p-2 rounded-xl text-xs transition ${
+                                  isMine
+                                    ? "bg-white/10 hover:bg-white/15 text-white"
+                                    : "bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200/80"
+                                }`}
                               >
-                                <FileText className="w-4 h-4 text-[#0056D2]" />
+                                <FileText className="w-4 h-4 shrink-0" />
                                 <span className="truncate font-medium">{msg.attachment.name}</span>
-                                <Download className="w-3.5 h-3.5 text-slate-400 ml-auto" />
+                                <Download className="w-3.5 h-3.5 ml-auto shrink-0 opacity-70" />
                               </a>
+                            ) : (
+                              <span className="text-[11px] opacity-75">
+                                Attachment could not be decrypted
+                              </span>
                             )}
                           </div>
                         )}
 
-                        <div className="flex items-center justify-end gap-1 text-[10px] mt-1 text-slate-400 font-normal">
-                          {msg.selfDestructSeconds > 0 && (
-                            <span className="flex items-center gap-0.5 text-amber-500 mr-1">
-                              <Clock className="w-2.5 h-2.5" />
-                              {msg.selfDestructSeconds}s
-                            </span>
-                          )}
+                        <div
+                          className={`flex items-center justify-end gap-1 text-[10px] mt-1 ${
+                            isMine ? "text-slate-300" : "text-slate-400"
+                          }`}
+                        >
                           <span>
-                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            {new Date(msg.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
                           </span>
-                          {isMine && <CheckCheck className="w-3.5 h-3.5 text-[#4FAE33]" />}
+                          {isMine && <CheckCheck className="w-3 h-3" />}
                         </div>
                       </div>
                     </div>
@@ -1453,401 +1158,233 @@ export default function CyberChat() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Bar Area - Telegram Clean Style */}
-            <div className="p-2.5 sm:p-3 border-t border-slate-200/80 bg-white/95 backdrop-blur-md relative">
-              {/* Emoji & Sticker Drawer Popover */}
-              {showEmojiPicker && (
-                <div
-                  ref={emojiPickerRef}
-                  className="absolute bottom-16 left-3 sm:left-6 z-30 w-80 sm:w-88 bg-white border border-slate-200/90 rounded-2xl shadow-xl p-3 text-slate-900 transition-all animate-in fade-in slide-in-from-bottom-2 duration-150"
-                >
-                  {/* Top Switcher: Emojis vs Stickers */}
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                    <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl">
-                      <button
-                        type="button"
-                        onClick={() => setEmojiPickerTab("emojis")}
-                        className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${
-                          emojiPickerTab === "emojis"
-                            ? "bg-white text-slate-900 shadow-2xs font-bold"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                      >
-                        😊 Emojis
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEmojiPickerTab("stickers")}
-                        className={`px-3 py-1 text-xs font-semibold rounded-lg transition ${
-                          emojiPickerTab === "stickers"
-                            ? "bg-white text-slate-900 shadow-2xs font-bold"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                      >
-                        🎨 Stickers
-                      </button>
-                    </div>
-
+            {/* Composer */}
+            <div className="p-3 border-t border-slate-200/90 bg-white">
+              {activeConv.isBlocked ? (
+                <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
+                  <span>
+                    {activeConv.blockedByMe
+                      ? "You blocked this contact."
+                      : "Messaging is unavailable in this conversation."}
+                  </span>
+                  {activeConv.blockedByMe && (
                     <button
                       type="button"
-                      onClick={() => setShowEmojiPicker(false)}
-                      className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                      onClick={handleToggleBlockPeer}
+                      className="px-3 py-1 rounded-lg bg-slate-900 text-white font-semibold text-xs cursor-pointer"
                     >
-                      <X className="w-4 h-4" />
+                      Unblock
                     </button>
-                  </div>
-
-                  {/* TAB 1: Emojis */}
-                  {emojiPickerTab === "emojis" ? (
-                    <div className="mt-2">
-                      <div className="flex items-center gap-1 overflow-x-auto pb-2 text-[11px]">
-                        {Object.entries(EMOJI_CATEGORIES).map(([key, cat]) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => setEmojiCategory(key)}
-                            className={`px-2 py-0.5 rounded-lg font-medium whitespace-nowrap transition ${
-                              emojiCategory === key
-                                ? "bg-slate-900 text-white"
-                                : "text-slate-500 hover:bg-slate-100"
-                            }`}
-                          >
-                            {cat.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto p-1 text-xl">
-                        {EMOJI_CATEGORIES[emojiCategory]?.emojis.map((emoji, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleInsertEmoji(emoji)}
-                            className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition hover:scale-120"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    /* TAB 2: Stickers */
-                    <div className="mt-2">
-                      <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1">
-                        {CYBER_STICKERS.map((sticker) => (
-                          <button
-                            key={sticker.id}
-                            type="button"
-                            onClick={() => handleSendSticker(sticker)}
-                            className="p-2 rounded-xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100/90 text-left flex items-center gap-2.5 transition hover:scale-[1.02]"
-                          >
-                            <span className="text-2xl">{sticker.emoji}</span>
-                            <div className="overflow-hidden">
-                              <div className="font-semibold text-xs leading-tight text-slate-900 truncate">{sticker.title}</div>
-                              <div className="text-[9px] text-slate-500 truncate">{sticker.tagline}</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   )}
-                </div>
-              )}
-
-              {(selectedFile || audioBlob) && (
-                <div className="mb-2 flex items-center justify-between p-2 rounded-xl bg-slate-100 border border-slate-200 text-xs">
-                  <div className="flex items-center gap-2 text-slate-800 font-medium">
-                    <Paperclip className="w-4 h-4 text-[#0056D2]" />
-                    <span>
-                      {selectedFile ? `File: ${selectedFile.name}` : `Voice Message (${audioDuration}s)`}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => {
-                      setSelectedFile(null);
-                      setAudioBlob(null);
-                    }}
-                    className="text-slate-400 hover:text-red-500 transition p-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-
-              {isRecordingVoice ? (
-                <div className="flex items-center justify-between p-2.5 rounded-full bg-red-50 border border-red-200">
-                  <div className="flex items-center gap-2.5 text-red-600 text-xs font-semibold pl-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
-                    <span>Recording: {audioDuration}s</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={cancelVoiceRecording}
-                      className="px-3 py-1 text-xs rounded-full bg-slate-200 text-slate-700 hover:bg-slate-300 transition font-medium"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={stopVoiceRecording}
-                      className="px-3 py-1 text-xs rounded-full bg-red-600 text-white font-bold hover:bg-red-700 transition flex items-center gap-1 shadow-xs"
-                    >
-                      <Square className="w-3 h-3" /> Done
-                    </button>
-                  </div>
                 </div>
               ) : (
-                <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition shrink-0"
-                    title="Attach file"
-                  >
-                    <Paperclip className="w-5 h-5" />
-                  </button>
-
-                  <div className="flex-1 flex items-center bg-slate-100 hover:bg-slate-150 focus-within:bg-white border border-slate-200/80 focus-within:border-slate-300 rounded-2xl px-3 py-1 transition">
-                    <input
-                      ref={textInputRef}
-                      type="text"
-                      value={messageText}
-                      disabled={peerKeyMissing}
-                      onChange={(e) => setMessageText(e.target.value)}
-                      placeholder={
-                        peerKeyMissing
-                          ? "Waiting for peer encryption keys..."
-                          : "Write a message..."
-                      }
-                      className="flex-1 bg-transparent text-sm text-slate-900 placeholder-slate-400 focus:outline-none py-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setShowEmojiPicker((prev) => !prev)}
-                      className={`p-1.5 rounded-full transition shrink-0 ${
-                        showEmojiPicker
-                          ? "text-[#0056D2]"
-                          : "text-slate-400 hover:text-slate-600"
-                      }`}
-                      title="Emojis and stickers"
-                    >
-                      <Smile className="w-5 h-5" />
-                    </button>
-                  </div>
-
-                  {messageText.trim() || selectedFile || audioBlob ? (
-                    <button
-                      type="submit"
-                      disabled={peerKeyMissing || sending}
-                      className="w-10 h-10 rounded-full bg-[#0056D2] hover:bg-blue-700 text-white flex items-center justify-center transition shadow-xs disabled:opacity-40 shrink-0"
-                      title="Send message"
-                    >
-                      <Send className="w-4 h-4 ml-0.5" />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={startVoiceRecording}
-                      className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition shrink-0"
-                      title="Record voice message"
-                    >
-                      <Mic className="w-4 h-4" />
-                    </button>
+                <>
+                  {(selectedFile || audioBlob) && (
+                    <div className="mb-2 flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                      <div className="flex items-center gap-2 text-slate-800 font-medium truncate">
+                        <Paperclip className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="truncate">
+                          {selectedFile
+                            ? `${selectedFile.name} (${Math.round(selectedFile.size / 1024)} KB)`
+                            : `Voice note (${audioDuration}s)`}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setAudioBlob(null);
+                        }}
+                        className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
-                </form>
+
+                  {isRecordingVoice ? (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-rose-50/80 border border-rose-200">
+                      <div className="flex items-center gap-2 text-rose-800 text-xs font-semibold pl-2">
+                        <span className="w-2 h-2 rounded-full bg-rose-600" />
+                        <span>Recording voice note ({audioDuration}s)</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelVoiceRecording}
+                          className="px-3 py-1 text-xs rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopVoiceRecording}
+                          className="px-3 py-1 text-xs rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 flex items-center gap-1 cursor-pointer"
+                        >
+                          <Square className="w-3 h-3" /> Done
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept=".png,.jpg,.jpeg,.webp,.pdf,.txt"
+                        onChange={handleFileSelection}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        disabled={peerKeyMissing}
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition shrink-0 disabled:opacity-40 cursor-pointer"
+                        title="Attach PDF, image, or text file (up to 2 MB)"
+                      >
+                        <Paperclip className="w-4 h-4" />
+                      </button>
+
+                      <input
+                        ref={textInputRef}
+                        type="text"
+                        value={messageText}
+                        disabled={peerKeyMissing}
+                        maxLength={4000}
+                        onChange={(e) => setMessageText(e.target.value)}
+                        placeholder={
+                          peerKeyMissing
+                            ? "Waiting for contact encryption keys..."
+                            : "Write an encrypted message..."
+                        }
+                        className="flex-1 bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-400 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-900 placeholder-slate-400 focus:outline-none transition disabled:opacity-60"
+                      />
+
+                      {messageText.trim() || selectedFile || audioBlob ? (
+                        <button
+                          type="submit"
+                          disabled={peerKeyMissing || sending}
+                          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition disabled:opacity-40 shrink-0 cursor-pointer"
+                        >
+                          {sending ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-3.5 h-3.5" />
+                          )}
+                          <span className="hidden sm:inline">Send</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={peerKeyMissing}
+                          onClick={startVoiceRecording}
+                          className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition shrink-0 disabled:opacity-40 cursor-pointer"
+                          title="Record voice note"
+                        >
+                          <Mic className="w-4 h-4" />
+                        </button>
+                      )}
+                    </form>
+                  )}
+                </>
               )}
             </div>
           </div>
         ) : (
-          /* Empty Welcome State - Telegram Clean Watermark */
-          <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 text-center bg-[#F1F5F9] chat-wallpaper-doodle select-none">
-            <div className="px-5 py-2.5 rounded-full bg-slate-200/80 backdrop-blur-md text-slate-600 text-xs font-semibold shadow-xs">
-              Select a chat to start messaging
-            </div>
-            <div className="mt-3 text-[11px] text-slate-400 flex items-center gap-1.5">
-              <Lock className="w-3 h-3 text-slate-400" />
-              <span>End-to-End Encrypted & Private</span>
-            </div>
-
-            {!profile?.username && (
-              <div className="mt-8 p-4 rounded-2xl bg-white/95 border border-slate-200 max-w-sm text-left flex items-center justify-between shadow-xs">
-                <div>
-                  <div className="text-xs font-bold text-slate-900">Choose your @username</div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">Let fellow cyber guards find you easily.</div>
-                </div>
-                <button
-                  onClick={() => setShowUsernameModal(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-[#0056D2] hover:bg-blue-700 text-white font-bold text-xs transition shadow-xs"
-                >
-                  Set Username
-                </button>
+          /* Empty State */
+          <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8 text-center bg-[#F8FAFC]">
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-8 max-w-md space-y-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center mx-auto">
+                <Lock className="w-4 h-4" />
               </div>
-            )}
+              <h2 className="text-base font-bold text-slate-900">
+                Mentorship &amp; CSA Support Chat
+              </h2>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                {isLearner
+                  ? "Select an existing conversation or choose a CSA-vetted cybersecurity mentor from the directory to ask course questions, career advice, or cyber safety guidance."
+                  : "Select a conversation from the left panel to assist learners who booked sessions with you or reached out for guidance."}
+              </p>
+              {isLearner && (
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("mentors")}
+                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer"
+                  >
+                    Browse verified mentors
+                  </button>
+                  <Link
+                    to="/tutors"
+                    className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition"
+                  >
+                    Book 1-on-1 video slot
+                  </Link>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
 
-      {/* MODAL: Create / Edit Username */}
-      {showUsernameModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2 text-[#0056D2] font-bold text-base">
-                <AtSign className="w-5 h-5" />
-                <span>Create Your @username</span>
+      {/* MODAL 1: Verify Key Fingerprint */}
+      {showSafetyModal && activeConv && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4"
+          onClick={() => setShowSafetyModal(false)}
+        >
+          <div
+            className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
+                <ShieldCheck className="w-4 h-4 text-slate-600" />
+                <span>Verify keys with {activeConv.peer?.displayName}</span>
               </div>
-              <button onClick={() => setShowUsernameModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveUsername} className="mt-4 space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Choose a unique username so other cyber guards can add you directly to their contacts and start chatting.
-              </p>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Username</label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3 text-[#0056D2] font-bold">@</span>
-                  <input
-                    type="text"
-                    value={newUsernameInput}
-                    onChange={(e) => setNewUsernameInput(e.target.value)}
-                    placeholder="e.g. kofi_cyber"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white transition font-mono"
-                  />
-                </div>
-                <div className="text-[10px] text-slate-500 mt-1">3-24 characters, letters, numbers, and underscores.</div>
-              </div>
-
-              {usernameError && (
-                <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-medium">
-                  {usernameError}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
-                <button
-                  type="button"
-                  onClick={() => setShowUsernameModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-800"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={usernameSaving || !newUsernameInput.trim()}
-                  className="px-4 py-2 rounded-xl bg-[#0056D2] hover:bg-blue-700 text-white text-xs font-bold transition disabled:opacity-50 shadow-xs"
-                >
-                  {usernameSaving ? "Saving..." : "Save Username"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Profile Picture Photo Upload */}
-      {showAvatarModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2 text-[#0056D2] font-bold text-sm">
-                <Camera className="w-4 h-4" />
-                <span>Profile Picture</span>
-              </div>
-              <button onClick={() => setShowAvatarModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                type="button"
+                onClick={() => setShowSafetyModal(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="my-5 flex flex-col items-center">
-              <UserAvatar
-                src={profile?.avatarUrl}
-                name={profile?.displayName}
-                size="xl"
-                rounded="rounded-3xl"
-                className="w-24 h-24 mb-3 border-4 border-[#0056D2] shadow-md"
-              />
-
-              <p className="text-xs text-slate-600">Choose a new photo to represent your CyberGuard profile</p>
-
-              <input
-                type="file"
-                ref={avatarInputRef}
-                accept="image/*"
-                onChange={(e) => handleAvatarUpload(e.target.files?.[0])}
-                className="hidden"
-              />
-
-              <button
-                onClick={() => avatarInputRef.current?.click()}
-                disabled={avatarUploading}
-                className="mt-4 px-4 py-2 rounded-xl bg-[#0056D2] hover:bg-blue-700 text-white font-bold text-xs transition flex items-center gap-2 shadow-xs"
-              >
-                <Camera className="w-4 h-4" />
-                <span>{avatarUploading ? "Uploading photo..." : "Upload New Photo"}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Verify Privacy (Safety Emojis & Verification) */}
-      {showSafetyModal && activeConv && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2 text-[#0056D2] font-bold text-base">
-                <ShieldCheck className="w-5 h-5" />
-                <span>Verify Privacy with {activeConv.peer?.displayName}</span>
-              </div>
-              <button onClick={() => setShowSafetyModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-              Compare these 4 security emojis with your peer. If they match on both devices, your connection is cryptographically confirmed and safe from any interception.
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Compare this 12-digit code or 4-symbol sequence during your video session. Matching
+              values confirm end-to-end encryption without interception.
             </p>
 
             {safetyInfo && (
-              <div className="my-5 p-5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
-                <div className="flex items-center justify-center gap-4 text-4xl mb-3">
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-center space-y-3">
+                <div className="flex items-center justify-center gap-3 text-2xl">
                   {safetyInfo.emojis.map((emoji, idx) => (
-                    <span key={idx} className="p-3 rounded-2xl bg-white border border-slate-200 shadow-2xs">
+                    <span
+                      key={idx}
+                      className="p-2.5 rounded-xl bg-white border border-slate-200"
+                    >
                       {emoji}
                     </span>
                   ))}
                 </div>
-                <div className="text-xs font-bold text-[#0056D2] tracking-wider">
-                  Secure Verification Emojis
-                </div>
+                <p className="font-mono text-sm font-bold text-slate-900 tracking-wider">
+                  {safetyInfo.safetyCode}
+                </p>
               </div>
             )}
 
-            <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
               <button
+                type="button"
                 onClick={() => activeConv?.peer?.id && togglePeerVerification(activeConv.peer.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs ${
-                  isCurrentPeerVerified
-                    ? "bg-amber-600 text-white hover:bg-amber-700"
-                    : "bg-[#0056D2] text-white hover:bg-blue-700"
-                }`}
+                className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer"
               >
-                <CheckCheck className="w-4 h-4" />
-                <span>{isCurrentPeerVerified ? "Mark as Unverified" : "Mark as Verified Peer"}</span>
+                {isCurrentPeerVerified ? "Mark unverified" : "Mark verified"}
               </button>
               <button
+                type="button"
                 onClick={() => setShowSafetyModal(false)}
-                className="px-4 py-2 rounded-xl text-xs text-slate-600 hover:text-slate-800 transition font-semibold"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs text-slate-700 hover:bg-slate-50 font-medium cursor-pointer"
               >
                 Close
               </button>
@@ -1856,148 +1393,323 @@ export default function CyberChat() {
         </div>
       )}
 
-      {/* MODAL: Admin-Blinded Inspector (Zero Knowledge Proof) */}
-      {showAdminBlindedModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 shadow-2xl max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2 text-[#0056D2] font-bold text-base">
-                <Database className="w-5 h-5" />
-                <span>Raw Database Inspector (Super Admin View)</span>
-              </div>
-              <button onClick={() => setShowAdminBlindedModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="mt-3 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-slate-700 leading-relaxed">
-              <strong className="text-[#0056D2]">Zero-Knowledge Verification:</strong> This live view shows exactly what is stored in the database. Because private keys are stored only in your browser, the Super Admin and server operators only see encrypted ciphertext and random nonces.
-            </div>
-
-            <div className="flex-1 overflow-y-auto mt-4 space-y-3 font-mono text-[11px]">
-              {rawServerMessages.length === 0 ? (
-                <div className="text-center py-8 text-slate-500">No message records stored yet</div>
-              ) : (
-                rawServerMessages.slice(-4).map((raw, idx) => (
-                  <div key={raw.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="flex items-center justify-between text-[#0056D2] font-bold mb-2">
-                      <span>Row #{idx + 1} • Message ID: {raw.id.slice(0, 8)}...</span>
-                      <span className="text-slate-500 text-[10px]">{new Date(raw.createdAt).toISOString()}</span>
-                    </div>
-                    <div className="space-y-1.5 text-slate-800">
-                      <div>
-                        <span className="text-slate-500">ciphertext: </span>
-                        <span className="text-[#0056D2] break-all">{raw.ciphertext.slice(0, 60)}... (Encrypted blob)</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">iv: </span>
-                        <span className="text-amber-700">{raw.iv} (Random nonce)</span>
-                      </div>
-                      <div>
-                        <span className="text-slate-500">ecdsa_signature: </span>
-                        <span className="text-indigo-700 break-all">{raw.signature.slice(0, 48)}...</span>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-slate-200 flex justify-end">
-              <button
-                onClick={() => setShowAdminBlindedModal(false)}
-                className="px-4 py-2 rounded-xl bg-[#0056D2] hover:bg-blue-700 text-white text-xs font-bold transition shadow-xs"
-              >
-                Close Inspector
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: Key Backup & Passphrase */}
+      {/* MODAL 2: Passphrase-Encrypted Key Backup & Restore */}
       {showKeyModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2 text-[#0056D2] font-bold text-base">
-                <Key className="w-5 h-5" />
-                <span>Encrypted Key Backup</span>
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4"
+          onClick={() => setShowKeyModal(false)}
+        >
+          <div
+            className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
+                <Key className="w-4 h-4 text-slate-600" />
+                <span>Encryption key backup</span>
               </div>
-              <button onClick={() => setShowKeyModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
+              <button
+                type="button"
+                onClick={() => setShowKeyModal(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="mt-3 space-y-4 text-xs">
-              <p className="text-slate-600 leading-relaxed">
-                Your private encryption keys reside exclusively in this browser. You can export an encrypted backup with a master passphrase to migrate to another device.
-              </p>
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setKeyModalMode("export");
+                  setKeyActionMsg(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                  keyModalMode === "export"
+                    ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                    : "text-slate-600"
+                }`}
+              >
+                Export backup
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setKeyModalMode("import");
+                  setKeyActionMsg(null);
+                }}
+                className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
+                  keyModalMode === "import"
+                    ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                    : "text-slate-600"
+                }`}
+              >
+                Restore backup
+              </button>
+            </div>
 
-              <div>
-                <label className="block text-slate-800 font-bold mb-1">Master Passphrase</label>
+            {keyModalMode === "export" ? (
+              <div className="space-y-3 text-xs">
+                <p className="text-slate-600 leading-relaxed">
+                  Private keys stay in this browser&apos;s IndexedDB and are never stored on our
+                  servers. Export an AES-256-GCM encrypted backup protected by an 8+ character
+                  passphrase.
+                </p>
+
                 <input
                   type="password"
                   value={backupPassphrase}
                   onChange={(e) => setBackupPassphrase(e.target.value)}
-                  placeholder="Enter secure passphrase..."
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 mb-2 focus:outline-none focus:border-[#0056D2]"
+                  placeholder="Create backup passphrase (8+ characters)..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
                 />
+
                 <button
+                  type="button"
                   onClick={async () => {
-                    if (!backupPassphrase || backupPassphrase.length < 6) {
-                      setKeyActionMsg("Passphrase must be at least 6 characters.");
-                      return;
-                    }
                     try {
                       const backup = await exportEncryptedKeyBackup(user.id, backupPassphrase);
                       setExportedBackup(backup);
-                      setKeyActionMsg("Backup generated! Copy and save this string safely.");
+                      setKeyActionMsg({
+                        type: "success",
+                        text: "Encrypted backup generated. Store it in a password manager.",
+                      });
                     } catch (err) {
-                      setKeyActionMsg("Export failed: " + err.message);
+                      setKeyActionMsg({ type: "error", text: err.message });
                     }
                   }}
-                  className="w-full py-2 rounded-xl bg-[#0056D2] hover:bg-blue-700 text-white font-bold transition shadow-xs"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold transition cursor-pointer"
                 >
-                  Generate Encrypted Backup
+                  Generate encrypted backup
                 </button>
 
                 {exportedBackup && (
-                  <div className="mt-3">
+                  <div className="space-y-2 pt-1">
                     <textarea
                       readOnly
                       value={exportedBackup}
                       rows={3}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 font-mono text-[10px] text-[#0056D2]"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono text-[10px] text-slate-800"
                     />
                     <button
+                      type="button"
                       onClick={() => {
                         navigator.clipboard.writeText(exportedBackup);
-                        alert("Backup string copied to clipboard!");
+                        setKeyActionMsg({
+                          type: "success",
+                          text: "Copied encrypted backup string to clipboard.",
+                        });
                       }}
-                      className="mt-1 text-xs text-[#0056D2] underline flex items-center gap-1 font-semibold"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 cursor-pointer"
                     >
-                      <Copy className="w-3 h-3" /> Copy Backup String
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy backup string</span>
                     </button>
                   </div>
                 )}
               </div>
+            ) : (
+              <div className="space-y-3 text-xs">
+                <p className="text-slate-600 leading-relaxed">
+                  Paste your previously exported encrypted backup JSON and enter its passphrase to
+                  restore your keys on this device.
+                </p>
 
-              {keyActionMsg && (
-                <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-[#0056D2] text-xs font-medium">
-                  {keyActionMsg}
-                </div>
-              )}
+                <textarea
+                  value={importBackupString}
+                  onChange={(e) => setImportBackupString(e.target.value)}
+                  rows={3}
+                  placeholder='{"salt":"...","iv":"...","data":"..."}'
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-mono text-[11px] text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
+                />
 
-              <div className="pt-3 border-t border-slate-200 flex justify-end">
+                <input
+                  type="password"
+                  value={backupPassphrase}
+                  onChange={(e) => setBackupPassphrase(e.target.value)}
+                  placeholder="Enter backup passphrase..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
+                />
+
                 <button
-                  onClick={() => setShowKeyModal(false)}
-                  className="px-4 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs hover:bg-slate-200 font-semibold"
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const restoredPublic = await importEncryptedKeyBackup(
+                        user.id,
+                        importBackupString.trim(),
+                        backupPassphrase
+                      );
+                      const refreshed = await initializeUserE2EE(user.id);
+                      setE2eeKeys(refreshed.keys);
+                      setPublicMeta(restoredPublic);
+                      await api.post("/cyberchat/keys", restoredPublic);
+                      setKeyActionMsg({
+                        type: "success",
+                        text: "Encryption keys restored and synchronized.",
+                      });
+                    } catch {
+                      setKeyActionMsg({
+                        type: "error",
+                        text: "Could not decrypt backup. Verify the JSON string and passphrase.",
+                      });
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold inline-flex items-center justify-center gap-1.5 transition cursor-pointer"
                 >
-                  Close
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Restore keys</span>
                 </button>
               </div>
+            )}
+
+            {keyActionMsg && (
+              <div
+                className={`p-3 rounded-xl text-xs font-medium border ${
+                  keyActionMsg.type === "error"
+                    ? "bg-rose-50 border-rose-200 text-rose-800"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                }`}
+              >
+                {keyActionMsg.text}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Report Safety Concern to CSA Officers */}
+      {showReportModal && activeConv && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4"
+          onClick={() => {
+            if (!submittingReport) setShowReportModal(false);
+          }}
+        >
+          <div
+            className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-900 font-semibold text-sm">
+                <Flag className="w-4 h-4 text-rose-600" />
+                <span>Report conversation to CSA</span>
+              </div>
+              <button
+                type="button"
+                disabled={submittingReport}
+                onClick={() => setShowReportModal(false)}
+                className="text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
+
+            {submittedReportRef ? (
+              <div className="space-y-4 text-xs">
+                <div className="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 space-y-1.5 text-emerald-950">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                    <span>Safety report escalated</span>
+                  </div>
+                  <p className="text-emerald-800 leading-relaxed">
+                    Your report has been escalated to CSA Officers under reference code{" "}
+                    <span className="font-mono font-bold">{submittedReportRef}</span>.
+                  </p>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowReportModal(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-900 text-white font-semibold text-xs cursor-pointer"
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitSafetyReport} className="space-y-3.5 text-xs">
+                <p className="text-slate-600 leading-relaxed">
+                  Reporting <span className="font-semibold text-slate-900">{activeConv.peer?.displayName}</span>{" "}
+                  sends an escalated case directly to Cyber Security Authority triage officers.
+                </p>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700">Concern category</label>
+                  <select
+                    value={reportCategory}
+                    onChange={(e) => setReportCategory(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 focus:outline-none focus:bg-white"
+                  >
+                    <option value="GROOMING">Inappropriate contact / grooming</option>
+                    <option value="BULLYING">Harassment or cyberbullying</option>
+                    <option value="SCAM">Scam, payment request, or phishing</option>
+                    <option value="SEXTORTION">Sextortion or threats</option>
+                    <option value="IMPERSONATION">Impersonation</option>
+                    <option value="OTHER">Other safety concern</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="font-semibold text-slate-700">What happened?</label>
+                  <textarea
+                    required
+                    rows={3}
+                    minLength={10}
+                    maxLength={2000}
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    placeholder="Describe the message or behavior so CSA officers can act quickly..."
+                    className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white resize-none"
+                  />
+                </div>
+
+                <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeTranscript}
+                    onChange={(e) => setIncludeTranscript(e.target.checked)}
+                    className="mt-0.5 rounded"
+                  />
+                  <span className="text-[11px] text-slate-600 leading-relaxed">
+                    Include the last 15 decrypted messages and cryptographic signatures from this
+                    session as verifiable evidence.
+                  </span>
+                </label>
+
+                <label className="flex items-center gap-2.5 px-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={blockOnReport}
+                    onChange={(e) => setBlockOnReport(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="text-xs text-slate-700 font-medium">
+                    Also block {activeConv.peer?.displayName} from messaging me
+                  </span>
+                </label>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    disabled={submittingReport}
+                    onClick={() => setShowReportModal(false)}
+                    className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 font-medium cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submittingReport || reportReason.trim().length < 10}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold transition disabled:opacity-40 cursor-pointer"
+                  >
+                    {submittingReport && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    <span>Submit report</span>
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
