@@ -704,6 +704,23 @@ export default function Register() {
                       </span>
                     </label>
 
+                    {/* Legal Compliance Notice */}
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                      By continuing, you agree to CyberGuard Ghana&apos;s{" "}
+                      <Link to="/terms" target="_blank" className="text-[#0056D2] font-semibold hover:underline">
+                        Terms of Service
+                      </Link>
+                      ,{" "}
+                      <Link to="/privacy" target="_blank" className="text-[#0056D2] font-semibold hover:underline">
+                        Privacy Policy
+                      </Link>
+                      , and the{" "}
+                      <Link to="/cop-policy" target="_blank" className="text-[#0056D2] font-semibold hover:underline">
+                        Child Online Protection Charter
+                      </Link>
+                      .
+                    </p>
+
                     {/* Submit Button */}
                     <button
                       type="submit"

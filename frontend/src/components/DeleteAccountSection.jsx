@@ -90,7 +90,7 @@ export default function DeleteAccountSection({ compact = false }) {
               </h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
-              Permanently erase your CyberGuard Ghana profile, course progress, earned certificates, mentorship bookings, and encrypted chat keys. Once deleted, your account cannot be recovered.
+              Permanently erase your CyberGuard Ghana profile, course progress, earned certificates, mentorship bookings, and encrypted chat keys in accordance with Section 28 of Ghana&apos;s <strong>Data Protection Act, 2012 (Act 843)</strong>. Once deleted, your account cannot be recovered.
             </p>
           </div>
 

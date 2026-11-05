@@ -514,7 +514,7 @@ export default function MainLayout() {
 
       {!isDashboardRoute && (
         <footer className="border-t-2 border-[#0056D2] bg-[#0B1528] text-slate-200 shadow-2xl relative z-10">
-          <div className="max-w-7xl mx-auto px-6 py-12 grid md:grid-cols-3 gap-8">
+          <div className="max-w-7xl mx-auto px-6 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="space-y-3">
               <Link to="/" className="inline-block group">
                 <CyberGuardLogo variant="full" size="md" theme="dark" interactive />
@@ -535,7 +535,7 @@ export default function MainLayout() {
               <ul className="space-y-2.5 text-xs">
                 <li>
                   <Link to="/courses" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
-                    <span className="text-[#38BDF8]">›</span> Courses & Safety Modules
+                    <span className="text-[#38BDF8]">›</span> Courses &amp; Safety Modules
                   </Link>
                 </li>
                 <li>
@@ -566,9 +566,47 @@ export default function MainLayout() {
               </ul>
             </div>
 
+            <div>
+              <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
+                Legal &amp; Child Safety
+              </h4>
+              <ul className="space-y-2.5 text-xs">
+                <li>
+                  <Link to="/privacy" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Privacy Policy (Act 843)
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/cop-policy" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5 text-sky-300 font-semibold">
+                    <span className="text-sky-400">›</span> Child Online Protection Charter
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/verify-certificate" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Verify Official Certificate
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/report/status" className="text-slate-300 hover:text-white hover:translate-x-1 transition-all inline-flex items-center gap-1.5">
+                    <span className="text-[#38BDF8]">›</span> Check Incident Triage Status
+                  </Link>
+                </li>
+                <li>
+                  <span className="text-[11px] text-slate-400 block pt-1 leading-snug">
+                    Data Protection Commission (DPC) Registered Controller.
+                  </span>
+                </li>
+              </ul>
+            </div>
+
             <div className="space-y-3">
               <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">
-                Emergency Hotline & Support
+                Emergency Hotline &amp; Support
               </h4>
               <div className="text-amber-200 font-bold bg-amber-400/10 p-3.5 rounded-xl border border-amber-400/30 flex items-start gap-2.5 shadow-xs">
                 <PhoneCall className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
@@ -587,8 +625,19 @@ export default function MainLayout() {
             </div>
           </div>
 
-          <div className="border-t border-slate-800/80 py-5 pb-20 md:pb-5 px-4 text-center text-xs text-slate-400 font-mono">
-            © {new Date().getFullYear()} CyberGuard Ghana. Built for National Child Online Protection (COP). All rights reserved.
+          <div className="border-t border-slate-800/80 py-5 pb-20 md:pb-5 px-4 text-center text-xs text-slate-400 font-mono space-y-2">
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-slate-300 font-sans text-xs">
+              <Link to="/privacy" className="hover:text-white transition">Privacy Policy</Link>
+              <span>·</span>
+              <Link to="/terms" className="hover:text-white transition">Terms of Service</Link>
+              <span>·</span>
+              <Link to="/cop-policy" className="hover:text-white transition">Child Online Protection (COP) Charter</Link>
+              <span>·</span>
+              <span className="text-slate-400">Ghana Act 843 &amp; Act 1038 Compliant</span>
+            </div>
+            <div>
+              © {new Date().getFullYear()} CyberGuard Ghana. Built for National Child Online Protection (COP). All rights reserved.
+            </div>
           </div>
         </footer>
       )}

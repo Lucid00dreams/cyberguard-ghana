@@ -30,6 +30,7 @@ import PhishingSimulator from "./pages/PhishingSimulator";
 import VerifyCertificate from "./pages/VerifyCertificate";
 import CyberChat from "./pages/CyberChat";
 import ExtensionsStorePage from "./pages/ExtensionsStorePage";
+import LegalPage from "./pages/LegalPage";
 import NotFound from "./pages/NotFound";
 
 export default function App() {
@@ -56,6 +57,9 @@ export default function App() {
         <Route path="report/status" element={<IncidentStatus />} />
         <Route path="verify-certificate" element={<VerifyCertificate />} />
         <Route path="verify-certificate/:certRef" element={<VerifyCertificate />} />
+        <Route path="privacy" element={<LegalPage />} />
+        <Route path="terms" element={<LegalPage />} />
+        <Route path="cop-policy" element={<LegalPage />} />
 
         <Route
           path="cyberchat"
