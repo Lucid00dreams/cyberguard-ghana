@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/prisma");
-const { sendDailySafetyTipEmail } = require("../utils/mailer");
+const { sendDailySafetyTipEmail, resolveClientOrigin } = require("../utils/mailer");
 
 const DEFAULT_TIMEZONE = process.env.DAILY_TIPS_TIMEZONE || "Africa/Accra";
 
@@ -395,9 +395,14 @@ function verifyUnsubscribeToken(token) {
 }
 
 function buildUnsubscribeUrl(user) {
+  const resolvedFrontendOrigin = resolveClientOrigin();
   const apiPublicBase =
     process.env.PUBLIC_API_URL ||
-    `http://localhost:${process.env.PORT || 4000}`;
+    (resolvedFrontendOrigin && !resolvedFrontendOrigin.includes("localhost")
+      ? resolvedFrontendOrigin
+      : process.env.RENDER
+      ? "https://cyberguard-ghana.onrender.com"
+      : `http://localhost:${process.env.PORT || 4000}`);
   const token = createUnsubscribeToken(user);
   return `${apiPublicBase.replace(/\/$/, "")}/api/daily-tips/unsubscribe?token=${encodeURIComponent(token)}`;
 }

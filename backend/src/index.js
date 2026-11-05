@@ -14,6 +14,7 @@ const cybergodRoutes = require("./routes/cybergod");
 const cyberchatRoutes = require("./routes/cyberchat");
 const dailyTipsRoutes = require("./routes/dailyTips");
 const { startDailyTipsScheduler } = require("./services/dailyTipsService");
+const { setClientOriginHint } = require("./utils/mailer");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -75,6 +76,7 @@ app.use(
         cleanOrigin.endsWith(".vercel.app") ||
         process.env.NODE_ENV !== "production"
       ) {
+        setClientOriginHint(cleanOrigin);
         return callback(null, true);
       }
       return callback(new Error(`CORS policy does not allow access from ${origin}`), false);
@@ -103,7 +105,13 @@ app.use(
 );
 
 app.get("/health", (req, res) => res.json({ status: "ok", service: "cyberguard-ghana-backend" }));
-app.get("/api/health", (req, res) => res.json({ status: "ok", service: "cyberguard-ghana-backend" }));
+app.get("/api/health", (req, res) => {
+  const hint = typeof req.query.clientOrigin === "string" ? req.query.clientOrigin.trim().replace(/\/$/, "") : "";
+  if (hint && (allowedOrigins.includes(hint) || hint.endsWith(".vercel.app"))) {
+    setClientOriginHint(hint);
+  }
+  res.json({ status: "ok", service: "cyberguard-ghana-backend" });
+});
 
 // Rate-limited authentication & recovery endpoints
 app.use("/api/auth/login", authLimiter);

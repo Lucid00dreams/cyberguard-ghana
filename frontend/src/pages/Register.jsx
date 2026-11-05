@@ -155,6 +155,12 @@ export default function Register() {
         avatarUrl: payload.picture || null,
         receiveDailyTips: receiveDailyTipsRef.current,
       });
+      if (data.isNewUser && !data.welcomeDispatchedByBackend && data.token) {
+        fetch("/api/welcome", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.token}` },
+        }).catch(() => {});
+      }
       login(data.token, data.user);
       navigate(getRedirectTarget(data.user?.role), { replace: true });
     } catch (err) {
@@ -170,6 +176,12 @@ export default function Register() {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/register", form);
+      if (data.isNewUser && !data.welcomeDispatchedByBackend && data.token) {
+        fetch("/api/welcome", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.token}` },
+        }).catch(() => {});
+      }
       login(data.token, data.user);
       navigate(getRedirectTarget(data.user?.role), { replace: true });
     } catch (err) {

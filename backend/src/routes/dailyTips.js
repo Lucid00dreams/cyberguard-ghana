@@ -1,6 +1,7 @@
 const express = require("express");
 const prisma = require("../config/prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
+const { resolveClientOrigin } = require("../utils/mailer");
 const {
   DEFAULT_TIMEZONE,
   getZonedTimeParts,
@@ -16,7 +17,7 @@ const router = express.Router();
  */
 async function handleUnsubscribe(req, res) {
   const token = req.query.token || req.body?.token;
-  const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+  const clientOrigin = resolveClientOrigin(req.headers.origin);
 
   if (!token || typeof token !== "string") {
     return res.status(400).send("Missing unsubscribe token.");

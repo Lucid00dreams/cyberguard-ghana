@@ -1,26 +1,132 @@
 const nodemailer = require("nodemailer");
 
+let lastKnownClientOrigin = null;
+
+/**
+ * Record a trusted live frontend origin (e.g. https://<app>.vercel.app)
+ * so email links and the HTTPS mail relay resolve accurately even when
+ * CLIENT_ORIGIN falls back to localhost.
+ */
+function setClientOriginHint(origin) {
+  if (!origin || typeof origin !== "string") return;
+  const cleaned = origin.trim().replace(/\/$/, "");
+  if (
+    cleaned.startsWith("https://") &&
+    !cleaned.includes("localhost") &&
+    !cleaned.includes("127.0.0.1")
+  ) {
+    lastKnownClientOrigin = cleaned;
+  }
+}
+
+function resolveClientOrigin(explicitOrigin) {
+  if (explicitOrigin && typeof explicitOrigin === "string") {
+    const cleaned = explicitOrigin.trim().replace(/\/$/, "");
+    if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) {
+      setClientOriginHint(cleaned);
+      if (!cleaned.includes("localhost") || process.env.NODE_ENV !== "production") {
+        return cleaned;
+      }
+    }
+  }
+
+  const envOrigin = (process.env.CLIENT_ORIGIN || "")
+    .split(",")[0]
+    .trim()
+    .replace(/\/$/, "");
+
+  if (envOrigin && !envOrigin.includes("localhost") && !envOrigin.includes("127.0.0.1")) {
+    return envOrigin;
+  }
+
+  if (lastKnownClientOrigin) {
+    return lastKnownClientOrigin;
+  }
+
+  return envOrigin || "http://localhost:5173";
+}
+
 // Create reusable SMTP transporter using Gmail / custom SMTP
-const smtpPass = process.env.SMTP_PASS;
+const smtpUser = (process.env.SMTP_USER || "cyberguardgh@gmail.com").trim();
+const smtpPass = (process.env.SMTP_PASS || "").trim();
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
   port: parseInt(process.env.SMTP_PORT || "465", 10),
   secure: process.env.SMTP_SECURE !== "false", // true for 465, false for other ports
+  connectionTimeout: 8000,
+  greetingTimeout: 8000,
+  socketTimeout: 12000,
   auth: smtpPass
     ? {
-        user: process.env.SMTP_USER || "cyberguardgh@gmail.com",
+        user: smtpUser,
         pass: smtpPass,
       }
     : undefined,
 });
 
 /**
-  Send a raw email with anti-spam delivery headers
-  @param {Object} options - { to, subject, html, text, headers }
+ * Dispatch an email via the Vercel HTTPS Serverless Mail Relay (/api/mail-relay)
+ * over port 443 — avoids Render Free Tier outbound blocks on SMTP ports 25/465/587.
  */
-async function sendEmail({ to, subject, html, text, headers = {} }) {
-  const fromAddress = process.env.FROM_EMAIL || `"CyberGuard Ghana" <cyberguardgh@gmail.com>`;
-  const replyToAddress = process.env.REPLY_TO_EMAIL || "cyberguardgh@gmail.com";
+async function sendViaHttpsRelay({ relayOrigin, to, subject, html, text, headers, fromAddress, replyToAddress }) {
+  const relayUrl = `${relayOrigin.replace(/\/$/, "")}/api/mail-relay`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 14000);
+
+  try {
+    const resp = await fetch(relayUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(process.env.MAIL_RELAY_SECRET
+          ? { "x-mail-relay-secret": process.env.MAIL_RELAY_SECRET }
+          : {}),
+      },
+      body: JSON.stringify({
+        to,
+        subject,
+        html,
+        text,
+        headers,
+        from: fromAddress,
+        replyTo: replyToAddress,
+        smtp: smtpPass ? { user: smtpUser, pass: smtpPass } : undefined,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok || !data?.ok) {
+      throw new Error(data?.error || `HTTPS mail relay returned HTTP ${resp.status}`);
+    }
+
+    console.log(`[Mailer] Email dispatched via HTTPS relay to ${to}. Message ID: ${data.messageId}`);
+    return { messageId: data.messageId, transport: "https-relay" };
+  } catch (err) {
+    clearTimeout(timeoutId);
+    throw err;
+  }
+}
+
+/**
+ * Send a raw email with anti-spam delivery headers and automatic HTTPS relay fallback
+ * @param {Object} options - { to, subject, html, text, headers, clientOrigin }
+ */
+async function sendEmail({ to, subject, html, text, headers = {}, clientOrigin }) {
+  const fromAddress = process.env.FROM_EMAIL || `"CyberGuard Ghana" <${smtpUser}>`;
+  const replyToAddress = process.env.REPLY_TO_EMAIL || smtpUser;
+
+  const mergedHeaders = {
+    "X-Priority": "3",
+    "X-Auto-Response-Suppress": "OOF, AutoReply",
+    "Auto-Submitted": "auto-generated",
+    "List-Unsubscribe": `<mailto:${replyToAddress}?subject=unsubscribe>`,
+    "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    ...headers,
+  };
 
   const mailOptions = {
     from: fromAddress,
@@ -29,29 +135,69 @@ async function sendEmail({ to, subject, html, text, headers = {} }) {
     subject,
     text: text || "CyberGuard Ghana Notification",
     html,
-    headers: {
-      "X-Priority": "3",
-      "X-Auto-Response-Suppress": "OOF, AutoReply",
-      "Auto-Submitted": "auto-generated",
-      "List-Unsubscribe": `<mailto:${replyToAddress}?subject=unsubscribe>`,
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-      ...headers,
-    },
+    headers: mergedHeaders,
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  console.log(`[Mailer] Email dispatched to ${to}. Message ID: ${info.messageId}`);
-  return info;
+  const resolvedOrigin = resolveClientOrigin(clientOrigin);
+  const canUseHttpsRelay =
+    resolvedOrigin.startsWith("https://") && !resolvedOrigin.includes("onrender.com");
+  const preferHttpsRelay =
+    canUseHttpsRelay &&
+    (Boolean(process.env.RENDER) || process.env.NODE_ENV === "production");
+
+  if (preferHttpsRelay) {
+    try {
+      return await sendViaHttpsRelay({
+        relayOrigin: resolvedOrigin,
+        to,
+        subject,
+        html,
+        text,
+        headers: mergedHeaders,
+        fromAddress,
+        replyToAddress,
+      });
+    } catch (relayErr) {
+      console.warn(`[Mailer] HTTPS relay attempt failed (${relayErr.message}); trying direct SMTP...`);
+    }
+  }
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[Mailer] Email dispatched via direct SMTP to ${to}. Message ID: ${info.messageId}`);
+    return info;
+  } catch (smtpErr) {
+    if (!preferHttpsRelay && canUseHttpsRelay) {
+      console.warn(`[Mailer] Direct SMTP failed (${smtpErr.message}); falling back to HTTPS relay...`);
+      return sendViaHttpsRelay({
+        relayOrigin: resolvedOrigin,
+        to,
+        subject,
+        html,
+        text,
+        headers: mergedHeaders,
+        fromAddress,
+        replyToAddress,
+      });
+    }
+    throw smtpErr;
+  }
 }
 
 /**
-  Send Password Reset Email with responsive Ghanaian COP branding
-  @param {string} toEmail - Recipient email
-  @param {string} resetToken - JWT or secure reset token
-  @param {string} displayName - Recipient name
+ * Send Password Reset Email with responsive Ghanaian COP branding
+ * @param {string} toEmail - Recipient email
+ * @param {string} resetToken - JWT or secure reset token
+ * @param {string} displayName - Recipient name
+ * @param {Object} [options] - { clientOrigin }
  */
-async function sendPasswordResetEmail(toEmail, resetToken, displayName = "CyberGuard Member") {
-  const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+async function sendPasswordResetEmail(
+  toEmail,
+  resetToken,
+  displayName = "CyberGuard Member",
+  options = {}
+) {
+  const clientOrigin = resolveClientOrigin(options.clientOrigin);
   const resetLink = `${clientOrigin}/reset-password?token=${encodeURIComponent(resetToken)}`;
 
   const subject = "Reset Your Password — CyberGuard Ghana";
@@ -121,19 +267,49 @@ async function sendPasswordResetEmail(toEmail, resetToken, displayName = "CyberG
 
   const text = `Hello ${displayName},\n\nWe received a request to reset your password for your CyberGuard Ghana account.\n\nPlease visit the following link to choose a new password:\n${resetLink}\n\nThis link will expire in 15 minutes.\n\nIf you did not request a password reset, please ignore this email.`;
 
-  return sendEmail({ to: toEmail, subject, html, text });
+  return sendEmail({ to: toEmail, subject, html, text, clientOrigin });
 }
 
 /**
- * Send Welcome Email to newly registered users
+ * Send Welcome Email when a user signs up for the first time
  * @param {string} toEmail - Recipient email
  * @param {string} displayName - Recipient display name
+ * @param {Object} [options] - { receiveDailyTips, clientOrigin }
  */
-async function sendWelcomeEmail(toEmail, displayName = "CyberGuard Member") {
-  const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
-  const loginLink = `${clientOrigin}/login`;
+async function sendWelcomeEmail(
+  toEmail,
+  displayName = "CyberGuard Member",
+  options = {}
+) {
+  const clientOrigin = resolveClientOrigin(options.clientOrigin);
+  const receiveDailyTips = Boolean(options.receiveDailyTips);
+  const dashboardLink = `${clientOrigin}/dashboard`;
+  const coursesLink = `${clientOrigin}/courses`;
+  const settingsLink = `${clientOrigin}/dashboard?tab=settings`;
 
-  const subject = `Welcome to CyberGuard Ghana, ${displayName}`;
+  const subject = `Welcome to CyberGuard Ghana, ${displayName}!`;
+
+  const dailyTipsSectionHtml = receiveDailyTips
+    ? `
+      <div style="background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
+        <div style="font-size: 12px; font-weight: 800; color: #15803d; margin-bottom: 4px;">
+          7:00 AM Daily Cyber Safety Tips: Enabled
+        </div>
+        <p style="font-size: 12px; color: #14532d; margin: 0; line-height: 1.55;">
+          You're subscribed to our morning safety briefing! Every day at <strong>7:00 AM GMT</strong>, we'll send one short, actionable cyber defense tip straight to your inbox.
+        </p>
+      </div>
+    `
+    : `
+      <div style="background: #f8fafc; border-left: 4px solid #0056D2; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
+        <div style="font-size: 12px; font-weight: 800; color: #0056D2; margin-bottom: 4px;">
+          Want Daily 7:00 AM Cyber Safety Tips?
+        </div>
+        <p style="font-size: 12px; color: #334155; margin: 0; line-height: 1.55;">
+          You can opt in anytime under <a href="${settingsLink}" style="color: #0056D2; font-weight: 700; text-decoration: underline;">Account Settings</a> to receive a 60-second cyber defense tip every morning at 7:00 AM GMT.
+        </p>
+      </div>
+    `;
 
   const html = `
     <!DOCTYPE html>
@@ -149,17 +325,18 @@ async function sendWelcomeEmail(toEmail, displayName = "CyberGuard Member") {
         .header h1 { color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.3px; }
         .header p { color: #93c5fd; margin: 6px 0 0 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
         .content { padding: 36px; text-align: left; }
-        .greeting { font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 14px; }
-        .lead-text { font-size: 14px; line-height: 1.6; color: #334155; margin-bottom: 20px; }
+        .greeting { font-size: 19px; font-weight: 800; color: #0f172a; margin-bottom: 12px; }
+        .lead-text { font-size: 14px; line-height: 1.65; color: #334155; margin-bottom: 16px; }
         .feature-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin: 20px 0; }
         .feature-title { font-size: 13px; font-weight: 700; color: #0056D2; margin-bottom: 3px; }
         .feature-desc { font-size: 12px; color: #475569; line-height: 1.5; margin: 0; }
-        .btn-container { text-align: center; margin: 28px 0 20px 0; }
+        .btn-container { text-align: center; margin: 26px 0 18px 0; }
         .btn { display: inline-block; background-color: #0056D2; color: #ffffff !important; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px; }
+        .secondary-link { display: block; text-align: center; font-size: 12px; color: #0056D2; text-decoration: underline; margin-bottom: 18px; font-weight: 600; }
         .hotline-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px; margin-top: 20px; }
         .hotline-title { font-size: 12px; font-weight: 700; color: #1e40af; margin-bottom: 3px; }
-        .hotline-desc { font-size: 12px; color: #1e3a8a; margin: 0; line-height: 1.4; }
-        .footer { background-color: #f1f5f9; padding: 20px 36px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; }
+        .hotline-desc { font-size: 12px; color: #1e3a8a; margin: 0; line-height: 1.45; }
+        .footer { background-color: #f1f5f9; padding: 20px 36px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; line-height: 1.5; }
         .footer strong { color: #334155; }
       </style>
     </head>
@@ -167,41 +344,44 @@ async function sendWelcomeEmail(toEmail, displayName = "CyberGuard Member") {
       <div class="wrapper">
         <div class="header">
           <h1>CyberGuard Ghana</h1>
-          <p>National Youth Cyber Safety Platform</p>
+          <p>National Cyber Safety &amp; Digital Defense Academy</p>
         </div>
 
         <div class="content">
-          <div class="greeting">Hello ${displayName},</div>
+          <div class="greeting">Akwaaba, ${displayName}!</div>
           <p class="lead-text">
-            Welcome to CyberGuard Ghana. Your student account has been registered successfully.
+            Welcome to <strong>CyberGuard Ghana</strong>! Thank you for signing up—your account is now active and ready.
           </p>
-          <p class="lead-text" style="margin-top: -10px;">
-            You can now explore accredited digital defense courses, hands-on safety simulations, and verified mentor guidance built under Ghana's Child Online Protection (COP) framework.
+          <p class="lead-text">
+            Whether you are learning to spot Mobile Money (MoMo) fraud, locking down your social accounts, or preparing for a career in cybersecurity, everything you need is waiting in your dashboard:
           </p>
 
           <div class="feature-box">
             <div>
-              <div class="feature-title">Accredited Learning & Certificates</div>
-              <p class="feature-desc">Learn practical steps to secure Mobile Money accounts and social media profiles. Earn verifiable certificates upon completing assessments.</p>
+              <div class="feature-title">1. Accredited Cyber Safety Courses &amp; Certificates</div>
+              <p class="feature-desc">Complete bite-sized lessons on phishing detection, password hygiene, AI deepfakes, and MoMo protection to earn verifiable certificates.</p>
             </div>
             <div style="margin-top: 14px;">
-              <div class="feature-title">Interactive Threat Simulator</div>
-              <p class="feature-desc">Practice identifying fraudulent SMS alerts, unauthorized access traps, and spoofed recruitment forms.</p>
+              <div class="feature-title">2. Vetted 1-on-1 Mentors &amp; Encrypted CyberChat</div>
+              <p class="feature-desc">Book live mentorship sessions with accredited cybersecurity practitioners and collaborate safely with end-to-end encryption.</p>
             </div>
             <div style="margin-top: 14px;">
-              <div class="feature-title">Confidential Incident Support</div>
-              <p class="feature-desc">Report online safety concerns confidentially with zero personal tracking, reviewed by Cyber Security Authority officers.</p>
+              <div class="feature-title">3. Confidential Incident Reporting</div>
+              <p class="feature-desc">Report online harassment, impersonation, or cyber scams confidentially for review under Ghana's Child Online Protection (COP) framework.</p>
             </div>
           </div>
+
+          ${dailyTipsSectionHtml}
 
           <div class="btn-container">
-            <a href="${loginLink}" class="btn" target="_blank">Access Your Dashboard</a>
+            <a href="${dashboardLink}" class="btn" target="_blank">Open Your Dashboard</a>
           </div>
+          <a href="${coursesLink}" class="secondary-link" target="_blank">Or browse all cyber safety courses &rarr;</a>
 
           <div class="hotline-box">
-            <div class="hotline-title">National Cyber Threat Helpline: 292</div>
+            <div class="hotline-title">National Cyber Threat Helpline: Toll-Free 292</div>
             <p class="hotline-desc">
-              For urgent questions or support regarding digital safety, call toll-free 292 anytime.
+              Need urgent help with cyber fraud or online harassment? Call <strong>292</strong> toll-free anytime or forward suspicious SMS messages to <strong>419</strong>.
             </p>
           </div>
         </div>
@@ -209,16 +389,20 @@ async function sendWelcomeEmail(toEmail, displayName = "CyberGuard Member") {
         <div class="footer">
           <p><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
           <p>Operated in alignment with the Cyber Security Authority (CSA), Ghana</p>
-          <p style="margin-top: 10px; font-size: 10px;">This automated notification was sent to ${toEmail}. You received this email because you registered on CyberGuard Ghana.</p>
+          <p style="margin-top: 10px; font-size: 10px;">This one-time welcome email was sent to ${toEmail} because you created an account on CyberGuard Ghana.</p>
         </div>
       </div>
     </body>
     </html>
   `;
 
-  const text = `Hello ${displayName},\n\nWelcome to CyberGuard Ghana. Your student account has been registered successfully.\n\nYou now have access to accredited safety courses, interactive threat simulations, and confidential incident reporting.\n\nSign in to your account:\n${loginLink}\n\nKey features:\n- Accredited courses on Mobile Money and social media security\n- Hands-on threat simulations\n- Confidential incident reporting\n\nHelpline: For immediate digital safety guidance, call toll-free 292.\n\nBest regards,\nThe CyberGuard Ghana Team`;
+  const dailyTipsText = receiveDailyTips
+    ? "7:00 AM Daily Cyber Safety Tips: ENABLED — You will receive a short, actionable cyber safety tip every morning at 7:00 AM GMT."
+    : `Want daily 7:00 AM cyber safety tips? Enable them anytime in Account Settings: ${settingsLink}`;
 
-  return sendEmail({ to: toEmail, subject, html, text });
+  const text = `Akwaaba, ${displayName}!\n\nWelcome to CyberGuard Ghana! Thank you for signing up — your account is now active and ready.\n\nWhat you can do right away:\n1. Explore accredited courses on Mobile Money (MoMo) security, phishing defense, and social media privacy: ${coursesLink}\n2. Book 1-on-1 sessions with vetted mentors and chat safely on E2EE CyberChat\n3. Report cyber threats confidentially\n\n${dailyTipsText}\n\nOpen your dashboard:\n${dashboardLink}\n\nNational Cyber Threat Helpline: Call toll-free 292 anytime or forward suspicious SMS alerts to 419.\n\nWarm regards,\nThe CyberGuard Ghana Team`;
+
+  return sendEmail({ to: toEmail, subject, html, text, clientOrigin });
 }
 
 /**
@@ -229,6 +413,7 @@ async function sendWelcomeEmail(toEmail, displayName = "CyberGuard Member") {
  * @param {Object} params.tip - { index, category, title, summary, actionStep, courseSlug }
  * @param {string} params.dateFormatted - Readable date string (e.g. "Wednesday, 4 November 2026")
  * @param {string} params.unsubscribeUrl - Signed one-click unsubscribe URL
+ * @param {string} [params.clientOrigin] - Optional explicit frontend origin
  */
 async function sendDailySafetyTipEmail({
   toEmail,
@@ -236,8 +421,9 @@ async function sendDailySafetyTipEmail({
   tip,
   dateFormatted,
   unsubscribeUrl,
+  clientOrigin: explicitOrigin,
 }) {
-  const clientOrigin = process.env.CLIENT_ORIGIN || "http://localhost:5173";
+  const clientOrigin = resolveClientOrigin(explicitOrigin);
   const courseUrl = tip?.courseSlug
     ? `${clientOrigin}/courses/${tip.courseSlug}`
     : `${clientOrigin}/courses`;
@@ -325,11 +511,13 @@ async function sendDailySafetyTipEmail({
       }
     : {};
 
-  return sendEmail({ to: toEmail, subject, html, text, headers: extraHeaders });
+  return sendEmail({ to: toEmail, subject, html, text, headers: extraHeaders, clientOrigin });
 }
 
 module.exports = {
   transporter,
+  setClientOriginHint,
+  resolveClientOrigin,
   sendEmail,
   sendPasswordResetEmail,
   sendWelcomeEmail,

@@ -21,6 +21,20 @@ function signToken(user) {
   );
 }
 
+function getRequestOrigin(req) {
+  if (req.headers.origin && typeof req.headers.origin === "string") {
+    return req.headers.origin.trim().replace(/\/$/, "");
+  }
+  if (req.headers.referer && typeof req.headers.referer === "string") {
+    try {
+      return new URL(req.headers.referer).origin;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 /**
  * Safely deletes a user and cleans up or reassigns all foreign-key dependencies
  * inside an atomic transaction while preserving anonymized email audit logs.
@@ -134,14 +148,23 @@ router.post(
         },
       });
 
-      // Send personalized welcome email automatically upon registration
-      sendWelcomeEmail(user.email, user.displayName).catch((err) => {
-        console.error(`[Mailer] Welcome email to ${user.email} failed:`, err.message);
-      });
+      // Send personalized welcome email automatically upon first-time registration
+      const requestOrigin = getRequestOrigin(req);
+      const hasBackendSmtp = Boolean((process.env.SMTP_PASS || "").trim());
+      if (hasBackendSmtp) {
+        sendWelcomeEmail(user.email, user.displayName, {
+          receiveDailyTips: user.receiveDailyTips,
+          clientOrigin: requestOrigin,
+        }).catch((err) => {
+          console.error(`[Mailer] Welcome email to ${user.email} failed:`, err.message);
+        });
+      }
 
       const token = signToken(user);
       res.status(201).json({
         token,
+        isNewUser: true,
+        welcomeDispatchedByBackend: hasBackendSmtp,
         user: {
           id: user.id,
           email: user.email,
@@ -205,8 +228,11 @@ router.post("/google", async (req, res, next) => {
     const optedInDailyTips = Boolean(req.body.receiveDailyTips);
 
     let user = await prisma.user.findUnique({ where: { email: verifiedEmail } });
+    let isNewUser = false;
+    const hasBackendSmtp = Boolean((process.env.SMTP_PASS || "").trim());
 
     if (!user) {
+      isNewUser = true;
       const dummyPassword = await bcrypt.hash(`Google_${Date.now()}_${Math.random()}`, 12);
       user = await prisma.user.create({
         data: {
@@ -220,10 +246,16 @@ router.post("/google", async (req, res, next) => {
         },
       });
 
-      // Send personalized welcome email automatically for new Google OAuth signups
-      sendWelcomeEmail(user.email, user.displayName).catch((err) => {
-        console.error(`[Mailer] Google signup welcome email to ${user.email} failed:`, err.message);
-      });
+      // Send personalized welcome email automatically for first-time Google OAuth signups
+      if (hasBackendSmtp) {
+        const requestOrigin = getRequestOrigin(req);
+        sendWelcomeEmail(user.email, user.displayName, {
+          receiveDailyTips: user.receiveDailyTips,
+          clientOrigin: requestOrigin,
+        }).catch((err) => {
+          console.error(`[Mailer] Google signup welcome email to ${user.email} failed:`, err.message);
+        });
+      }
     } else {
       const googleUpdates = {};
       if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes("googleusercontent.com") || user.avatarUrl.includes("default-user"))) {
@@ -243,6 +275,8 @@ router.post("/google", async (req, res, next) => {
     const token = signToken(user);
     res.json({
       token,
+      isNewUser,
+      welcomeDispatchedByBackend: isNewUser ? hasBackendSmtp : false,
       user: {
         id: user.id,
         email: user.email,
@@ -629,7 +663,9 @@ router.post(
         );
 
         try {
-          await sendPasswordResetEmail(user.email, resetToken, user.displayName);
+          await sendPasswordResetEmail(user.email, resetToken, user.displayName, {
+            clientOrigin: getRequestOrigin(req),
+          });
         } catch (mailErr) {
           console.error("Failed to send reset email via SMTP:", mailErr);
           return res.status(500).json({

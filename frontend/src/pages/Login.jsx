@@ -125,6 +125,12 @@ export default function Login() {
         displayName: payload.name || payload.email.split("@")[0],
         avatarUrl: payload.picture || null,
       });
+      if (data.isNewUser && !data.welcomeDispatchedByBackend && data.token) {
+        fetch("/api/welcome", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${data.token}` },
+        }).catch(() => {});
+      }
       login(data.token, data.user);
       navigate(getRedirectTarget(data.user?.role), { replace: true });
     } catch (err) {
