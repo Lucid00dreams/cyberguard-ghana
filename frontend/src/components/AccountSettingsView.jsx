@@ -269,10 +269,10 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
   }
 
   const roleBadgeStyle = {
-    ADMIN: "bg-purple-50 text-purple-800 border-purple-200",
-    CSA_OFFICER: "bg-blue-50 text-blue-800 border-blue-200",
-    TUTOR: "bg-amber-50 text-amber-800 border-amber-200",
-    STUDENT: "bg-emerald-50 text-emerald-800 border-emerald-200",
+    ADMIN: "bg-slate-100 text-slate-800 border-slate-200",
+    CSA_OFFICER: "bg-slate-100 text-slate-700 border-slate-200",
+    TUTOR: "bg-slate-100 text-slate-700 border-slate-200",
+    STUDENT: "bg-slate-100 text-slate-700 border-slate-200",
   }[user?.role || "STUDENT"];
 
   const memberSinceLabel = user?.createdAt
@@ -741,7 +741,7 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
             </div>
 
             <div className="space-y-3">
-              <label className="flex items-center justify-between p-4 rounded-xl bg-blue-50/50 border border-blue-200/80 cursor-pointer hover:bg-blue-50 transition">
+              <label className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200/80 cursor-pointer hover:bg-slate-100/70 transition">
                 <div className="pr-4">
                   <p className="text-xs font-bold text-slate-900">
                     Daily 7:00 AM GMT Cyber Safety Tips

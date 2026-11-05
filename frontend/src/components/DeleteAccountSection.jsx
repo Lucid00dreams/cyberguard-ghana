@@ -77,16 +77,16 @@ export default function DeleteAccountSection({ compact = false }) {
   return (
     <>
       <div
-        className={`bg-white border border-rose-200/90 shadow-xs ${
+        className={`bg-white border border-slate-200/90 shadow-xs ${
           compact ? "rounded-xl p-6 max-w-xl" : "rounded-2xl p-6"
         }`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 text-rose-700">
-              <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
-              <h3 className="font-extrabold text-sm sm:text-base tracking-tight">
-                Delete Account
+            <div className="inline-flex items-center gap-2 text-slate-900">
+              <Trash2 className="w-4 h-4 text-slate-500 shrink-0" />
+              <h3 className="font-bold text-sm sm:text-base tracking-tight">
+                Delete account
               </h3>
             </div>
             <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
@@ -97,10 +97,10 @@ export default function DeleteAccountSection({ compact = false }) {
           <button
             type="button"
             onClick={openDeleteModal}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs transition shrink-0 cursor-pointer"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-rose-50 text-rose-700 border border-slate-200 hover:border-rose-200 font-semibold text-xs transition shrink-0 cursor-pointer"
           >
             <Trash2 className="w-3.5 h-3.5" />
-            <span>Delete My Account</span>
+            <span>Delete account</span>
           </button>
         </div>
       </div>

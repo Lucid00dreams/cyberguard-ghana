@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ShieldCheck,
   FileDown,
@@ -10,65 +11,116 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Compass,
-  Filter,
   Search,
-  Activity,
-  FileText,
   Lock,
-  Sparkles,
   ExternalLink,
   X,
-  Shield,
-  ArrowRight,
   SlidersHorizontal,
   Plus,
   RefreshCw,
-  Cpu,
   LogOut,
-  Copy,
-  Check,
-  ChevronDown,
   Globe,
   LayoutGrid,
   Menu,
   Mail,
   Send,
-  Loader2
+  Loader2,
+  ArrowUpRight,
 } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../utils/api";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AccountSettingsView from "../components/AccountSettingsView";
 import CyberGuardLogo from "../components/CyberGuardLogo";
 import UserAvatar from "../components/UserAvatar";
 
+const VALID_TABS = [
+  "overview",
+  "users",
+  "daily-tips",
+  "reports",
+  "approvals",
+  "tutors",
+  "courses",
+  "certificates",
+  "settings",
+];
+
+const TAB_META = {
+  overview: {
+    label: "Overview",
+    title: "Admin overview",
+    description: "Summary of accounts, incident reports, tutor applications, and curriculum.",
+  },
+  users: {
+    label: "Users",
+    title: "Users & permissions",
+    description: "Manage account roles or remove accounts across the platform.",
+  },
+  "daily-tips": {
+    label: "Daily tips log",
+    title: "Daily cyber safety tips log",
+    description: "Delivery history and subscriber list for the 07:00 GMT email broadcast.",
+  },
+  reports: {
+    label: "Incident reports",
+    title: "Incident reports",
+    description: "Review submitted cyber incident reports, update status, and export PDF case briefs.",
+  },
+  approvals: {
+    label: "Tutor applications",
+    title: "Tutor applications",
+    description: "Review educators applying to host 1-on-1 mentorship sessions.",
+  },
+  tutors: {
+    label: "Verified tutors",
+    title: "Verified tutors",
+    description: "Approved mentors currently active in the mentorship directory.",
+  },
+  courses: {
+    label: "Courses",
+    title: "Course catalog",
+    description: "Preview published courses, manage catalog entries, or create lessons in Course Studio.",
+  },
+  certificates: {
+    label: "Certificates",
+    title: "Issued certificates",
+    description: "Search completion credentials issued to learners.",
+  },
+  settings: {
+    label: "Settings",
+    title: "Account & profile settings",
+    description: "Manage your administrator profile, password, and email preferences.",
+  },
+};
+
+const ROLE_LABELS = {
+  ADMIN: "Admin",
+  CSA_OFFICER: "CSA Officer",
+  TUTOR: "Tutor",
+  STUDENT: "Student",
+};
+
+const INCIDENT_STATUS_STYLES = {
+  SUBMITTED: "bg-slate-100 text-slate-700 border-slate-200",
+  UNDER_REVIEW: "bg-amber-50/80 text-amber-800 border-amber-200/80",
+  ESCALATED: "bg-rose-50/80 text-rose-800 border-rose-200/80",
+  RESOLVED: "bg-emerald-50/80 text-emerald-800 border-emerald-200/80",
+  DISMISSED: "bg-slate-100 text-slate-500 border-slate-200",
+};
+
 export default function CsaPortal() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
   const adminScrollRef = useRef(null);
+  const searchInputRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialActive = searchParams.get("tab") || "overview";
-  const [active, setActive] = useState(initialActive);
+
+  const initialTab = VALID_TABS.includes(searchParams.get("tab"))
+    ? searchParams.get("tab")
+    : "overview";
+  const [active, setActive] = useState(initialTab);
   const isSuperAdmin = user?.role === "ADMIN";
-
-  useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (
-      tabParam &&
-      ["overview", "users", "daily-tips", "reports", "approvals", "tutors", "courses", "certificates", "settings"].includes(tabParam)
-    ) {
-      setActive(tabParam);
-    }
-  }, [searchParams]);
-
-  const selectAdminTab = (tabKey) => {
-    setActive(tabKey);
-    setSearchParams({ tab: tabKey });
-    setMobileSidebarOpen(false);
-    adminScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  };
 
   const [reports, setReports] = useState([]);
   const [pendingTutors, setPendingTutors] = useState([]);
@@ -76,19 +128,20 @@ export default function CsaPortal() {
   const [courses, setCourses] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [users, setUsers] = useState([]);
+
   const [userRoleFilter, setUserRoleFilter] = useState("");
   const [userSearch, setUserSearch] = useState("");
-  const [stats, setStats] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [reportSearch, setReportSearch] = useState("");
+  const [courseSearch, setCourseSearch] = useState("");
   const [certSearch, setCertSearch] = useState("");
+  const [globalSearch, setGlobalSearch] = useState("");
+
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [actionStatus, setActionStatus] = useState("");
+  const [actionStatus, setActionStatus] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
-
-  const [copiedUrl, setCopiedUrl] = useState(false);
-  const [searchCategory, setSearchCategory] = useState("all");
-  const [globalSearch, setGlobalSearch] = useState("");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Daily Cyber Safety Tips Superadmin Log State
@@ -103,7 +156,29 @@ export default function CsaPortal() {
   const [tipLogDate, setTipLogDate] = useState("");
   const [tipLogStatus, setTipLogStatus] = useState("");
   const [tipLogSearch, setTipLogSearch] = useState("");
-  const [tipLogSubView, setTipLogSubView] = useState("daily"); // "daily" | "emails" | "subscribers"
+  const [tipLogSubView, setTipLogSubView] = useState("daily");
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && VALID_TABS.includes(tabParam)) {
+      if ((tabParam === "users" || tabParam === "daily-tips") && !isSuperAdmin) {
+        setActive("overview");
+      } else {
+        setActive(tabParam);
+      }
+    }
+  }, [searchParams, isSuperAdmin]);
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (mobileSidebarOpen) {
@@ -116,32 +191,45 @@ export default function CsaPortal() {
     };
   }, [mobileSidebarOpen]);
 
-  function handleSearchSubmit(e) {
+  function notify(text, type = "info") {
+    setActionStatus({ text, type });
+  }
+
+  function selectAdminTab(tabKey) {
+    setActive(tabKey);
+    setSearchParams({ tab: tabKey });
+    setMobileSidebarOpen(false);
+    adminScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }
+
+  function handleGlobalSearchSubmit(e) {
     if (e) e.preventDefault();
     const query = globalSearch.trim();
-    if (searchCategory === "users") {
-      setActive("users");
+    if (!query) return;
+
+    if (/^CG-/i.test(query) && active !== "certificates") {
+      selectAdminTab("reports");
+      setReportSearch(query);
+      return;
+    }
+
+    if (active === "reports") {
+      setReportSearch(query);
+    } else if (active === "courses") {
+      setCourseSearch(query);
+    } else if (active === "certificates") {
+      setCertSearch(query);
+    } else if (active === "daily-tips" && isSuperAdmin) {
+      setTipLogSearch(query);
+      loadDailyTipsLogs(query);
+    } else if (isSuperAdmin) {
+      selectAdminTab("users");
       setUserSearch(query);
       loadUsers(query, userRoleFilter);
-    } else if (searchCategory === "reports") {
-      setActive("reports");
-    } else if (searchCategory === "courses") {
-      setActive("courses");
-    } else if (searchCategory === "certificates") {
-      setActive("certificates");
-      setCertSearch(query);
     } else {
-      // Default behavior
-      if (active === "users") {
-        setUserSearch(query);
-        loadUsers(query, userRoleFilter);
-      } else if (active === "certificates") {
-        setCertSearch(query);
-      } else {
-        setActive("users");
-        setUserSearch(query);
-        loadUsers(query, userRoleFilter);
-      }
+      selectAdminTab("reports");
+      setReportSearch(query);
     }
   }
 
@@ -152,12 +240,83 @@ export default function CsaPortal() {
   useEffect(() => {
     if (active === "reports") loadReports();
     if (active === "approvals") loadPendingTutors();
-    if (active === "users") loadUsers();
+    if (active === "users" && isSuperAdmin) loadUsers();
     if (active === "daily-tips" && isSuperAdmin) loadDailyTipsLogs();
     if (active === "tutors") loadTutors();
     if (active === "courses") loadCourses();
     if (active === "certificates") loadCertificates();
   }, [active, categoryFilter, userRoleFilter, tipLogDate, tipLogStatus]);
+
+  async function loadOverview() {
+    setLoading(true);
+    try {
+      await Promise.all([
+        loadStats(),
+        loadReports(),
+        loadPendingTutors(),
+        loadCourses(),
+        loadTutors(),
+        loadCertificates(),
+        ...(isSuperAdmin ? [loadUsers(), loadDailyTipsLogs()] : []),
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function loadStats() {
+    return api
+      .get("/courses/stats/summary")
+      .then((res) => setStats(res.data))
+      .catch(() => setStats(null));
+  }
+
+  function loadReports() {
+    return api
+      .get("/incidents", { params: categoryFilter ? { category: categoryFilter } : {} })
+      .then((res) => setReports(res.data || []))
+      .catch(() => setReports([]));
+  }
+
+  function loadPendingTutors() {
+    return api
+      .get("/tutors/pending")
+      .then((res) => setPendingTutors(res.data || []))
+      .catch(() => setPendingTutors([]));
+  }
+
+  function loadTutors() {
+    return api
+      .get("/tutors")
+      .then((res) => setTutors(res.data || []))
+      .catch(() => setTutors([]));
+  }
+
+  function loadCourses() {
+    return api
+      .get("/courses/all")
+      .then((res) => setCourses(res.data || []))
+      .catch(() => setCourses([]));
+  }
+
+  function loadCertificates() {
+    return api
+      .get("/courses/certificates")
+      .then((res) => setCertificates(res.data || []))
+      .catch(() => setCertificates([]));
+  }
+
+  async function loadUsers(searchVal = userSearch, roleVal = userRoleFilter) {
+    if (!isSuperAdmin) return;
+    try {
+      const res = await api.get("/auth/users", {
+        params: { role: roleVal || undefined, search: searchVal || undefined },
+      });
+      setUsers(res.data || []);
+    } catch {
+      setUsers([]);
+    }
+  }
 
   async function loadDailyTipsLogs(customSearch = tipLogSearch) {
     if (!isSuperAdmin) return;
@@ -176,7 +335,7 @@ export default function CsaPortal() {
         emailLogs: res.data?.emailLogs || [],
         subscribers: res.data?.subscribers || [],
       });
-    } catch (err) {
+    } catch {
       setDailyTipsData({ summary: null, dispatches: [], emailLogs: [], subscribers: [] });
     } finally {
       setDailyTipsLoading(false);
@@ -188,10 +347,10 @@ export default function CsaPortal() {
     setDispatchingNow(true);
     try {
       const res = await api.post("/daily-tips/dispatch-now");
-      setActionStatus(res.data?.message || "Daily cyber safety tips dispatched successfully.");
+      notify(res.data?.message || "Daily cyber safety tips sent.");
       await loadDailyTipsLogs();
     } catch (err) {
-      setActionStatus(err.response?.data?.error || "Failed to dispatch daily cyber safety tips.");
+      notify(err.response?.data?.error || "Failed to send daily cyber safety tips.", "error");
     } finally {
       setDispatchingNow(false);
     }
@@ -200,7 +359,16 @@ export default function CsaPortal() {
   function exportDailyTipLogsCsv() {
     const rows = dailyTipsData.emailLogs || [];
     if (rows.length === 0) return;
-    const headers = ["Date", "Sent At (ISO)", "Recipient Email", "Recipient Name", "Tip Title", "Status", "Message ID", "Error"];
+    const headers = [
+      "Date",
+      "Sent At (ISO)",
+      "Recipient Email",
+      "Recipient Name",
+      "Tip Title",
+      "Status",
+      "Message ID",
+      "Error",
+    ];
     const escapeCsv = (val) => `"${String(val ?? "").replace(/"/g, '""')}"`;
     const csvContent = [
       headers.join(","),
@@ -229,27 +397,14 @@ export default function CsaPortal() {
     window.URL.revokeObjectURL(url);
   }
 
-  async function loadUsers(searchVal = userSearch, roleVal = userRoleFilter) {
-    try {
-      const res = await api.get("/auth/users", {
-        params: { role: roleVal || undefined, search: searchVal || undefined },
-      });
-      setUsers(res.data || []);
-    } catch (err) {
-      setUsers([]);
-    }
-  }
-
   async function changeUserRole(userId, newRole) {
     try {
       await api.patch(`/auth/users/${userId}/role`, { role: newRole });
-      setActionStatus(`User role successfully updated to ${newRole}`);
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-      );
+      notify(`Updated role to ${ROLE_LABELS[newRole] || newRole}.`);
+      setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
       await loadStats();
     } catch (err) {
-      setActionStatus(err.response?.data?.error || "Failed to update user role.");
+      notify(err.response?.data?.error || "Failed to update user role.", "error");
     }
   }
 
@@ -262,68 +417,23 @@ export default function CsaPortal() {
       onConfirm: async () => {
         try {
           await api.delete(`/auth/users/${userId}`);
-          setActionStatus(`User account "${name}" removed.`);
+          notify(`Removed user "${name}".`);
           setUsers((prev) => prev.filter((u) => u.id !== userId));
           await loadStats();
         } catch (err) {
-          setActionStatus(err.response?.data?.error || "Failed to delete user account.");
+          notify(err.response?.data?.error || "Failed to delete user account.", "error");
         }
       },
     });
   }
 
-  async function loadOverview() {
-    setLoading(true);
-    try {
-      await Promise.all([
-        loadStats(),
-        loadReports(),
-        loadPendingTutors(),
-        loadCourses(),
-        loadTutors(),
-        loadCertificates(),
-        loadUsers(),
-        ...(isSuperAdmin ? [loadDailyTipsLogs()] : []),
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function loadStats() {
-    return api.get("/courses/stats/summary").then((res) => setStats(res.data)).catch(() => setStats(null));
-  }
-
-  function loadReports() {
-    return api
-      .get("/incidents", { params: categoryFilter ? { category: categoryFilter } : {} })
-      .then((res) => setReports(res.data))
-      .catch(() => setReports([]));
-  }
-
-  function loadPendingTutors() {
-    return api.get("/tutors/pending").then((res) => setPendingTutors(res.data)).catch(() => setPendingTutors([]));
-  }
-
-  function loadTutors() {
-    return api.get("/tutors").then((res) => setTutors(res.data)).catch(() => setTutors([]));
-  }
-
-  function loadCourses() {
-    return api.get("/courses/all").then((res) => setCourses(res.data)).catch(() => setCourses([]));
-  }
-
-  function loadCertificates() {
-    return api.get("/courses/certificates").then((res) => setCertificates(res.data)).catch(() => setCertificates([]));
-  }
-
   async function updateIncidentStatus(id, newStatus) {
     try {
       await api.patch(`/incidents/${id}/status`, { status: newStatus });
-      setActionStatus(`Incident status updated to ${newStatus}`);
+      notify(`Incident status updated to ${newStatus.replace("_", " ").toLowerCase()}.`);
       await loadReports();
-    } catch (e) {
-      setActionStatus("Failed to update incident status.");
+    } catch {
+      notify("Failed to update incident status.", "error");
     }
   }
 
@@ -335,152 +445,212 @@ export default function CsaPortal() {
       a.href = url;
       a.download = `case-brief-${refCode}.pdf`;
       a.click();
-    } catch (e) {
-      setActionStatus("Error exporting PDF case brief.");
+      window.URL.revokeObjectURL(url);
+    } catch {
+      notify("Could not export PDF case brief.", "error");
     }
   }
 
   async function approveTutor(tutorId) {
-    await api.patch(`/tutors/${tutorId}/vet`);
-    setActionStatus("Tutor application approved & verified.");
-    await loadPendingTutors();
-    await loadTutors();
-    await loadStats();
+    try {
+      await api.patch(`/tutors/${tutorId}/vet`);
+      notify("Tutor application approved.");
+      await Promise.all([loadPendingTutors(), loadTutors(), loadStats()]);
+    } catch (err) {
+      notify(err.response?.data?.error || "Failed to approve tutor application.", "error");
+    }
   }
 
-  function removeTutor(tutorId) {
+  function removeTutor(tutorId, tutorName) {
     setConfirmDialog({
-      title: "Revoke tutor verification?",
+      title: `Revoke tutor verification${tutorName ? ` for ${tutorName}` : ""}?`,
       message:
-        "This removes the tutor's verified mentor profile and reverts their account role back to standard learner.",
-      confirmLabel: "Revoke tutor",
+        "This removes the tutor's verified mentor profile and reverts their account role to standard learner.",
+      confirmLabel: "Revoke verification",
       onConfirm: async () => {
         try {
           await api.delete(`/tutors/${tutorId}`);
-          setActionStatus("Tutor verification revoked.");
-          await loadTutors();
-          await loadPendingTutors();
-          await loadStats();
+          notify("Tutor verification revoked.");
+          await Promise.all([loadTutors(), loadPendingTutors(), loadStats()]);
         } catch (err) {
-          setActionStatus(err.response?.data?.error || "Failed to revoke tutor.");
+          notify(err.response?.data?.error || "Failed to revoke tutor.", "error");
         }
       },
     });
   }
 
-  function removeCourse(courseId) {
+  function removeCourse(courseId, title) {
     setConfirmDialog({
-      title: "Delete course permanently?",
+      title: `Delete course${title ? ` "${title}"` : ""}?`,
       message:
         "This removes the course and its modules, lessons, and quizzes from the catalog. This action cannot be undone.",
       confirmLabel: "Delete course",
       onConfirm: async () => {
         try {
           await api.delete(`/courses/${courseId}`);
-          setActionStatus("Course removed from catalog.");
-          await loadCourses();
-          await loadStats();
+          notify("Course deleted from catalog.");
+          await Promise.all([loadCourses(), loadStats()]);
         } catch (err) {
-          setActionStatus(err.response?.data?.error || "Failed to remove course.");
+          notify(err.response?.data?.error || "Failed to delete course.", "error");
         }
       },
     });
   }
 
-  const filteredCerts = certificates.filter((c) =>
-    c.certRef?.toLowerCase().includes(certSearch.toLowerCase()) ||
-    c.user?.displayName?.toLowerCase().includes(certSearch.toLowerCase()) ||
-    c.course?.title?.toLowerCase().includes(certSearch.toLowerCase())
-  );
+  const filteredReports = useMemo(() => {
+    const q = reportSearch.trim().toLowerCase();
+    if (!q) return reports;
+    return reports.filter(
+      (r) =>
+        r.refCode?.toLowerCase().includes(q) ||
+        r.category?.toLowerCase().includes(q) ||
+        r.status?.toLowerCase().includes(q) ||
+        r.narrative?.toLowerCase().includes(q)
+    );
+  }, [reports, reportSearch]);
 
-  const SIDEBAR_SECTIONS = [
+  const filteredCourses = useMemo(() => {
+    const q = courseSearch.trim().toLowerCase();
+    if (!q) return courses;
+    return courses.filter(
+      (c) =>
+        c.title?.toLowerCase().includes(q) ||
+        c.category?.toLowerCase().includes(q) ||
+        c.slug?.toLowerCase().includes(q)
+    );
+  }, [courses, courseSearch]);
+
+  const filteredCerts = useMemo(() => {
+    const q = certSearch.trim().toLowerCase();
+    if (!q) return certificates;
+    return certificates.filter(
+      (c) =>
+        c.certRef?.toLowerCase().includes(q) ||
+        c.user?.displayName?.toLowerCase().includes(q) ||
+        c.course?.title?.toLowerCase().includes(q)
+    );
+  }, [certificates, certSearch]);
+
+  const totalUsersCount = stats?.users ?? users.length;
+
+  const sidebarSections = [
     {
-      title: "Operations & Governance",
+      title: "Administration",
       items: [
-        { key: "overview", label: "Overview", icon: LayoutGrid, count: null, color: "text-blue-300", bg: "bg-blue-500/20" },
+        { key: "overview", label: "Overview", icon: LayoutGrid, count: null },
         ...(isSuperAdmin
           ? [
-              { key: "users", label: "User Governance", icon: Users, count: users.length, color: "text-indigo-300", bg: "bg-indigo-500/20" },
+              { key: "users", label: "Users", icon: Users, count: totalUsersCount },
               {
                 key: "daily-tips",
-                label: "Daily Tips Mail Log",
+                label: "Daily tips log",
                 icon: Mail,
-                count: dailyTipsData.summary?.totalEmailsSent ?? null,
-                color: "text-cyan-300",
-                bg: "bg-cyan-500/20",
+                count: dailyTipsData.summary?.activeSubscribers ?? null,
               },
             ]
           : []),
       ],
     },
     {
-      title: "Safety & Compliance",
+      title: "Moderation",
       items: [
-        { key: "reports", label: "Incident Triage", icon: AlertTriangle, count: reports.length, alert: reports.length > 0, color: "text-rose-300", bg: "bg-rose-500/20" },
-        { key: "approvals", label: "Mentor Vetting", icon: UserCheck, count: pendingTutors.length, warn: pendingTutors.length > 0, color: "text-amber-300", bg: "bg-amber-500/20" },
-        { key: "tutors", label: "Accredited Mentors", icon: ShieldCheck, count: tutors.length, color: "text-emerald-300", bg: "bg-emerald-500/20" },
+        { key: "reports", label: "Incident reports", icon: AlertTriangle, count: reports.length },
+        {
+          key: "approvals",
+          label: "Tutor applications",
+          icon: UserCheck,
+          count: pendingTutors.length,
+        },
+        { key: "tutors", label: "Verified tutors", icon: ShieldCheck, count: tutors.length },
       ],
     },
     {
-      title: "Curriculum & Records",
+      title: "Learning",
       items: [
-        { key: "courses", label: "Course Catalog", icon: BookOpen, count: courses.length, color: "text-sky-300", bg: "bg-sky-500/20" },
-        { key: "certificates", label: "Issued Registry", icon: Award, count: certificates.length, color: "text-amber-300", bg: "bg-amber-500/20" },
+        { key: "courses", label: "Courses", icon: BookOpen, count: courses.length },
+        { key: "certificates", label: "Certificates", icon: Award, count: certificates.length },
       ],
     },
     {
-      title: "Account & Preferences",
-      items: [
-        { key: "settings", label: "Account Settings", icon: SlidersHorizontal, color: "text-cyan-300", bg: "bg-cyan-500/20" },
-      ],
+      title: "Account",
+      items: [{ key: "settings", label: "Settings", icon: SlidersHorizontal, count: null }],
     },
     {
-      title: "Quick Portals",
+      title: "Shortcuts",
       items: [
-        { key: "cyberchat", label: "CyberChat (E2EE)", icon: Lock, isLink: true, to: "/cyberchat", color: "text-teal-300", bg: "bg-teal-500/20" },
-        { key: "studio", label: "Course Studio", icon: Plus, isLink: true, to: "/course-studio", color: "text-purple-300", bg: "bg-purple-500/20" },
-        { key: "reportPortal", label: "Incident Portal", icon: ExternalLink, isLink: true, to: "/report", color: "text-rose-300", bg: "bg-rose-500/20" },
+        { key: "studio", label: "Course Studio", icon: Plus, isLink: true, to: "/course-studio" },
+        { key: "cyberchat", label: "CyberChat", icon: Lock, isLink: true, to: "/cyberchat" },
+        {
+          key: "reportPortal",
+          label: "Public report form",
+          icon: ExternalLink,
+          isLink: true,
+          to: "/report",
+        },
       ],
     },
   ];
 
+  const mobileTabs = sidebarSections
+    .flatMap((s) => s.items)
+    .filter((item) => !item.isLink);
+
+  const currentMeta = TAB_META[active] || TAB_META.overview;
+
+  const panelMotion = prefersReducedMotion
+    ? {}
+    : {
+        initial: { opacity: 0, y: 6 },
+        animate: { opacity: 1, y: 0 },
+        exit: { opacity: 0, y: -4 },
+        transition: { duration: 0.16, ease: [0.22, 1, 0.36, 1] },
+      };
+
   return (
-    <div className="h-screen h-[100dvh] overflow-hidden bg-[#f8fafc] text-slate-900 flex flex-col lg:flex-row font-sans selection:bg-slate-900 selection:text-white">
+    <div className="h-screen h-[100dvh] overflow-hidden bg-[#F8FAFC] text-slate-900 flex flex-col lg:flex-row font-sans selection:bg-slate-900 selection:text-white">
       {/* Mobile Drawer Backdrop */}
       {mobileSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-30 lg:hidden"
+          className="fixed inset-0 bg-slate-900/35 z-30 lg:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
-      {/* ===================== CSA COMMAND CENTER BLUE SIDEBAR ===================== */}
+      {/* Stationary Neutral Light Sidebar */}
       <aside
-        className={`w-68 bg-[#0A1E3F] text-white border-r border-blue-900/60 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:static lg:h-full lg:translate-x-0 lg:shadow-none ${
-          mobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
+        className={`w-64 bg-white text-slate-800 border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:static lg:h-full lg:translate-x-0 lg:shadow-none ${
+          mobileSidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"
         }`}
       >
-        {/* Top Brand Header */}
-        <div className="h-16 px-4 flex items-center justify-between border-b border-blue-900/60 bg-[#07162E]/70">
-          <Link to="/" className="flex items-center group" title="Return to Landing Page">
-            <CyberGuardLogo variant="full" size="sm" subtitle="CSA Command Center" theme="dark" interactive />
-          </Link>
+        {/* Brand Header */}
+        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link to="/" className="flex items-center shrink-0" title="Return to home">
+              <CyberGuardLogo variant="compact" size="sm" interactive />
+            </Link>
+            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/80 text-[10px] font-semibold">
+              Admin
+            </span>
+          </div>
+
           <button
+            type="button"
             onClick={() => setMobileSidebarOpen(false)}
-            className="lg:hidden text-blue-300 hover:text-white p-1.5 rounded-lg hover:bg-blue-800/40 transition"
+            className="lg:hidden text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
             aria-label="Close navigation"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Middle Scrollable Nav List Categorized */}
-        <nav className="flex-1 overflow-y-auto overscroll-contain py-3 px-3 space-y-4 custom-scrollbar">
-          {SIDEBAR_SECTIONS.map((section) => (
-            <div key={section.title} className="space-y-1">
-              <div className="px-3 pt-1.5 pb-1 text-[11px] font-bold uppercase tracking-wider text-blue-300/80">
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto overscroll-contain py-4 px-3 space-y-5">
+          {sidebarSections.map((section) => (
+            <div key={section.title} className="space-y-0.5">
+              <div className="px-3 pb-1 text-[11px] font-semibold text-slate-400">
                 {section.title}
               </div>
+
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = active === item.key;
@@ -488,18 +658,16 @@ export default function CsaPortal() {
                 if (item.isLink) {
                   return (
                     <Link
-                      key={item.label}
+                      key={item.key}
                       to={item.to}
                       onClick={() => setMobileSidebarOpen(false)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-blue-100/90 hover:text-white hover:bg-white/10 transition-all group"
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.bg || 'bg-blue-500/20'} ${item.color || 'text-blue-300'} ring-1 ring-white/10 group-hover:scale-105 transition-transform`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
+                        <Icon className="w-4 h-4 text-slate-400 shrink-0" />
                         <span className="truncate">{item.label}</span>
                       </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-blue-300/50 group-hover:text-blue-200 shrink-0 transition" />
+                      <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     </Link>
                   );
                 }
@@ -507,46 +675,34 @@ export default function CsaPortal() {
                 return (
                   <button
                     key={item.key}
+                    type="button"
                     onClick={() => selectAdminTab(item.key)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all group ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition cursor-pointer ${
                       isActive
-                        ? "bg-[#0056D2] text-white font-bold shadow-md shadow-blue-950/60 ring-1 ring-blue-400/40"
-                        : "text-blue-100/90 hover:text-white hover:bg-white/10 font-medium"
+                        ? "bg-slate-100 text-slate-900 font-semibold"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-normal"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all ${
-                          isActive
-                            ? "bg-white/20 text-white ring-1 ring-white/30"
-                            : `${item.bg || 'bg-blue-500/20'} ${item.color || 'text-blue-300'} ring-1 ring-white/10 group-hover:scale-105`
+                      <Icon
+                        className={`w-4 h-4 shrink-0 ${
+                          isActive ? "text-slate-900" : "text-slate-400"
                         }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </div>
+                      />
                       <span className="truncate">{item.label}</span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      {item.count !== null && item.count !== undefined && (
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                            isActive
-                              ? "bg-white/20 text-white"
-                              : item.alert
-                              ? "bg-rose-500/30 text-rose-300 border border-rose-500/50"
-                              : item.warn
-                              ? "bg-amber-500/30 text-amber-300 border border-amber-500/50"
-                              : "bg-[#07162E] text-blue-200 border border-blue-800/80"
-                          }`}
-                        >
-                          {item.count}
-                        </span>
-                      )}
-                      {isActive && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shrink-0 animate-pulse" />
-                      )}
-                    </div>
+                    {item.count !== null && item.count !== undefined && item.count > 0 && (
+                      <span
+                        className={`text-[11px] font-mono px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                          isActive
+                            ? "bg-white text-slate-800 border border-slate-200/80"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -554,40 +710,43 @@ export default function CsaPortal() {
           ))}
         </nav>
 
-        {/* Bottom User Profile Footer */}
-        <div className="border-t border-blue-900/60 p-3 bg-[#07162E]/80 flex items-center justify-between">
+        {/* Account Footer */}
+        <div className="border-t border-slate-100 p-3 bg-slate-50/50 flex items-center justify-between gap-2">
           <button
+            type="button"
             onClick={() => selectAdminTab("settings")}
-            title="Open Account Settings"
-            className="flex items-center gap-2.5 min-w-0 text-left hover:opacity-90 transition cursor-pointer group flex-1 mr-1"
+            title="Account settings"
+            className="flex items-center gap-2.5 min-w-0 text-left hover:opacity-90 transition cursor-pointer flex-1"
           >
-            <UserAvatar user={user} size="md" rounded="rounded-full" showOnlineStatus />
+            <UserAvatar user={user} size="sm" rounded="rounded-full" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate group-hover:text-cyan-300 transition">
-                {user?.displayName || "Patrick Paul"}
+              <p className="text-xs font-semibold text-slate-900 truncate">
+                {user?.displayName || "Administrator"}
               </p>
-              <p className="text-[10px] text-blue-300/80 font-mono truncate">
-                {user?.phoneNumber || user?.email || "+233544748171"}
+              <p className="text-[11px] text-slate-500 truncate">
+                {user?.email || ROLE_LABELS[user?.role] || "Admin"}
               </p>
             </div>
           </button>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-0.5 shrink-0">
             <button
+              type="button"
               onClick={() => selectAdminTab("settings")}
-              title="Account Settings"
-              className={`p-1.5 rounded-lg transition ${
+              title="Settings"
+              className={`p-1.5 rounded-lg transition cursor-pointer ${
                 active === "settings"
-                  ? "bg-blue-600 text-white"
-                  : "text-blue-300 hover:text-white hover:bg-white/10"
+                  ? "bg-slate-200/80 text-slate-900"
+                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-100"
               }`}
             >
               <SlidersHorizontal className="w-4 h-4" />
             </button>
             <button
+              type="button"
               onClick={logout}
-              title="Sign Out"
-              className="p-1.5 rounded-lg text-rose-300 hover:text-rose-100 hover:bg-rose-500/25 transition"
+              title="Sign out"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -595,1116 +754,1221 @@ export default function CsaPortal() {
         </div>
       </aside>
 
-      {/* ===================== MAIN ADMINISTRATIVE CANVAS ===================== */}
+      {/* Main Administrative Workspace */}
       <div
         ref={adminScrollRef}
-        className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto overscroll-contain bg-[#f8fafc]"
+        className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto overscroll-contain bg-[#F8FAFC]"
       >
-        {/* Top Header Bar */}
-        <header className="h-16 shrink-0 bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between sticky top-0 z-30 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-          <div className="flex items-center gap-3">
+        {/* Top Bar */}
+        <header className="h-16 shrink-0 bg-white/95 backdrop-blur-xs border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-20">
+          <div className="flex items-center gap-3 min-w-0">
             <button
+              type="button"
               onClick={() => setMobileSidebarOpen(true)}
-              className="lg:hidden text-slate-600 hover:text-slate-900 p-1"
+              className="lg:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
+              aria-label="Open navigation"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <Shield className="w-4 h-4 text-emerald-600" />
-                <span className="font-semibold text-slate-700">Admin</span>
-              </div>
+
+            <div className="flex items-center gap-2 text-xs text-slate-500 truncate">
+              <span className="font-medium text-slate-500">Admin</span>
               <span className="text-slate-300">/</span>
-              <span className="font-bold text-slate-900 capitalize">
-                {active === "overview"
-                  ? "Overview"
-                  : active === "daily-tips"
-                  ? "Daily Tips Mail Log"
-                  : active}
-              </span>
+              <span className="font-semibold text-slate-900 truncate">{currentMeta.label}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 text-xs font-semibold">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Platform Online</span>
-            </div>
+          <div className="flex items-center gap-2.5">
+            {/* Compact Quick Search */}
+            <form
+              onSubmit={handleGlobalSearchSubmit}
+              className="hidden md:flex items-center relative w-64 lg:w-72"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                placeholder="Quick search..."
+                className="w-full pl-8 pr-14 py-1.5 rounded-lg bg-slate-50 border border-slate-200/90 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-slate-400 transition"
+              />
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white rounded border border-slate-200 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                Ctrl K
+              </kbd>
+            </form>
 
             <button
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.origin + "/admin");
-                setCopiedUrl(true);
-                setTimeout(() => setCopiedUrl(false), 2000);
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 transition"
-              title="Copy Command Portal URL"
+              type="button"
+              onClick={loadOverview}
+              disabled={loading}
+              title="Refresh data"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-medium transition cursor-pointer disabled:opacity-50"
             >
-              {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
-              <span>cyberguard.gh/admin</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
 
             <Link
               to="/"
-              className="text-xs font-semibold text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition hidden md:flex items-center gap-1.5"
-              title="View Public Site"
+              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-600 hover:text-slate-900 transition"
             >
               <Globe className="w-3.5 h-3.5 text-slate-400" />
-              <span>Public Site</span>
+              <span>Public site</span>
             </Link>
-
-            <button
-              onClick={() => setActive("settings")}
-              title="Open Account Settings"
-              className="w-8 h-8 rounded-full overflow-hidden border border-slate-700 hover:ring-2 hover:ring-emerald-400 transition cursor-pointer shrink-0"
-            >
-              <UserAvatar user={user} size="sm" rounded="rounded-full" />
-            </button>
           </div>
         </header>
 
-        {/* Content Body */}
-        <main className="flex-1 p-4 sm:p-8 space-y-6 max-w-7xl w-full mx-auto">
-          {/* Status Message Notification */}
-          {actionStatus && (
-            <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-semibold flex justify-between items-center shadow-xs">
-              <span>{actionStatus}</span>
-              <button onClick={() => setActionStatus("")} className="text-emerald-700 hover:text-emerald-950">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+        {/* Mobile Quick Tab Strip */}
+        <div className="lg:hidden bg-white border-b border-slate-200/80 px-4 py-2 flex items-center gap-1.5 overflow-x-auto">
+          {mobileTabs.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => selectAdminTab(t.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition cursor-pointer ${
+                active === t.key
+                  ? "bg-slate-900 text-white font-semibold"
+                  : "text-slate-600 hover:bg-slate-100 font-medium"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-          {/* Admin Overview Header (shown on admin tabs) */}
-          {active !== "settings" && (
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                  {active === "overview" ? "Admin Overview" : active.replace(/^[a-z]/, (c) => c.toUpperCase())}
-                </h1>
-              <p className="text-xs text-slate-500 mt-1">
-                Real-time governance, Act 1038 incident triage, and educational telemetry console.
-              </p>
-            </div>
-
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-slate-200 text-slate-700 text-xs font-semibold font-mono shadow-2xs">
-                <Users className="w-3.5 h-3.5 text-emerald-600" />
-                <span>{users.length || 74} registered users</span>
-              </div>
-            </div>
-          )}
-
-          {/* Executive Command Search Console & 4 Executive KPI Cards (hidden on settings tab) */}
-          {active !== "settings" && (
-            <>
-              {/* Executive Command Search Console */}
-              <form
-                onSubmit={handleSearchSubmit}
-                className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-1.5 bg-white border border-slate-200/90 rounded-xl shadow-xs"
+        {/* Main Content */}
+        <main className="flex-1 p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6">
+          {/* Status Banner */}
+          <AnimatePresence>
+            {actionStatus && (
+              <motion.div
+                initial={prefersReducedMotion ? false : { opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.15 }}
+                className={`p-3.5 rounded-xl border text-xs font-medium flex justify-between items-center gap-3 ${
+                  actionStatus.type === "error"
+                    ? "bg-rose-50/80 border-rose-200 text-rose-900"
+                    : "bg-white border-slate-200 text-slate-800 shadow-2xs"
+                }`}
               >
-                <div className="relative shrink-0 sm:w-44">
-                  <select
-                    value={searchCategory}
-                    onChange={(e) => setSearchCategory(e.target.value)}
-                    className="w-full appearance-none bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold px-3 py-2 pr-8 rounded-lg border border-slate-200/80 focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer transition"
-                  >
-                    <option value="all">All Modules</option>
-                    <option value="users">Users</option>
-                    <option value="reports">Incidents</option>
-                    <option value="courses">Courses</option>
-                    <option value="certificates">Certificates</option>
-                  </select>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                </div>
-
-                <div className="relative flex-1">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  <input
-                    type="text"
-                    placeholder="Search across users, incident reference codes, or courses..."
-                    value={globalSearch}
-                    onChange={(e) => {
-                      setGlobalSearch(e.target.value);
-                      setUserSearch(e.target.value);
-                    }}
-                    className="w-full bg-transparent text-slate-900 text-xs placeholder-slate-400 pl-9 pr-12 py-2 focus:outline-none"
-                  />
-                  <div className="hidden sm:flex items-center absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-slate-100 rounded border border-slate-200">
-                      Ctrl K
-                    </kbd>
-                  </div>
-                </div>
-
+                <span>{actionStatus.text}</span>
                 <button
-                  type="submit"
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-5 py-2 rounded-lg transition shadow-xs flex items-center justify-center gap-1.5 shrink-0"
+                  type="button"
+                  onClick={() => setActionStatus(null)}
+                  className="text-slate-400 hover:text-slate-700 cursor-pointer shrink-0"
+                  aria-label="Dismiss notification"
                 >
-                  <Search className="w-3.5 h-3.5" />
-                  <span>Search</span>
+                  <X className="w-4 h-4" />
                 </button>
-              </form>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-              {/* 4 Executive KPI Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-medium text-slate-600">Total Users</span>
-                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-700 flex items-center justify-center">
-                      <Users className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mt-2.5 tracking-tight font-display">
-                    {users.length || 74}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium">Platform accounts</p>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-medium text-slate-600">Total Incidents</span>
-                    <div className="w-8 h-8 rounded-lg bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center">
-                      <AlertTriangle className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mt-2.5 tracking-tight font-display">
-                    {stats?.reports ?? reports.length}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium">Act 1038 reports</p>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-medium text-slate-600">Total Courses</span>
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-600 flex items-center justify-center">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mt-2.5 tracking-tight font-display">
-                    {stats?.courses ?? courses.length}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium">Published curriculum</p>
-                </div>
-
-                <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-xs hover:border-slate-300 transition">
-                  <div className="flex justify-between items-start">
-                    <span className="text-xs font-medium text-slate-600">Accredited Mentors</span>
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center">
-                      <ShieldCheck className="w-4 h-4" />
-                    </div>
-                  </div>
-                  <div className="text-3xl font-extrabold text-slate-900 mt-2.5 tracking-tight font-display">
-                    {stats?.vettedTutors ?? tutors.length}
-                  </div>
-                  <p className="text-[11px] text-slate-400 mt-1 font-medium">Verified tutors</p>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* PANEL 1: SYSTEM OVERVIEW */}
-          {active === "overview" && (
-            <div className="space-y-6">
-              {/* Recent Users Card matching Lynkinbio screenshot */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                  <h2 className="text-base font-bold text-slate-900 tracking-tight">Recent Users</h2>
-                  <button
-                    onClick={() => setActive("users")}
-                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
-                  >
-                    View all
-                  </button>
-                </div>
-
-                {users.length === 0 ? (
-                  <p className="text-xs text-slate-400 py-4 text-center">No users registered yet.</p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {users.slice(0, 4).map((u) => (
-                      <div
-                        key={u.id}
-                        className="p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-slate-300 hover:bg-white transition"
-                      >
-                        <div className="flex items-center gap-3">
-                          <UserAvatar user={u} size="sm" rounded="rounded-full" />
-                          <div>
-                            <p className="text-xs font-bold text-slate-900">{u.displayName}</p>
-                            <p className="text-[11px] text-slate-500 mt-0.5">
-                              {u.phoneNumber || u.email} — <span className="text-emerald-700 font-semibold">{u.role}</span>
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right text-[11px] text-slate-500">
-                          <span>{u._count?.enrollments || 0} courses · {u._count?.certificates || 0} certs</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+          {/* Page Heading (AccountSettingsView renders its own heading) */}
+          {active !== "settings" && (
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                  {currentMeta.title}
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                  {currentMeta.description}
+                </p>
               </div>
 
-              {/* Incidents & Tutor Approvals Row */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-red-500" /> Active Incidents
-                    </h3>
-                    <button
-                      onClick={() => setActive("reports")}
-                      className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
-                    >
-                      Manage all ({reports.length})
-                    </button>
-                  </div>
-
-                  {reports.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4 text-center">No active incident reports.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {reports.slice(0, 3).map((r) => (
-                        <div key={r.id} className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center text-xs hover:border-slate-300 transition">
-                          <div>
-                            <span className="font-mono font-bold text-emerald-700">{r.refCode}</span>
-                            <p className="font-semibold text-slate-900">{r.category}</p>
-                          </div>
-                          <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-mono text-[10px] font-bold">
-                            {r.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                    <h3 className="font-bold text-sm text-slate-900 flex items-center gap-2">
-                      <UserCheck className="w-4 h-4 text-amber-500" /> Pending Mentor Vettings
-                    </h3>
-                    <button
-                      onClick={() => setActive("approvals")}
-                      className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
-                    >
-                      Review all ({pendingTutors.length})
-                    </button>
-                  </div>
-
-                  {pendingTutors.length === 0 ? (
-                    <p className="text-xs text-slate-400 py-4 text-center">No applications awaiting review.</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {pendingTutors.slice(0, 3).map((t) => (
-                        <div key={t.id} className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center text-xs hover:border-slate-300 transition">
-                          <div>
-                            <p className="font-bold text-slate-900">{t.user?.displayName}</p>
-                            <p className="text-[10px] text-slate-500 truncate max-w-[180px]">{t.headline}</p>
-                          </div>
-                          <button
-                            onClick={() => approveTutor(t.id)}
-                            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10px] transition shadow-xs"
-                          >
-                            Approve
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* PANEL 2: USER ROLES & GOVERNANCE */}
-          {active === "users" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[11px] font-bold mb-1">
-                    <Users className="w-3.5 h-3.5" />
-                    <span>Access Control & Managerial Roles</span>
-                  </div>
-                  <h2 className="text-xl font-black text-slate-900">User Management & Permissions</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Promote users, reassign managerial roles, or manage accounts. Administrators hold supervisory oversight and cannot enroll as students.
-                  </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-56">
-                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Search name or email..."
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") loadUsers(userSearch, userRoleFilter);
-                      }}
-                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white"
-                    />
-                  </div>
-                  <button
-                    onClick={() => loadUsers(userSearch, userRoleFilter)}
-                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition shadow-xs"
-                  >
-                    Filter
-                  </button>
-                </div>
-              </div>
-
-              {/* Users Roster List */}
-              {users.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 text-xs">
-                  No accounts found matching your query.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {users.map((u) => {
-                    const roleBadgeColor =
-                      u.role === "ADMIN"
-                        ? "bg-purple-50 text-purple-700 border-purple-200"
-                        : u.role === "CSA_OFFICER"
-                        ? "bg-blue-50 text-blue-700 border-blue-200"
-                        : u.role === "TUTOR"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                        : "bg-slate-100 text-slate-700 border-slate-200";
-
-                    return (
-                      <div
-                        key={u.id}
-                        className="p-4 sm:p-5 rounded-2xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 hover:shadow-xs transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
-                      >
-                        <div className="flex items-center gap-3.5">
-                          <UserAvatar user={u} size="md" rounded="rounded-full" />
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-slate-900 text-sm">{u.displayName}</span>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${roleBadgeColor}`}>
-                                {u.role}
-                              </span>
-                              {u.ageBand && (
-                                <span className="text-[10px] font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                                  {u.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
-                                </span>
-                              )}
-                              {u.receiveDailyTips && (
-                                <span className="text-[10px] font-semibold text-[#0056D2] bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 inline-flex items-center gap-1">
-                                  <Mail className="w-2.5 h-2.5" /> 7AM Tips
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-slate-500 mt-1 flex-wrap">
-                              <span>{u.email}</span>
-                              <span>•</span>
-                              <span>Joined {new Date(u.createdAt).toLocaleDateString()}</span>
-                              <span>•</span>
-                              <span className="font-medium text-emerald-700">
-                                {u._count?.enrollments || 0} Enrollments · {u._count?.certificates || 0} Certs
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Managerial Role Selector & Actions */}
-                        <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] font-semibold text-slate-500">Role:</span>
-                            <select
-                              value={u.role}
-                              onChange={(e) => changeUserRole(u.id, e.target.value)}
-                              className="text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 hover:border-emerald-500 focus:outline-none shadow-2xs"
-                            >
-                              <option value="STUDENT">STUDENT</option>
-                              <option value="TUTOR">TUTOR</option>
-                              <option value="ADMIN">ADMIN</option>
-                              <option value="CSA_OFFICER">CSA OFFICER</option>
-                            </select>
-                          </div>
-
-                          <button
-                            onClick={() => deleteUser(u.id, u.displayName)}
-                            title="Delete user account"
-                            className="p-2 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+              {active === "courses" && (
+                <Link
+                  to="/course-studio"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>New course</span>
+                </Link>
               )}
             </div>
           )}
 
-          {/* PANEL 2B: SUPERADMIN DAILY CYBER SAFETY TIPS EMAIL LOGS */}
-          {active === "daily-tips" && isSuperAdmin && (
-            <div className="space-y-6">
-              {/* Top Schedule & Dispatch Banner */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-7 shadow-xs space-y-5">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-                  <div className="space-y-1">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0056D2] border border-blue-200 text-[11px] font-bold">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Automated Schedule: Every Morning at 07:00 AM GMT ({dailyTipsData.summary?.timezone || "Africa/Accra"})</span>
+          <AnimatePresence mode="wait">
+            {/* PANEL 1: OVERVIEW */}
+            {active === "overview" && (
+              <motion.div key="overview" {...panelMotion} className="space-y-6">
+                {/* 4 Summary Metric Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <MetricCard
+                    label="Registered users"
+                    value={totalUsersCount}
+                    sublabel={`${stats?.students ?? 0} learners`}
+                    icon={Users}
+                    onClick={isSuperAdmin ? () => selectAdminTab("users") : undefined}
+                  />
+                  <MetricCard
+                    label="Incident reports"
+                    value={stats?.reports ?? reports.length}
+                    sublabel="Submitted cases"
+                    icon={AlertTriangle}
+                    onClick={() => selectAdminTab("reports")}
+                  />
+                  <MetricCard
+                    label="Published courses"
+                    value={stats?.courses ?? courses.length}
+                    sublabel={`${stats?.certificates ?? certificates.length} certificates issued`}
+                    icon={BookOpen}
+                    onClick={() => selectAdminTab("courses")}
+                  />
+                  <MetricCard
+                    label="Verified tutors"
+                    value={stats?.vettedTutors ?? tutors.length}
+                    sublabel={
+                      pendingTutors.length > 0
+                        ? `${pendingTutors.length} awaiting review`
+                        : "No pending applications"
+                    }
+                    icon={ShieldCheck}
+                    onClick={() =>
+                      selectAdminTab(pendingTutors.length > 0 ? "approvals" : "tutors")
+                    }
+                  />
+                </div>
+
+                {/* Recent Users (Superadmin) */}
+                {isSuperAdmin && (
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <h2 className="text-sm font-semibold text-slate-900">Recent accounts</h2>
+                      <button
+                        type="button"
+                        onClick={() => selectAdminTab("users")}
+                        className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                      >
+                        View all ({totalUsersCount})
+                      </button>
                     </div>
-                    <h2 className="text-xl font-black text-slate-900">
-                      Daily Cyber Safety Tips — Email Delivery Ledger
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      Audit every daily 7:00 AM cyber safety broadcast and inspect the exact email addresses that received each tip daily.
-                    </p>
-                  </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => loadDailyTipsLogs()}
-                      disabled={dailyTipsLoading}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold transition cursor-pointer"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${dailyTipsLoading ? "animate-spin" : ""}`} />
-                      <span>Refresh</span>
-                    </button>
+                    {users.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-6 text-center">
+                        No registered accounts found.
+                      </p>
+                    ) : (
+                      <div className="divide-y divide-slate-100">
+                        {users.slice(0, 5).map((u) => (
+                          <div
+                            key={u.id}
+                            className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <UserAvatar user={u} size="sm" rounded="rounded-full" />
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-900 truncate">
+                                  {u.displayName}
+                                </p>
+                                <p className="text-[11px] text-slate-500 truncate">{u.email}</p>
+                              </div>
+                            </div>
 
-                    <button
-                      type="button"
-                      onClick={exportDailyTipLogsCsv}
-                      disabled={!dailyTipsData.emailLogs?.length}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold transition disabled:opacity-40 cursor-pointer"
-                    >
-                      <FileDown className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Export CSV</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleDispatchTipsNow}
-                      disabled={dispatchingNow || (dailyTipsData.summary?.activeSubscribers ?? 0) === 0}
-                      title="Immediately send today's cyber safety tip to all opted-in subscribers"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0056D2] hover:bg-[#00419E] text-white text-xs font-bold shadow-xs transition disabled:opacity-50 cursor-pointer"
-                    >
-                      {dispatchingNow ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Sending Mails...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" />
-                          <span>Send Today's Tip Now</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Daily Tips Summary Metrics */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                  <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80">
-                    <p className="text-[11px] font-semibold text-slate-500">Opted-In Subscribers</p>
-                    <p className="text-2xl font-extrabold text-slate-900 mt-1">
-                      {dailyTipsData.summary?.activeSubscribers ?? 0}
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Active 7:00 AM recipients</p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80">
-                    <p className="text-[11px] font-semibold text-emerald-800">Sent Today ({dailyTipsData.summary?.todayDateStr || "Today"})</p>
-                    <p className="text-2xl font-extrabold text-emerald-900 mt-1">
-                      {dailyTipsData.summary?.sentTodayCount ?? 0}
-                    </p>
-                    <p className="text-[11px] text-emerald-700 mt-0.5">
-                      Next auto-run: {dailyTipsData.summary?.nextScheduledRunLabel || "07:00 AM GMT"}
-                    </p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-blue-50/50 border border-blue-200/80">
-                    <p className="text-[11px] font-semibold text-blue-800">Total Daily Mails Sent</p>
-                    <p className="text-2xl font-extrabold text-blue-950 mt-1">
-                      {dailyTipsData.summary?.totalEmailsSent ?? 0}
-                    </p>
-                    <p className="text-[11px] text-blue-700 mt-0.5">Cumulative delivered tips</p>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80">
-                    <p className="text-[11px] font-semibold text-slate-500">Delivery Failures</p>
-                    <p className="text-2xl font-extrabold text-slate-900 mt-1">
-                      {dailyTipsData.summary?.totalFailed ?? 0}
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">SMTP bounce / error count</p>
-                  </div>
-                </div>
-
-                {/* Today's Scheduled Tip Preview */}
-                {dailyTipsData.summary?.todaysTip && (
-                  <div className="p-4 rounded-xl bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-[11px] text-sky-300 font-semibold">
-                        <span>Today's Tip #{dailyTipsData.summary.todaysTip.index}</span>
-                        <span>•</span>
-                        <span>{dailyTipsData.summary.todaysTip.category}</span>
+                            <div className="flex items-center gap-2.5 text-[11px] text-slate-500 shrink-0">
+                              <span>
+                                {u._count?.enrollments || 0} courses ·{" "}
+                                {u._count?.certificates || 0} certs
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 font-medium">
+                                {ROLE_LABELS[u.role] || u.role}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <p className="text-sm font-bold text-white">
-                        {dailyTipsData.summary.todaysTip.title}
-                      </p>
-                      <p className="text-xs text-slate-300 leading-relaxed">
-                        {dailyTipsData.summary.todaysTip.summary}
-                      </p>
-                    </div>
+                    )}
                   </div>
                 )}
 
-                {/* Filter & Sub-View Controls */}
-                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-1">
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
-                    <button
-                      type="button"
-                      onClick={() => setTipLogSubView("daily")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        tipLogSubView === "daily"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      Daily Dispatches ({dailyTipsData.dispatches.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipLogSubView("emails")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        tipLogSubView === "emails"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      All Recipient Emails ({dailyTipsData.emailLogs.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipLogSubView("subscribers")}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        tipLogSubView === "subscribers"
-                          ? "bg-white text-slate-900 shadow-2xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      Subscribed Emails ({dailyTipsData.subscribers.length})
-                    </button>
+                {/* Incidents & Tutor Applications */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <h2 className="text-sm font-semibold text-slate-900">
+                        Recent incident reports
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => selectAdminTab("reports")}
+                        className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                      >
+                        Manage ({reports.length})
+                      </button>
+                    </div>
+
+                    {reports.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-6 text-center">
+                        No incident reports submitted.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {reports.slice(0, 4).map((r) => (
+                          <div
+                            key={r.id}
+                            className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center gap-3 text-xs"
+                          >
+                            <div className="min-w-0">
+                              <span className="font-mono font-semibold text-slate-800">
+                                {r.refCode}
+                              </span>
+                              <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                                {r.category}
+                              </p>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 rounded-md border font-mono text-[10px] font-semibold shrink-0 ${
+                                INCIDENT_STATUS_STYLES[r.status] ||
+                                "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              {r.status.replace("_", " ")}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      type="date"
-                      value={tipLogDate}
-                      onChange={(e) => setTipLogDate(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 focus:outline-none focus:bg-white"
-                      title="Filter logs by dispatch date"
-                    />
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <h2 className="text-sm font-semibold text-slate-900">
+                        Pending tutor applications
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={() => selectAdminTab("approvals")}
+                        className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                      >
+                        Review ({pendingTutors.length})
+                      </button>
+                    </div>
 
-                    <select
-                      value={tipLogStatus}
-                      onChange={(e) => setTipLogStatus(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 focus:outline-none focus:bg-white"
-                    >
-                      <option value="">All Statuses</option>
-                      <option value="SENT">SENT</option>
-                      <option value="FAILED">FAILED</option>
-                    </select>
+                    {pendingTutors.length === 0 ? (
+                      <p className="text-xs text-slate-400 py-6 text-center">
+                        No tutor applications awaiting review.
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {pendingTutors.slice(0, 4).map((t) => (
+                          <div
+                            key={t.id}
+                            className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center gap-3 text-xs"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900 truncate">
+                                {t.user?.displayName}
+                              </p>
+                              <p className="text-[11px] text-slate-500 truncate">{t.headline}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => approveTutor(t.id)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-[11px] transition shrink-0 cursor-pointer"
+                            >
+                              Approve
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
-                    <div className="relative flex-1 sm:w-56">
-                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            {/* PANEL 2: USERS */}
+            {active === "users" && isSuperAdmin && (
+              <motion.div
+                key="users"
+                {...panelMotion}
+                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+              >
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div className="flex flex-wrap items-center gap-2 flex-1">
+                    <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
-                        value={tipLogSearch}
-                        onChange={(e) => setTipLogSearch(e.target.value)}
+                        placeholder="Search by name or email..."
+                        value={userSearch}
+                        onChange={(e) => setUserSearch(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") loadDailyTipsLogs(tipLogSearch);
+                          if (e.key === "Enter") loadUsers(userSearch, userRoleFilter);
                         }}
-                        placeholder="Search recipient email..."
-                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 focus:outline-none focus:bg-white"
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
                       />
                     </div>
 
+                    <select
+                      value={userRoleFilter}
+                      onChange={(e) => setUserRoleFilter(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                    >
+                      <option value="">All roles</option>
+                      <option value="STUDENT">Students</option>
+                      <option value="TUTOR">Tutors</option>
+                      <option value="CSA_OFFICER">CSA Officers</option>
+                      <option value="ADMIN">Admins</option>
+                    </select>
+
                     <button
                       type="button"
-                      onClick={() => loadDailyTipsLogs(tipLogSearch)}
-                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer"
+                      onClick={() => loadUsers(userSearch, userRoleFilter)}
+                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer"
                     >
-                      Filter
+                      Search
                     </button>
 
-                    {(tipLogDate || tipLogStatus || tipLogSearch) && (
+                    {(userSearch || userRoleFilter) && (
                       <button
                         type="button"
                         onClick={() => {
-                          setTipLogDate("");
-                          setTipLogStatus("");
-                          setTipLogSearch("");
-                          loadDailyTipsLogs("");
+                          setUserSearch("");
+                          setUserRoleFilter("");
+                          loadUsers("", "");
                         }}
-                        className="px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800"
+                        className="px-2.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-900 cursor-pointer"
                       >
                         Reset
                       </button>
                     )}
                   </div>
+
+                  <span className="text-xs text-slate-500 font-mono">
+                    {users.length} {users.length === 1 ? "account" : "accounts"}
+                  </span>
                 </div>
 
-                {/* SUB-VIEW 1: GROUPED BY DAY (DAILY DISPATCHES + RECIPIENT EMAILS) */}
-                {tipLogSubView === "daily" && (
-                  <div className="space-y-4 pt-2">
-                    {dailyTipsLoading ? (
-                      <div className="py-10 text-center text-xs text-slate-500">Loading daily email logs...</div>
-                    ) : dailyTipsData.dispatches.length === 0 ? (
-                      <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/50 space-y-2">
-                        <Mail className="w-6 h-6 text-slate-400 mx-auto" />
-                        <p className="text-sm font-bold text-slate-800">No daily tip dispatches recorded yet</p>
-                        <p className="text-xs text-slate-500 max-w-md mx-auto">
-                          Emails are automatically dispatched every morning at 07:00 AM GMT to all opted-in users, or you can click &ldquo;Send Today&apos;s Tip Now&rdquo; above.
-                        </p>
-                      </div>
-                    ) : (
-                      dailyTipsData.dispatches.map((d) => (
-                        <div
-                          key={d.id}
-                          className="rounded-2xl border border-slate-200 bg-slate-50/40 overflow-hidden"
-                        >
-                          <div className="p-4 sm:p-5 bg-white border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-xs font-extrabold text-[#0056D2] bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-md">
-                                  {d.dispatchDate}
-                                </span>
-                                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                                  {d.triggerType === "SCHEDULED_7AM" ? "07:00 AM Auto-Schedule" : "Admin Dispatch"}
-                                </span>
-                                <span className="text-[11px] text-slate-400">
-                                  {new Date(d.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              </div>
-                              <h3 className="text-sm font-bold text-slate-900">
-                                Tip #{d.tipIndex}: {d.tipTitle}
-                              </h3>
-                              <p className="text-xs text-slate-500">{d.subject}</p>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
-                                {d.sentCount} Sent
+                {users.length === 0 ? (
+                  <p className="text-center py-12 text-slate-400 text-xs">
+                    No accounts match your filter.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {users.map((u) => (
+                      <div
+                        key={u.id}
+                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                      >
+                        <div className="flex items-center gap-3.5 min-w-0">
+                          <UserAvatar user={u} size="md" rounded="rounded-full" />
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-slate-900 text-sm">
+                                {u.displayName}
                               </span>
-                              {d.failedCount > 0 && (
-                                <span className="px-2.5 py-1 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold">
-                                  {d.failedCount} Failed
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                                {ROLE_LABELS[u.role] || u.role}
+                              </span>
+                              {u.ageBand && (
+                                <span className="text-[10px] font-medium text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/80">
+                                  {u.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
+                                </span>
+                              )}
+                              {u.receiveDailyTips && (
+                                <span className="text-[10px] font-medium text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/80 inline-flex items-center gap-1">
+                                  <Mail className="w-2.5 h-2.5 text-slate-400" /> Daily tips
                                 </span>
                               )}
                             </div>
-                          </div>
 
-                          {/* Recipient Emails List for this Daily Dispatch */}
-                          {!d.logs || d.logs.length === 0 ? (
-                            <p className="p-4 text-xs text-slate-500">
-                              No matching recipient emails recorded for this dispatch.
-                            </p>
-                          ) : (
-                            <div className="overflow-x-auto">
-                              <table className="w-full text-left border-collapse text-xs">
-                                <thead>
-                                  <tr className="border-b border-slate-200/80 text-[11px] text-slate-500 bg-slate-50">
-                                    <th className="py-2.5 px-4 font-semibold">Recipient Email</th>
-                                    <th className="py-2.5 px-4 font-semibold">Name</th>
-                                    <th className="py-2.5 px-4 font-semibold">Time Sent</th>
-                                    <th className="py-2.5 px-4 font-semibold">Status</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200/60 bg-white">
-                                  {d.logs.map((log) => (
-                                    <tr key={log.id} className="hover:bg-slate-50/70">
-                                      <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
-                                        {log.recipientEmail}
-                                      </td>
-                                      <td className="py-2.5 px-4 text-slate-700">{log.recipientName}</td>
-                                      <td className="py-2.5 px-4 text-slate-500 font-mono text-[11px]">
-                                        {new Date(log.sentAt).toLocaleString()}
-                                      </td>
-                                      <td className="py-2.5 px-4">
-                                        {log.status === "SENT" ? (
-                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                                            <CheckCircle2 className="w-3 h-3" /> SENT
-                                          </span>
-                                        ) : (
-                                          <span
-                                            title={log.errorMessage || "Delivery failed"}
-                                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-bold"
-                                          >
-                                            FAILED
-                                          </span>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                            <div className="flex items-center gap-2.5 text-xs text-slate-500 mt-1 flex-wrap">
+                              <span className="truncate">{u.email}</span>
+                              <span className="text-slate-300">·</span>
+                              <span>Joined {new Date(u.createdAt).toLocaleDateString()}</span>
+                              <span className="text-slate-300">·</span>
+                              <span>
+                                {u._count?.enrollments || 0} enrollments,{" "}
+                                {u._count?.certificates || 0} certs
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-
-                {/* SUB-VIEW 2: FLAT CHRONOLOGICAL RECIPIENT EMAILS LOG */}
-                {tipLogSubView === "emails" && (
-                  <div className="pt-2">
-                    {dailyTipsData.emailLogs.length === 0 ? (
-                      <p className="py-10 text-center text-xs text-slate-400">
-                        No individual email delivery entries match your current filter.
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500">
-                              <th className="py-3 px-4 font-semibold">Date</th>
-                              <th className="py-3 px-4 font-semibold">Recipient Email</th>
-                              <th className="py-3 px-4 font-semibold">Recipient Name</th>
-                              <th className="py-3 px-4 font-semibold">Cyber Safety Tip Sent</th>
-                              <th className="py-3 px-4 font-semibold">Timestamp</th>
-                              <th className="py-3 px-4 font-semibold">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/70 bg-white">
-                            {dailyTipsData.emailLogs.map((log) => (
-                              <tr key={log.id} className="hover:bg-slate-50/70">
-                                <td className="py-2.5 px-4 font-mono font-bold text-[#0056D2]">
-                                  {log.dispatchDate}
-                                </td>
-                                <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
-                                  {log.recipientEmail}
-                                </td>
-                                <td className="py-2.5 px-4 text-slate-700">{log.recipientName}</td>
-                                <td className="py-2.5 px-4 text-slate-800 font-medium">{log.tipTitle}</td>
-                                <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
-                                  {new Date(log.sentAt).toLocaleTimeString([], {
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    second: "2-digit",
-                                  })}
-                                </td>
-                                <td className="py-2.5 px-4">
-                                  <span
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                                      log.status === "SENT"
-                                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                        : "bg-rose-50 text-rose-700 border-rose-200"
-                                    }`}
-                                  >
-                                    {log.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* SUB-VIEW 3: OPTED-IN SUBSCRIBERS ROSTER */}
-                {tipLogSubView === "subscribers" && (
-                  <div className="pt-2">
-                    {dailyTipsData.subscribers.length === 0 ? (
-                      <p className="py-10 text-center text-xs text-slate-400">
-                        No users have opted in to 7:00 AM Daily Cyber Safety Tips yet.
-                      </p>
-                    ) : (
-                      <div className="overflow-x-auto rounded-xl border border-slate-200">
-                        <table className="w-full text-left border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200 text-[11px] text-slate-500">
-                              <th className="py-3 px-4 font-semibold">Subscribed Email</th>
-                              <th className="py-3 px-4 font-semibold">Member Name</th>
-                              <th className="py-3 px-4 font-semibold">Role</th>
-                              <th className="py-3 px-4 font-semibold">Joined</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-200/70 bg-white">
-                            {dailyTipsData.subscribers.map((sub) => (
-                              <tr key={sub.id} className="hover:bg-slate-50/70">
-                                <td className="py-2.5 px-4 font-mono font-semibold text-slate-900">
-                                  {sub.email}
-                                </td>
-                                <td className="py-2.5 px-4 text-slate-800 font-medium">{sub.displayName}</td>
-                                <td className="py-2.5 px-4">
-                                  <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700">
-                                    {sub.role}
-                                  </span>
-                                </td>
-                                <td className="py-2.5 px-4 text-slate-500">
-                                  {new Date(sub.createdAt).toLocaleDateString()}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* PANEL 3: INCIDENT TRIAGE */}
-          {active === "reports" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">Incident Triage Center</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Review reported cybersecurity crimes, inspect SHA-256 evidence hashes, and export case briefs.</p>
-                </div>
-
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 focus:outline-none focus:border-emerald-500"
-                >
-                  <option value="">All Incident Categories</option>
-                  <option value="SEXTORTION">Sextortion</option>
-                  <option value="GROOMING">Grooming</option>
-                  <option value="SCAM">Scams & Fraud</option>
-                  <option value="BULLYING">Cyberbullying</option>
-                  <option value="IMPERSONATION">Impersonation</option>
-                </select>
-              </div>
-
-              {reports.length === 0 ? (
-                <p className="text-slate-400 text-xs text-center py-10">No incident reports found for this filter.</p>
-              ) : (
-                <div className="space-y-4">
-                  {reports.map((r) => (
-                    <div key={r.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3 shadow-2xs">
-                      <div className="flex flex-wrap justify-between items-center gap-2">
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200">
-                            {r.refCode}
-                          </span>
-                          <span className="text-xs font-bold uppercase text-slate-900">{r.category}</span>
-                          <span className="text-[10px] text-slate-400">{new Date(r.createdAt).toLocaleString()}</span>
+                          </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+                          <label className="text-[11px] font-medium text-slate-500">Role</label>
                           <select
-                            value={r.status}
-                            onChange={(e) => updateIncidentStatus(r.id, e.target.value)}
-                            className="text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-emerald-500 shadow-2xs"
+                            value={u.role}
+                            onChange={(e) => changeUserRole(u.id, e.target.value)}
+                            className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 hover:border-slate-300 focus:outline-none focus:border-slate-400 cursor-pointer"
                           >
-                            <option value="SUBMITTED">SUBMITTED</option>
-                            <option value="UNDER_REVIEW">UNDER REVIEW</option>
-                            <option value="ESCALATED">ESCALATED</option>
-                            <option value="RESOLVED">RESOLVED</option>
-                            <option value="DISMISSED">DISMISSED</option>
+                            <option value="STUDENT">Student</option>
+                            <option value="TUTOR">Tutor</option>
+                            <option value="CSA_OFFICER">CSA Officer</option>
+                            <option value="ADMIN">Admin</option>
                           </select>
 
                           <button
-                            onClick={() => exportPdf(r.id, r.refCode)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 font-bold text-xs shadow-xs transition"
+                            type="button"
+                            onClick={() => deleteUser(u.id, u.displayName)}
+                            title="Delete user account"
+                            className="p-2 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-50/70 border border-transparent hover:border-rose-200/80 transition cursor-pointer"
                           >
-                            <FileDown className="w-3.5 h-3.5" /> PDF Brief
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-                      <p className="text-xs text-slate-700 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200">
-                        "{r.narrative}"
-                      </p>
+            {/* PANEL 2B: DAILY CYBER SAFETY TIPS LOG */}
+            {active === "daily-tips" && isSuperAdmin && (
+              <motion.div key="daily-tips" {...panelMotion} className="space-y-6">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Clock className="w-4 h-4 text-slate-400 shrink-0" />
+                      <span>
+                        Scheduled daily at 07:00 GMT (
+                        {dailyTipsData.summary?.timezone || "Africa/Accra"})
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* PANEL 4: TUTOR APPROVALS */}
-          {active === "approvals" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
-              <div className="border-b border-slate-100 pb-4">
-                <h2 className="text-xl font-black text-slate-900">Pending Tutor Vettings</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Accredit verified cyber educators and mentors.</p>
-              </div>
-              {pendingTutors.length === 0 ? (
-                <p className="text-slate-400 text-xs text-center py-10">No pending tutor applications.</p>
-              ) : (
-                <div className="space-y-4">
-                  {pendingTutors.map((t) => (
-                    <div key={t.id} className="p-5 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-3">
-                      <div className="flex justify-between items-start gap-4">
-                        <div>
-                          <h3 className="font-bold text-slate-900">{t.user?.displayName}</h3>
-                          <p className="text-xs font-semibold text-emerald-700">{t.headline}</p>
-                        </div>
-                        <button
-                          onClick={() => approveTutor(t.id)}
-                          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-xs transition"
-                        >
-                          VET & APPROVE
-                        </button>
-                      </div>
-                      <p className="text-xs text-slate-600 bg-white p-3 rounded-xl border border-slate-200">{t.bio}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* PANEL 5: ACCREDITED MENTORS */}
-          {active === "tutors" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
-              <div className="border-b border-slate-100 pb-4">
-                <h2 className="text-xl font-black text-slate-900">Accredited Mentor Roster</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Tutors approved to host 1-on-1 mentorship sessions.</p>
-              </div>
-              {tutors.length === 0 ? (
-                <p className="text-slate-400 text-xs text-center py-10">No accredited tutors found.</p>
-              ) : (
-                <div className="space-y-3">
-                  {tutors.map((t) => (
-                    <div key={t.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex items-center justify-between hover:bg-white transition">
-                      <div>
-                        <p className="font-bold text-slate-900 text-sm">{t.user?.displayName}</p>
-                        <p className="text-xs text-slate-500">{t.headline}</p>
-                      </div>
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
-                        onClick={() => removeTutor(t.id)}
-                        className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-xl border border-red-200 transition"
+                        type="button"
+                        onClick={() => loadDailyTipsLogs()}
+                        disabled={dailyTipsLoading}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer"
                       >
-                        Revoke Vetting
+                        <RefreshCw
+                          className={`w-3.5 h-3.5 ${dailyTipsLoading ? "animate-spin" : ""}`}
+                        />
+                        <span>Refresh</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={exportDailyTipLogsCsv}
+                        disabled={!dailyTipsData.emailLogs?.length}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition disabled:opacity-40 cursor-pointer"
+                      >
+                        <FileDown className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Export CSV</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleDispatchTipsNow}
+                        disabled={
+                          dispatchingNow || (dailyTipsData.summary?.activeSubscribers ?? 0) === 0
+                        }
+                        title="Send today's cyber safety tip to all opted-in subscribers"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition disabled:opacity-40 cursor-pointer"
+                      >
+                        {dispatchingNow ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Sending...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" />
+                            <span>Send today&apos;s tip now</span>
+                          </>
+                        )}
                       </button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                  </div>
 
-          {/* PANEL 6: COURSE MANAGEMENT */}
-          {active === "courses" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
-              <div className="border-b border-slate-100 pb-4 flex justify-between items-center">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">Course Catalog Oversight</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Review published curriculum and lesson modules.</p>
-                </div>
-                <Link
-                  to="/course-studio"
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5" /> New Course
-                </Link>
-              </div>
-              {courses.length === 0 ? (
-                <p className="text-slate-400 text-xs text-center py-10">No courses registered.</p>
-              ) : (
-                <div className="space-y-3">
-                  {courses.map((c) => (
-                    <div key={c.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex items-center justify-between hover:bg-white transition">
-                      <div>
-                        <p className="font-bold text-slate-900 text-sm">{c.title}</p>
-                        <p className="text-xs text-slate-500">{c.category} · {c.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}</p>
+                  {/* Uniform Neutral Summary Metrics */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                      <p className="text-[11px] font-medium text-slate-500">Subscribers</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                        {dailyTipsData.summary?.activeSubscribers ?? 0}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Opted-in accounts</p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                      <p className="text-[11px] font-medium text-slate-500">
+                        Sent today ({dailyTipsData.summary?.todayDateStr || "Today"})
+                      </p>
+                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                        {dailyTipsData.summary?.sentTodayCount ?? 0}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        Next: {dailyTipsData.summary?.nextScheduledRunLabel || "07:00 GMT"}
+                      </p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                      <p className="text-[11px] font-medium text-slate-500">Total delivered</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                        {dailyTipsData.summary?.totalEmailsSent ?? 0}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">All-time emails sent</p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                      <p className="text-[11px] font-medium text-slate-500">Delivery errors</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                        {dailyTipsData.summary?.totalFailed ?? 0}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">Bounce or relay errors</p>
+                    </div>
+                  </div>
+
+                  {/* Calm Light Preview Card for Today's Tip */}
+                  {dailyTipsData.summary?.todaysTip && (
+                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
+                        <span>Today&apos;s tip #{dailyTipsData.summary.todaysTip.index}</span>
+                        <span>·</span>
+                        <span>{dailyTipsData.summary.todaysTip.category}</span>
                       </div>
-                      <div className="flex gap-2">
-                        <Link to={`/courses/${c.slug}`} className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-white transition">
-                          Preview
-                        </Link>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {dailyTipsData.summary.todaysTip.title}
+                      </p>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {dailyTipsData.summary.todaysTip.summary}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sub-view Switcher & Filters */}
+                  <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setTipLogSubView("daily")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          tipLogSubView === "daily"
+                            ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        By day ({dailyTipsData.dispatches.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTipLogSubView("emails")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          tipLogSubView === "emails"
+                            ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        All emails ({dailyTipsData.emailLogs.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTipLogSubView("subscribers")}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                          tipLogSubView === "subscribers"
+                            ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        Subscribers ({dailyTipsData.subscribers.length})
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="date"
+                        value={tipLogDate}
+                        onChange={(e) => setTipLogDate(e.target.value)}
+                        className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-800 focus:outline-none focus:border-slate-400 focus:bg-white"
+                        title="Filter by dispatch date"
+                      />
+
+                      <select
+                        value={tipLogStatus}
+                        onChange={(e) => setTipLogStatus(e.target.value)}
+                        className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400 focus:bg-white"
+                      >
+                        <option value="">All statuses</option>
+                        <option value="SENT">Sent</option>
+                        <option value="FAILED">Failed</option>
+                      </select>
+
+                      <div className="relative flex-1 sm:w-52">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          value={tipLogSearch}
+                          onChange={(e) => setTipLogSearch(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") loadDailyTipsLogs(tipLogSearch);
+                          }}
+                          placeholder="Recipient email..."
+                          className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => loadDailyTipsLogs(tipLogSearch)}
+                        className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer"
+                      >
+                        Filter
+                      </button>
+
+                      {(tipLogDate || tipLogStatus || tipLogSearch) && (
                         <button
-                          onClick={() => removeCourse(c.id)}
-                          className="px-3 py-1.5 rounded-xl border border-red-200 text-xs font-bold text-red-600 hover:bg-red-50 transition"
+                          type="button"
+                          onClick={() => {
+                            setTipLogDate("");
+                            setTipLogStatus("");
+                            setTipLogSearch("");
+                            loadDailyTipsLogs("");
+                          }}
+                          className="px-2.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-900 cursor-pointer"
                         >
-                          Delete
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Sub-view 1: Daily Dispatches */}
+                  {tipLogSubView === "daily" && (
+                    <div className="space-y-4 pt-2">
+                      {dailyTipsLoading ? (
+                        <div className="py-10 text-center text-xs text-slate-500">
+                          Loading email logs...
+                        </div>
+                      ) : dailyTipsData.dispatches.length === 0 ? (
+                        <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/40 space-y-1.5">
+                          <Mail className="w-5 h-5 text-slate-400 mx-auto" />
+                          <p className="text-sm font-semibold text-slate-800">
+                            No daily dispatches recorded yet
+                          </p>
+                          <p className="text-xs text-slate-500 max-w-md mx-auto">
+                            Tips are sent automatically at 07:00 GMT to opted-in accounts, or use
+                            &ldquo;Send today&apos;s tip now&rdquo; above.
+                          </p>
+                        </div>
+                      ) : (
+                        dailyTipsData.dispatches.map((d) => (
+                          <div
+                            key={d.id}
+                            className="rounded-xl border border-slate-200 overflow-hidden bg-white"
+                          >
+                            <div className="p-4 bg-slate-50/60 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono text-xs font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                    {d.dispatchDate}
+                                  </span>
+                                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                                    {d.triggerType === "SCHEDULED_7AM"
+                                      ? "07:00 scheduled"
+                                      : "Manual send"}
+                                  </span>
+                                  <span className="text-[11px] text-slate-400">
+                                    {new Date(d.startedAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                </div>
+                                <h3 className="text-sm font-semibold text-slate-900">
+                                  Tip #{d.tipIndex}: {d.tipTitle}
+                                </h3>
+                                <p className="text-xs text-slate-500">{d.subject}</p>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-700 text-xs font-medium">
+                                  {d.sentCount} sent
+                                </span>
+                                {d.failedCount > 0 && (
+                                  <span className="px-2.5 py-1 rounded-md bg-rose-50/80 border border-rose-200 text-rose-800 text-xs font-medium">
+                                    {d.failedCount} failed
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {!d.logs || d.logs.length === 0 ? (
+                              <p className="p-4 text-xs text-slate-500">
+                                No matching recipient rows for this dispatch.
+                              </p>
+                            ) : (
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-left border-collapse text-xs">
+                                  <thead>
+                                    <tr className="border-b border-slate-200/80 text-[11px] text-slate-500 bg-white">
+                                      <th className="py-2.5 px-4 font-medium">Recipient</th>
+                                      <th className="py-2.5 px-4 font-medium">Name</th>
+                                      <th className="py-2.5 px-4 font-medium">Time sent</th>
+                                      <th className="py-2.5 px-4 font-medium">Status</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 bg-white">
+                                    {d.logs.map((log) => (
+                                      <tr key={log.id} className="hover:bg-slate-50/60">
+                                        <td className="py-2.5 px-4 font-mono text-slate-800">
+                                          {log.recipientEmail}
+                                        </td>
+                                        <td className="py-2.5 px-4 text-slate-600">
+                                          {log.recipientName}
+                                        </td>
+                                        <td className="py-2.5 px-4 text-slate-500 font-mono text-[11px]">
+                                          {new Date(log.sentAt).toLocaleString()}
+                                        </td>
+                                        <td className="py-2.5 px-4">
+                                          {log.status === "SENT" ? (
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50/80 text-emerald-800 border border-emerald-200/80 text-[10px] font-semibold">
+                                              <CheckCircle2 className="w-3 h-3" /> Sent
+                                            </span>
+                                          ) : (
+                                            <span
+                                              title={log.errorMessage || "Delivery failed"}
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50/80 text-rose-800 border border-rose-200/80 text-[10px] font-semibold"
+                                            >
+                                              Failed
+                                            </span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {/* Sub-view 2: All Recipient Emails */}
+                  {tipLogSubView === "emails" && (
+                    <div className="pt-2">
+                      {dailyTipsData.emailLogs.length === 0 ? (
+                        <p className="py-10 text-center text-xs text-slate-400">
+                          No email log entries match your filter.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] text-slate-500">
+                                <th className="py-2.5 px-4 font-medium">Date</th>
+                                <th className="py-2.5 px-4 font-medium">Recipient</th>
+                                <th className="py-2.5 px-4 font-medium">Name</th>
+                                <th className="py-2.5 px-4 font-medium">Tip</th>
+                                <th className="py-2.5 px-4 font-medium">Time</th>
+                                <th className="py-2.5 px-4 font-medium">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {dailyTipsData.emailLogs.map((log) => (
+                                <tr key={log.id} className="hover:bg-slate-50/60">
+                                  <td className="py-2.5 px-4 font-mono text-slate-700">
+                                    {log.dispatchDate}
+                                  </td>
+                                  <td className="py-2.5 px-4 font-mono text-slate-900">
+                                    {log.recipientEmail}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-slate-600">{log.recipientName}</td>
+                                  <td className="py-2.5 px-4 text-slate-800">{log.tipTitle}</td>
+                                  <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
+                                    {new Date(log.sentAt).toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                      second: "2-digit",
+                                    })}
+                                  </td>
+                                  <td className="py-2.5 px-4">
+                                    <span
+                                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                                        log.status === "SENT"
+                                          ? "bg-emerald-50/80 text-emerald-800 border-emerald-200/80"
+                                          : "bg-rose-50/80 text-rose-800 border-rose-200/80"
+                                      }`}
+                                    >
+                                      {log.status === "SENT" ? "Sent" : "Failed"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Sub-view 3: Subscribers */}
+                  {tipLogSubView === "subscribers" && (
+                    <div className="pt-2">
+                      {dailyTipsData.subscribers.length === 0 ? (
+                        <p className="py-10 text-center text-xs text-slate-400">
+                          No accounts are currently subscribed to daily tips.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-200">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] text-slate-500">
+                                <th className="py-2.5 px-4 font-medium">Email</th>
+                                <th className="py-2.5 px-4 font-medium">Name</th>
+                                <th className="py-2.5 px-4 font-medium">Role</th>
+                                <th className="py-2.5 px-4 font-medium">Joined</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 bg-white">
+                              {dailyTipsData.subscribers.map((sub) => (
+                                <tr key={sub.id} className="hover:bg-slate-50/60">
+                                  <td className="py-2.5 px-4 font-mono text-slate-900">
+                                    {sub.email}
+                                  </td>
+                                  <td className="py-2.5 px-4 text-slate-700">{sub.displayName}</td>
+                                  <td className="py-2.5 px-4">
+                                    <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-700">
+                                      {ROLE_LABELS[sub.role] || sub.role}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-4 text-slate-500">
+                                    {new Date(sub.createdAt).toLocaleDateString()}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* PANEL 3: INCIDENT REPORTS */}
+            {active === "reports" && (
+              <motion.div
+                key="reports"
+                {...panelMotion}
+                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+              >
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div className="flex flex-wrap items-center gap-2 flex-1">
+                    <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
+                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search ref code or narrative..."
+                        value={reportSearch}
+                        onChange={(e) => setReportSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                      />
+                    </div>
+
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400 focus:bg-white"
+                    >
+                      <option value="">All categories</option>
+                      <option value="SEXTORTION">Sextortion</option>
+                      <option value="GROOMING">Grooming</option>
+                      <option value="SCAM">Scams &amp; fraud</option>
+                      <option value="BULLYING">Cyberbullying</option>
+                      <option value="IMPERSONATION">Impersonation</option>
+                    </select>
+                  </div>
+
+                  <span className="text-xs text-slate-500 font-mono">
+                    {filteredReports.length} {filteredReports.length === 1 ? "report" : "reports"}
+                  </span>
+                </div>
+
+                {filteredReports.length === 0 ? (
+                  <p className="text-slate-400 text-xs text-center py-12">
+                    No incident reports match this filter.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredReports.map((r) => (
+                      <div
+                        key={r.id}
+                        className="p-5 rounded-xl border border-slate-200/80 bg-slate-50/40 space-y-3"
+                      >
+                        <div className="flex flex-wrap justify-between items-center gap-2">
+                          <div className="flex items-center gap-2.5 flex-wrap">
+                            <span className="font-mono text-xs font-semibold text-slate-800 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                              {r.refCode}
+                            </span>
+                            <span className="text-xs font-semibold text-slate-800">
+                              {r.category}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              {new Date(r.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={r.status}
+                              onChange={(e) => updateIncidentStatus(r.id, e.target.value)}
+                              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-slate-400 cursor-pointer"
+                            >
+                              <option value="SUBMITTED">Submitted</option>
+                              <option value="UNDER_REVIEW">Under review</option>
+                              <option value="ESCALATED">Escalated</option>
+                              <option value="RESOLVED">Resolved</option>
+                              <option value="DISMISSED">Dismissed</option>
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => exportPdf(r.id, r.refCode)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition cursor-pointer"
+                            >
+                              <FileDown className="w-3.5 h-3.5 text-slate-400" />
+                              <span>PDF brief</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-700 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200/80">
+                          {r.narrative}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* PANEL 4: TUTOR APPLICATIONS */}
+            {active === "approvals" && (
+              <motion.div
+                key="approvals"
+                {...panelMotion}
+                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4"
+              >
+                {pendingTutors.length === 0 ? (
+                  <p className="text-slate-400 text-xs text-center py-12">
+                    No pending tutor applications.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {pendingTutors.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-5 rounded-xl border border-slate-200/80 bg-slate-50/40 space-y-3"
+                      >
+                        <div className="flex justify-between items-start gap-4">
+                          <div>
+                            <h3 className="font-semibold text-sm text-slate-900">
+                              {t.user?.displayName}
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">{t.headline}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => approveTutor(t.id)}
+                            className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition shrink-0 cursor-pointer"
+                          >
+                            Approve tutor
+                          </button>
+                        </div>
+                        {t.bio && (
+                          <p className="text-xs text-slate-600 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200/80">
+                            {t.bio}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* PANEL 5: VERIFIED TUTORS */}
+            {active === "tutors" && (
+              <motion.div
+                key="tutors"
+                {...panelMotion}
+                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4"
+              >
+                {tutors.length === 0 ? (
+                  <p className="text-slate-400 text-xs text-center py-12">
+                    No verified tutors yet.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {tutors.map((t) => (
+                      <div
+                        key={t.id}
+                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white hover:border-slate-300 transition"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 text-sm">
+                            {t.user?.displayName}
+                          </p>
+                          <p className="text-xs text-slate-500 truncate">{t.headline}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeTutor(t.id, t.user?.displayName)}
+                          className="text-xs font-medium text-slate-600 hover:text-rose-700 hover:bg-rose-50/70 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 transition shrink-0 cursor-pointer"
+                        >
+                          Revoke verification
                         </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-          {/* PANEL 7: CERTIFICATE REGISTRY */}
-          {active === "certificates" && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-5">
-                <div>
-                  <h2 className="text-xl font-black text-slate-900">Issued Certificates Registry</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Immutable credential ledger for verified graduates.</p>
+            {/* PANEL 6: COURSES */}
+            {active === "courses" && (
+              <motion.div
+                key="courses"
+                {...panelMotion}
+                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Filter courses..."
+                      value={courseSearch}
+                      onChange={(e) => setCourseSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                    />
+                  </div>
+                  <span className="text-xs text-slate-500 font-mono">
+                    {filteredCourses.length} {filteredCourses.length === 1 ? "course" : "courses"}
+                  </span>
                 </div>
-                <div className="relative w-full sm:w-64">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Search cert ref code..."
-                    value={certSearch}
-                    onChange={(e) => setCertSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:bg-white"
-                  />
-                </div>
-              </div>
 
-              {filteredCerts.length === 0 ? (
-                <p className="text-slate-400 text-xs text-center py-10">No certificates match your search query.</p>
-              ) : (
-                <div className="space-y-3">
-                  {filteredCerts.map((c) => (
-                    <div key={c.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 flex items-center justify-between text-xs hover:bg-white transition">
-                      <div>
-                        <p className="font-bold text-slate-900">{c.user?.displayName}</p>
-                        <p className="text-slate-500">{c.course?.title}</p>
+                {filteredCourses.length === 0 ? (
+                  <p className="text-slate-400 text-xs text-center py-12">
+                    No courses match your search.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {filteredCourses.map((c) => (
+                      <div
+                        key={c.id}
+                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white hover:border-slate-300 transition"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-900 text-sm truncate">{c.title}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {c.category} · {c.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Link
+                            to={`/courses/${c.slug}`}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                          >
+                            Preview
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => removeCourse(c.id, c.title)}
+                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:text-rose-700 hover:bg-rose-50/70 hover:border-rose-200 transition cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-mono font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 block">
-                          {c.certRef}
-                        </span>
-                        <span className="text-[10px] text-slate-400">{new Date(c.issuedAt).toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* PANEL 7: CERTIFICATES */}
+            {active === "certificates" && (
+              <motion.div
+                key="certificates"
+                {...panelMotion}
+                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search ref code, learner, or course..."
+                      value={certSearch}
+                      onChange={(e) => setCertSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                    />
+                  </div>
+                  <span className="text-xs text-slate-500 font-mono">
+                    {filteredCerts.length}{" "}
+                    {filteredCerts.length === 1 ? "certificate" : "certificates"}
+                  </span>
                 </div>
-              )}
-            </div>
-          )}
 
-          {/* PANEL 8: ACCOUNT & PROFILE SETTINGS */}
-          {active === "settings" && (
-            <AccountSettingsView />
-          )}
+                {filteredCerts.length === 0 ? (
+                  <p className="text-slate-400 text-xs text-center py-12">
+                    No certificates match your search.
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {filteredCerts.map((c) => (
+                      <div
+                        key={c.id}
+                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-white hover:border-slate-300 transition"
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-900">{c.user?.displayName}</p>
+                          <p className="text-slate-500 mt-0.5">{c.course?.title}</p>
+                        </div>
+                        <div className="sm:text-right flex sm:flex-col items-center sm:items-end justify-between gap-2">
+                          <span className="font-mono font-semibold text-slate-800 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                            {c.certRef}
+                          </span>
+                          <span className="text-[11px] text-slate-400">
+                            {new Date(c.issuedAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
+            {/* PANEL 8: SETTINGS */}
+            {active === "settings" && (
+              <motion.div key="settings" {...panelMotion}>
+                <AccountSettingsView />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       </div>
 
-      {/* IN-APP CONFIRMATION DIALOG */}
+      {/* Confirmation Modal */}
       {confirmDialog && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-2xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-2xs"
           onClick={() => {
             if (!confirmBusy) setConfirmDialog(null);
           }}
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5"
+            className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="w-5 h-5" />
+                <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-4 h-4" />
                 </div>
-                <h3 className="text-base font-bold text-slate-900">
-                  {confirmDialog.title}
-                </h3>
+                <h3 className="text-sm font-semibold text-slate-900">{confirmDialog.title}</h3>
               </div>
               <button
                 type="button"
@@ -1716,16 +1980,14 @@ export default function CsaPortal() {
               </button>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              {confirmDialog.message}
-            </p>
+            <p className="text-xs text-slate-600 leading-relaxed">{confirmDialog.message}</p>
 
-            <div className="flex items-center justify-end gap-2.5 pt-1">
+            <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
                 disabled={confirmBusy}
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -1741,7 +2003,7 @@ export default function CsaPortal() {
                     setConfirmBusy(false);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
               >
                 {confirmBusy ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1758,14 +2020,25 @@ export default function CsaPortal() {
   );
 }
 
-function StatTile({ title, value, icon, color }) {
+function MetricCard({ label, value, sublabel, icon: Icon, onClick }) {
+  const Wrapper = onClick ? "button" : "div";
   return (
-    <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs space-y-1.5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-600">{title}</span>
-        <div className={`p-1.5 rounded-xl ${color}`}>{icon}</div>
+    <Wrapper
+      {...(onClick ? { type: "button", onClick } : {})}
+      className={`w-full text-left bg-white border border-slate-200/90 rounded-2xl p-5 transition ${
+        onClick ? "hover:border-slate-300 cursor-pointer" : ""
+      }`}
+    >
+      <div className="flex justify-between items-start">
+        <span className="text-xs font-medium text-slate-500">{label}</span>
+        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 flex items-center justify-center">
+          <Icon className="w-4 h-4" />
+        </div>
       </div>
-      <p className="text-xl font-black text-slate-900 tracking-tight">{value}</p>
-    </div>
+      <div className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2.5 tracking-tight font-display">
+        {value}
+      </div>
+      <p className="text-[11px] text-slate-400 mt-1">{sublabel}</p>
+    </Wrapper>
   );
 }

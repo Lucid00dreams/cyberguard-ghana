@@ -640,13 +640,14 @@ router.get("/quizzes/:quizId", async (req, res, next) => {
 // Admin/CSA Officer: get global dashboard stats
 router.get("/stats/summary", requireAuth, requireRole("ADMIN", "CSA_OFFICER"), async (req, res, next) => {
   try {
-    const [reportsCount, pendingTutorsCount, tutorsCount, coursesCount, certificatesCount, studentsCount] = await Promise.all([
+    const [reportsCount, pendingTutorsCount, tutorsCount, coursesCount, certificatesCount, studentsCount, usersCount] = await Promise.all([
       prisma.incidentReport.count(),
       prisma.tutorProfile.count({ where: { vetted: false } }),
       prisma.tutorProfile.count({ where: { vetted: true } }),
       prisma.course.count(),
       prisma.certificate.count(),
       prisma.user.count({ where: { role: "STUDENT" } }),
+      prisma.user.count(),
     ]);
 
     res.json({
@@ -656,6 +657,7 @@ router.get("/stats/summary", requireAuth, requireRole("ADMIN", "CSA_OFFICER"), a
       courses: coursesCount,
       certificates: certificatesCount,
       students: studentsCount,
+      users: usersCount,
     });
   } catch (err) {
     next(err);

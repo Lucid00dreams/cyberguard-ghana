@@ -28,14 +28,12 @@ export function resolveAvatarUrl(url) {
  * Deterministic color palette for initial badges based on name
  */
 const AVATAR_PALETTES = [
-  "bg-blue-100 text-[#0056D2] border-blue-200",
-  "bg-emerald-100 text-emerald-800 border-emerald-200",
-  "bg-indigo-100 text-indigo-800 border-indigo-200",
-  "bg-amber-100 text-amber-800 border-amber-200",
-  "bg-rose-100 text-rose-800 border-rose-200",
-  "bg-purple-100 text-purple-800 border-purple-200",
-  "bg-teal-100 text-teal-800 border-teal-200",
-  "bg-sky-100 text-sky-800 border-sky-200",
+  "bg-slate-100 text-slate-700 border-slate-200",
+  "bg-stone-100 text-stone-700 border-stone-200",
+  "bg-zinc-100 text-zinc-700 border-zinc-200",
+  "bg-sky-50 text-sky-800 border-sky-200/80",
+  "bg-slate-50 text-slate-800 border-slate-200",
+  "bg-blue-50/80 text-slate-700 border-blue-200/70",
 ];
 
 function getPalette(name = "") {
