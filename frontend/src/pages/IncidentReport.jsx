@@ -143,11 +143,7 @@ export default function IncidentReport() {
             Report Online Abuse or Fraud
           </h1>
           <p className="text-slate-600 text-xs sm:text-sm mt-1.5 leading-relaxed">
-            Submit an anonymous or follow-up report under Ghana&apos;s Cybersecurity Act, 2020 (Act 1038). Camera and GPS EXIF metadata are stripped locally from uploaded images before submission. Learn more about our{" "}
-            <Link to="/privacy" className="text-[#0056D2] font-semibold hover:underline">
-              Confidentiality Protocol
-            </Link>
-            .
+            Submit an anonymous or follow-up report under Ghana&apos;s Cybersecurity Act, 2020 (Act 1038). Camera and GPS EXIF metadata are stripped locally from uploaded images before submission.
           </p>
         </div>
 

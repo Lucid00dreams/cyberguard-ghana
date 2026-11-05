@@ -609,7 +609,7 @@ export default function Register() {
                   <form onSubmit={handleStep1Submit} className="space-y-3" autoComplete="off">
                     {/* Date of Birth Input */}
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-1.5">
                         <span>Date of Birth</span>
                         {calculatedAge !== null && calculatedAge >= 10 && (
                           <span
@@ -703,23 +703,6 @@ export default function Register() {
                         Get a short 60-second tip every morning at 7:00 AM in your inbox.
                       </span>
                     </label>
-
-                    {/* Legal Compliance Notice */}
-                    <p className="text-[11px] text-slate-500 leading-snug">
-                      By continuing, you agree to CyberGuard Ghana&apos;s{" "}
-                      <Link to="/terms" target="_blank" className="text-[#0056D2] font-semibold hover:underline">
-                        Terms of Service
-                      </Link>
-                      ,{" "}
-                      <Link to="/privacy" target="_blank" className="text-[#0056D2] font-semibold hover:underline">
-                        Privacy Policy
-                      </Link>
-                      , and the{" "}
-                      <Link to="/cop-policy" target="_blank" className="text-[#0056D2] font-semibold hover:underline">
-                        Child Online Protection Charter
-                      </Link>
-                      .
-                    </p>
 
                     {/* Submit Button */}
                     <button

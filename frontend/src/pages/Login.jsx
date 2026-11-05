@@ -207,7 +207,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-3 sm:p-6">
       <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden grid lg:grid-cols-12 lg:h-[560px]">
         {/* Left Hero Side Banner with Background Photo */}
         <div className="lg:col-span-5 bg-[#001E3C] relative overflow-hidden p-6 sm:p-8 text-white flex flex-col justify-between hidden lg:flex h-full">
@@ -240,7 +240,7 @@ export default function Login() {
         </div>
 
         {/* Right Clean Form Section */}
-        <div className="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-center bg-white h-full">
+        <div className="lg:col-span-7 p-4 sm:p-8 flex flex-col justify-center bg-white h-full">
           <div className="max-w-sm w-full mx-auto space-y-5">
             <div className="space-y-1">
               <h1 className="text-2xl font-black text-slate-900 tracking-tight">Sign in to your account</h1>

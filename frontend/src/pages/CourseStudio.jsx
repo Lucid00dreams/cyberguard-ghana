@@ -301,9 +301,9 @@ export default function CourseStudio() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12 space-y-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-12 space-y-6 sm:space-y-8">
       {/* Course Studio Header Banner with Background Image */}
-      <div className="bg-[#001E3C] rounded-3xl p-8 sm:p-10 relative overflow-hidden text-white border border-slate-800 shadow-xl min-h-[180px] flex items-center justify-between flex-col md:flex-row gap-6">
+      <div className="bg-[#001E3C] rounded-2xl sm:rounded-3xl p-5 sm:p-10 relative overflow-hidden text-white border border-slate-800 shadow-xl min-h-[160px] sm:min-h-[180px] flex items-center justify-between flex-col md:flex-row gap-6">
         {/* Background Image Layer */}
         <div
           className="absolute inset-0 bg-cover bg-center opacity-85 scale-105"
@@ -344,7 +344,7 @@ export default function CourseStudio() {
 
       <div className="grid gap-8 lg:grid-cols-[320px_1fr] items-start">
         <aside className="space-y-6 lg:sticky lg:top-20">
-          <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs">
+          <section className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-xs">
             <div className="flex items-center justify-between gap-3 mb-5">
               <div>
                 <h2 className="text-lg font-black text-slate-900 tracking-tight">Your Courses</h2>
@@ -406,7 +406,7 @@ export default function CourseStudio() {
             </button>
           </section>
 
-          <section className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-xs">
+          <section className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-xs">
             <h2 className="text-base font-black text-slate-900 mb-4">Create a New Course</h2>
             <form onSubmit={handleCreateCourse} className="space-y-3.5 text-xs">
               <label className="block">
@@ -517,7 +517,7 @@ export default function CourseStudio() {
 
               <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
                 <div className="space-y-6">
-                  <section className="rounded-3xl border border-line bg-paper p-6">
+                  <section className="rounded-2xl sm:rounded-3xl border border-line bg-paper p-4 sm:p-6">
                     <div className="flex items-center justify-between gap-4 mb-5">
                       <div>
                         <h3 className="text-lg font-semibold">Modules</h3>
@@ -590,7 +590,7 @@ export default function CourseStudio() {
                     )}
                   </section>
 
-                  <section className="rounded-3xl border border-line bg-paper p-6">
+                  <section className="rounded-2xl sm:rounded-3xl border border-line bg-paper p-4 sm:p-6">
                     <h3 className="text-lg font-semibold mb-4">Add a lesson</h3>
                     <form onSubmit={addLesson} className="space-y-4">
                       <label className="block">
@@ -788,7 +788,7 @@ export default function CourseStudio() {
                 </div>
 
                 <div className="space-y-6">
-                  <section className="rounded-3xl border border-line bg-paper p-6">
+                  <section className="rounded-2xl sm:rounded-3xl border border-line bg-paper p-4 sm:p-6">
                     <h3 className="text-lg font-semibold mb-4">Add a module</h3>
                     <form onSubmit={addModule} className="space-y-4">
                       <label className="block">
