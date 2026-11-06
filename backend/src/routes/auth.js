@@ -600,7 +600,8 @@ router.post("/google", async (req, res, next) => {
     const verifiedEmail = tokenData.email.trim().toLowerCase();
     const displayName = tokenData.name || verifiedEmail.split("@")[0];
     const avatarUrl = tokenData.picture || null;
-    const optedInDailyTips = Boolean(req.body.receiveDailyTips);
+    // Google OAuth users automatically get daily cyber tips without checking any box
+    const optedInDailyTips = true;
 
     let user = await prisma.user.findUnique({ where: { email: verifiedEmail } });
     let isNewUser = false;
@@ -628,7 +629,8 @@ router.post("/google", async (req, res, next) => {
             role: "STUDENT",
             ageBand: effectiveAgeBand,
             dateOfBirth: birthDate,
-            receiveDailyTips: optedInDailyTips,
+            receiveDailyTips: true,
+            receiveDailyPushTips: true,
           },
         });
 
@@ -651,8 +653,11 @@ router.post("/google", async (req, res, next) => {
       if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes("googleusercontent.com") || user.avatarUrl.includes("default-user"))) {
         googleUpdates.avatarUrl = avatarUrl;
       }
-      if (optedInDailyTips && !user.receiveDailyTips) {
+      if (!user.receiveDailyTips) {
         googleUpdates.receiveDailyTips = true;
+      }
+      if (!user.receiveDailyPushTips) {
+        googleUpdates.receiveDailyPushTips = true;
       }
       if (Object.keys(googleUpdates).length > 0) {
         user = await prisma.user.update({

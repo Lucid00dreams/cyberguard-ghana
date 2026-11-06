@@ -7,6 +7,8 @@ const {
   getZonedTimeParts,
   getTipForDate,
   verifyUnsubscribeToken,
+  getDailyTipsScheduleConfig,
+  setDailyTipsScheduleConfig,
   dispatchDailySafetyTips,
 } = require("../services/dailyTipsService");
 
@@ -90,13 +92,74 @@ router.post("/cron", async (req, res, next) => {
 });
 
 /**
+ * Superadmin (ADMIN): Get current daily tips schedule settings
+ */
+router.get("/schedule", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
+  try {
+    const schedule = await getDailyTipsScheduleConfig();
+    const { dateStr, hour, minute } = getZonedTimeParts(new Date());
+    const todayScheduledDispatch = await prisma.dailyTipDispatch.findFirst({
+      where: { dispatchDate: dateStr, triggerType: { startsWith: "SCHEDULED" } },
+    });
+
+    const isBeforeScheduledTimeToday =
+      hour < schedule.hour || (hour === schedule.hour && minute < schedule.minute);
+
+    const nextScheduledRunLabel = !schedule.enabled
+      ? "Disabled by Admin"
+      : isBeforeScheduledTimeToday && !todayScheduledDispatch
+      ? `Today at ${schedule.displayTime} GMT`
+      : `Tomorrow at ${schedule.displayTime} GMT`;
+
+    res.json({
+      ...schedule,
+      dispatchedToday: Boolean(todayScheduledDispatch),
+      nextScheduledRunLabel,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
+ * Superadmin (ADMIN): Update daily tips dispatch schedule
+ */
+router.patch("/schedule", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
+  try {
+    const { hour, minute, enabled } = req.body;
+    if (hour === undefined || isNaN(parseInt(hour, 10)) || parseInt(hour, 10) < 0 || parseInt(hour, 10) > 23) {
+      return res.status(400).json({ error: "Hour must be an integer between 0 and 23." });
+    }
+    const cleanMinute = minute !== undefined ? parseInt(minute, 10) : 0;
+    if (isNaN(cleanMinute) || cleanMinute < 0 || cleanMinute > 59) {
+      return res.status(400).json({ error: "Minute must be an integer between 0 and 59." });
+    }
+
+    const updated = await setDailyTipsScheduleConfig({
+      hour: parseInt(hour, 10),
+      minute: cleanMinute,
+      enabled: enabled !== undefined ? Boolean(enabled) : true,
+    });
+
+    res.json({
+      success: true,
+      message: `Daily tips dispatch schedule updated to ${updated.displayTime} GMT (${updated.enabled ? "Active" : "Paused"}).`,
+      schedule: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/**
  * Superadmin (ADMIN): Fetch comprehensive Daily Tips email logs, daily dispatches, and active subscribers
  */
 router.get("/logs", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
   try {
     const { date, search, status } = req.query;
-    const { dateStr: todayDateStr, hour } = getZonedTimeParts(new Date());
+    const { dateStr: todayDateStr, hour, minute } = getZonedTimeParts(new Date());
     const todaysTip = getTipForDate(new Date());
+    const schedule = await getDailyTipsScheduleConfig();
 
     const logWhere = {
       ...(date ? { dispatchDate: String(date).trim() } : {}),
@@ -140,7 +203,7 @@ router.get("/logs", requireAuth, requireRole("ADMIN"), async (req, res, next) =>
       prisma.dailyTipEmailLog.count({ where: { status: "FAILED" } }),
       prisma.dailyTipEmailLog.count({ where: { dispatchDate: todayDateStr, status: "SENT" } }),
       prisma.dailyTipDispatch.findFirst({
-        where: { dispatchDate: todayDateStr, triggerType: "SCHEDULED_7AM" },
+        where: { dispatchDate: todayDateStr, triggerType: { startsWith: "SCHEDULED" } },
       }),
       prisma.dailyTipDispatch.findMany({
         where: date ? { dispatchDate: String(date).trim() } : {},
@@ -173,7 +236,14 @@ router.get("/logs", requireAuth, requireRole("ADMIN"), async (req, res, next) =>
       }),
     ]);
 
-    const nextRunDayLabel = hour < 7 && !todayScheduledDispatch ? "Today at 07:00 AM GMT" : "Tomorrow at 07:00 AM GMT";
+    const isBeforeScheduledTimeToday =
+      hour < schedule.hour || (hour === schedule.hour && minute < schedule.minute);
+
+    const nextRunDayLabel = !schedule.enabled
+      ? "Disabled by Admin"
+      : isBeforeScheduledTimeToday && !todayScheduledDispatch
+      ? `Today at ${schedule.displayTime} GMT`
+      : `Tomorrow at ${schedule.displayTime} GMT`;
 
     res.json({
       summary: {
@@ -185,6 +255,7 @@ router.get("/logs", requireAuth, requireRole("ADMIN"), async (req, res, next) =>
         dispatchedToday: Boolean(todayScheduledDispatch),
         nextScheduledRunLabel: nextRunDayLabel,
         timezone: DEFAULT_TIMEZONE,
+        schedule,
         todaysTip: {
           index: todaysTip.index,
           category: todaysTip.category,

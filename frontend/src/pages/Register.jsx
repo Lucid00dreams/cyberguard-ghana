@@ -229,7 +229,7 @@ export default function Register() {
         email: payload.email,
         displayName: payload.name || payload.email.split("@")[0],
         avatarUrl: payload.picture || null,
-        receiveDailyTips: receiveDailyTipsRef.current,
+        receiveDailyTips: true,
         dateOfBirth: dateOfBirth || undefined,
       });
 

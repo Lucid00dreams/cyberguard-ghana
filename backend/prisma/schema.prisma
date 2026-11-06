@@ -461,3 +461,11 @@ model PushSubscription {
   @@index([userId])
   @@map("push_subscriptions")
 }
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
+}

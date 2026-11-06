@@ -10,6 +10,7 @@ import {
   BookOpen,
   AlertTriangle,
   CheckCircle2,
+  Check,
   Clock,
   Search,
   Lock,
@@ -60,7 +61,7 @@ const TAB_META = {
   "daily-tips": {
     label: "Daily tips log",
     title: "Daily cyber safety tips log",
-    description: "Delivery history and subscriber list for the 07:00 GMT email broadcast.",
+    description: "Delivery history, subscriber list, and automated broadcast schedule.",
   },
   reports: {
     label: "Incident reports",
@@ -157,6 +158,15 @@ export default function CsaPortal() {
   const [tipLogStatus, setTipLogStatus] = useState("");
   const [tipLogSearch, setTipLogSearch] = useState("");
   const [tipLogSubView, setTipLogSubView] = useState("daily");
+  const [scheduleConfig, setScheduleConfig] = useState({
+    hour: 7,
+    minute: 0,
+    timeString: "07:00",
+    displayTime: "7:00 AM",
+    enabled: true,
+  });
+  const [scheduleInputTime, setScheduleInputTime] = useState("07:00");
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -335,10 +345,70 @@ export default function CsaPortal() {
         emailLogs: res.data?.emailLogs || [],
         subscribers: res.data?.subscribers || [],
       });
+      if (res.data?.summary?.schedule) {
+        setScheduleConfig(res.data.summary.schedule);
+        setScheduleInputTime(res.data.summary.schedule.timeString || "07:00");
+      }
     } catch {
       setDailyTipsData({ summary: null, dispatches: [], emailLogs: [], subscribers: [] });
     } finally {
       setDailyTipsLoading(false);
+    }
+  }
+
+  async function handleSaveSchedule(e) {
+    if (e) e.preventDefault();
+    if (scheduleSaving) return;
+
+    const [hStr, mStr] = (scheduleInputTime || "07:00").split(":");
+    const hour = parseInt(hStr, 10);
+    const minute = parseInt(mStr, 10);
+
+    if (isNaN(hour) || hour < 0 || hour > 23 || isNaN(minute) || minute < 0 || minute > 59) {
+      notify("Please select a valid time (HH:MM).", "error");
+      return;
+    }
+
+    setScheduleSaving(true);
+    try {
+      const res = await api.patch("/daily-tips/schedule", {
+        hour,
+        minute,
+        enabled: scheduleConfig.enabled,
+      });
+      notify(res.data?.message || "Notification schedule updated.");
+      if (res.data?.schedule) {
+        setScheduleConfig(res.data.schedule);
+        setScheduleInputTime(res.data.schedule.timeString);
+      }
+      await loadDailyTipsLogs();
+    } catch (err) {
+      notify(err.response?.data?.error || "Failed to update notification schedule.", "error");
+    } finally {
+      setScheduleSaving(false);
+    }
+  }
+
+  async function handleToggleScheduleStatus() {
+    if (scheduleSaving) return;
+    setScheduleSaving(true);
+    try {
+      const newEnabled = !scheduleConfig.enabled;
+      const res = await api.patch("/daily-tips/schedule", {
+        hour: scheduleConfig.hour,
+        minute: scheduleConfig.minute,
+        enabled: newEnabled,
+      });
+      notify(`Automated tips dispatch ${newEnabled ? "activated" : "paused"}.`);
+      if (res.data?.schedule) {
+        setScheduleConfig(res.data.schedule);
+        setScheduleInputTime(res.data.schedule.timeString);
+      }
+      await loadDailyTipsLogs();
+    } catch (err) {
+      notify(err.response?.data?.error || "Failed to toggle schedule.", "error");
+    } finally {
+      setScheduleSaving(false);
     }
   }
 
@@ -1225,7 +1295,7 @@ export default function CsaPortal() {
                     <div className="flex items-center gap-2 text-xs text-slate-600">
                       <Clock className="w-4 h-4 text-slate-400 shrink-0" />
                       <span>
-                        Scheduled daily at 07:00 GMT (
+                        Automatic daily broadcast: {dailyTipsData.summary?.nextScheduledRunLabel || `${scheduleConfig.displayTime} GMT`} (
                         {dailyTipsData.summary?.timezone || "Africa/Accra"})
                       </span>
                     </div>
@@ -1275,6 +1345,72 @@ export default function CsaPortal() {
                         )}
                       </button>
                     </div>
+                  </div>
+
+                  {/* ADMIN SCHEDULE CONTROL PANEL */}
+                  <div className="p-4 rounded-xl bg-slate-50/90 border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-blue-600 shrink-0" />
+                        <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Broadcast Schedule Controls
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                            scheduleConfig.enabled
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-amber-50 text-amber-700 border border-amber-200"
+                          }`}
+                        >
+                          {scheduleConfig.enabled ? "Active" : "Paused"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        Dispatches automated tips (email &amp; web push) daily at{" "}
+                        <strong className="text-slate-800">{scheduleConfig.displayTime} GMT</strong> (Africa/Accra timezone).
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleSaveSchedule} className="flex flex-wrap items-center gap-2.5">
+                      <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
+                        <label htmlFor="tips-schedule-time" className="text-[11px] font-medium text-slate-500">
+                          Time (GMT):
+                        </label>
+                        <input
+                          id="tips-schedule-time"
+                          type="time"
+                          value={scheduleInputTime}
+                          onChange={(e) => setScheduleInputTime(e.target.value)}
+                          className="text-xs font-semibold text-slate-900 bg-transparent focus:outline-none"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={scheduleSaving || scheduleInputTime === scheduleConfig.timeString}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition disabled:opacity-40 cursor-pointer shadow-2xs"
+                      >
+                        {scheduleSaving ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Check className="w-3.5 h-3.5" />
+                        )}
+                        <span>Set Time</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleToggleScheduleStatus}
+                        disabled={scheduleSaving}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
+                          scheduleConfig.enabled
+                            ? "border-amber-200 bg-amber-50/70 hover:bg-amber-100/70 text-amber-800"
+                            : "border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-800"
+                        }`}
+                      >
+                        {scheduleConfig.enabled ? "Pause Auto-Send" : "Resume Auto-Send"}
+                      </button>
+                    </form>
                   </div>
 
                   {/* Uniform Neutral Summary Metrics */}

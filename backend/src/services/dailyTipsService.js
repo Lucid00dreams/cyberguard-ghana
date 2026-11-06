@@ -412,12 +412,90 @@ let isDispatching = false;
 let schedulerInterval = null;
 
 /**
+ * Fetch the admin-configured daily notification schedule.
+ * Defaults to 07:00 AM (Africa/Accra GMT).
+ */
+async function getDailyTipsScheduleConfig() {
+  try {
+    const settings = await prisma.systemSetting.findMany({
+      where: {
+        key: {
+          in: ["daily_tips_hour", "daily_tips_minute", "daily_tips_enabled"],
+        },
+      },
+    });
+
+    const map = {};
+    for (const s of settings) {
+      map[s.key] = s.value;
+    }
+
+    const hour = map.daily_tips_hour !== undefined ? parseInt(map.daily_tips_hour, 10) : 7;
+    const minute = map.daily_tips_minute !== undefined ? parseInt(map.daily_tips_minute, 10) : 0;
+    const enabled = map.daily_tips_enabled !== undefined ? map.daily_tips_enabled === "true" : true;
+
+    const timeString = `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    const period = hour >= 12 ? "PM" : "AM";
+    const displayHour = hour % 12 || 12;
+    const displayTime = `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+
+    return {
+      hour: isNaN(hour) ? 7 : hour,
+      minute: isNaN(minute) ? 0 : minute,
+      timeString,
+      displayTime,
+      enabled,
+      timezone: DEFAULT_TIMEZONE,
+    };
+  } catch (err) {
+    console.error("[DailyTips] Error fetching schedule config:", err.message);
+    return {
+      hour: 7,
+      minute: 0,
+      timeString: "07:00",
+      displayTime: "7:00 AM",
+      enabled: true,
+      timezone: DEFAULT_TIMEZONE,
+    };
+  }
+}
+
+/**
+ * Admin: Update the daily notification dispatch time and status.
+ */
+async function setDailyTipsScheduleConfig({ hour, minute = 0, enabled = true }) {
+  const cleanHour = Math.max(0, Math.min(23, parseInt(hour, 10) || 0));
+  const cleanMinute = Math.max(0, Math.min(59, parseInt(minute, 10) || 0));
+  const cleanEnabled = Boolean(enabled);
+
+  await prisma.$transaction([
+    prisma.systemSetting.upsert({
+      where: { key: "daily_tips_hour" },
+      update: { value: String(cleanHour) },
+      create: { key: "daily_tips_hour", value: String(cleanHour) },
+    }),
+    prisma.systemSetting.upsert({
+      where: { key: "daily_tips_minute" },
+      update: { value: String(cleanMinute) },
+      create: { key: "daily_tips_minute", value: String(cleanMinute) },
+    }),
+    prisma.systemSetting.upsert({
+      where: { key: "daily_tips_enabled" },
+      update: { value: String(cleanEnabled) },
+      create: { key: "daily_tips_enabled", value: String(cleanEnabled) },
+    }),
+  ]);
+
+  return getDailyTipsScheduleConfig();
+}
+
+/**
  * Dispatch the daily cyber safety tip to all opted-in users and log every email sent.
  * @param {Object} options
- * @param {"SCHEDULED_7AM" | "MANUAL_ADMIN"} options.triggerType
+ * @param {"SCHEDULED_DAILY" | "SCHEDULED_7AM" | "MANUAL_ADMIN"} options.triggerType
  * @param {boolean} options.force - When true, allows manual admin re-dispatch even if today's scheduled run already completed.
  */
-async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_7AM", force = false } = {}) {
+async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_DAILY", force = false } = {}) {
   if (isDispatching) {
     return { skipped: true, reason: "A daily tips dispatch is already in progress." };
   }
@@ -427,17 +505,18 @@ async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_7AM", force = 
     const now = new Date();
     const { dateStr, formattedDate } = getZonedTimeParts(now);
 
-    if (!force && triggerType === "SCHEDULED_7AM") {
+    const isScheduledRun = triggerType.startsWith("SCHEDULED");
+    if (!force && isScheduledRun) {
       const existingScheduled = await prisma.dailyTipDispatch.findFirst({
         where: {
           dispatchDate: dateStr,
-          triggerType: "SCHEDULED_7AM",
+          triggerType: { in: ["SCHEDULED_DAILY", "SCHEDULED_7AM"] },
         },
       });
       if (existingScheduled) {
         return {
           skipped: true,
-          reason: `Scheduled 7:00 AM dispatch already completed for ${dateStr}.`,
+          reason: `Daily scheduled dispatch already completed for ${dateStr}.`,
           dispatchId: existingScheduled.id,
         };
       }
@@ -474,13 +553,13 @@ async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_7AM", force = 
       if (!sub.email) continue;
 
       // Extra per-recipient idempotency guard for scheduled runs
-      if (!force && triggerType === "SCHEDULED_7AM") {
+      if (!force && isScheduledRun) {
         const alreadySentToday = await prisma.dailyTipEmailLog.findFirst({
           where: {
             dispatchDate: dateStr,
             recipientEmail: sub.email,
             status: "SENT",
-            dispatch: { triggerType: "SCHEDULED_7AM" },
+            dispatch: { triggerType: { startsWith: "SCHEDULED" } },
           },
         });
         if (alreadySentToday) continue;
@@ -542,7 +621,7 @@ async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_7AM", force = 
 
       if (pushSubscriptions.length > 0) {
         const pushPayload = {
-          title: `🛡️ 7:00 AM Daily Cyber Tip #${tip.index}`,
+          title: `🛡️ Daily Cyber Tip #${tip.index}`,
           body: `${tip.title}: ${tip.summary}`,
           icon: "/logo-mark.svg",
           badge: "/favicon.svg",
@@ -586,29 +665,44 @@ async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_7AM", force = 
 
 /**
  * Starts the automated background scheduler that dispatches cyber safety tips
- * every morning at 07:00 AM (Africa/Accra GMT).
- * Includes a 07:00–07:59 AM catch-up window in case the server restarts right at 7:00 AM.
+ * dynamically at the admin-configured time (Africa/Accra GMT).
+ * Includes a catch-up window in case the server was down right at the exact minute.
  */
 function startDailyTipsScheduler() {
   if (schedulerInterval) return;
 
-  console.log(`[DailyTips] Automated 07:00 AM daily cyber safety tip scheduler active (Timezone: ${DEFAULT_TIMEZONE})`);
+  console.log(`[DailyTips] Automated daily cyber safety tip scheduler active (Timezone: ${DEFAULT_TIMEZONE})`);
 
   const checkAndRun = async () => {
     try {
-      const { hour } = getZonedTimeParts(new Date());
-      if (hour === 7) {
-        await dispatchDailySafetyTips({ triggerType: "SCHEDULED_7AM", force: false });
+      const config = await getDailyTipsScheduleConfig();
+      if (!config.enabled) return;
+
+      const now = new Date();
+      const { hour, minute, dateStr } = getZonedTimeParts(now);
+
+      // Check if current hour and minute match or if we are past the scheduled minute in this hour
+      if (hour === config.hour && minute >= config.minute) {
+        const existingScheduled = await prisma.dailyTipDispatch.findFirst({
+          where: {
+            dispatchDate: dateStr,
+            triggerType: { startsWith: "SCHEDULED" },
+          },
+        });
+        if (!existingScheduled) {
+          console.log(`[DailyTips] Triggering scheduled tips dispatch at ${config.displayTime} GMT for ${dateStr}`);
+          await dispatchDailySafetyTips({ triggerType: "SCHEDULED_DAILY", force: false });
+        }
       }
     } catch (err) {
       console.error("[DailyTips] Scheduler check error:", err.message);
     }
   };
 
-  // Run an initial check shortly after boot (catches 07:00-07:59 AM cold starts)
+  // Run an initial check shortly after boot
   setTimeout(checkAndRun, 5000);
 
-  // Check every 30 seconds so 07:00 AM triggers right on the minute
+  // Check every 30 seconds so it triggers promptly
   schedulerInterval = setInterval(checkAndRun, 30 * 1000);
   if (typeof schedulerInterval.unref === "function") {
     schedulerInterval.unref();
@@ -622,6 +716,8 @@ module.exports = {
   getTipForDate,
   createUnsubscribeToken,
   verifyUnsubscribeToken,
+  getDailyTipsScheduleConfig,
+  setDailyTipsScheduleConfig,
   dispatchDailySafetyTips,
   startDailyTipsScheduler,
 };
