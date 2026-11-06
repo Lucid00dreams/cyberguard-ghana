@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -13,13 +13,15 @@ import {
   Lock,
   ArrowRight,
   RotateCcw,
+  Headphones,
 } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import CyberSpinner from "../components/CyberSpinner";
 import FormattedLessonContent from "../components/FormattedLessonContent";
 import CertificateModal from "../components/CertificateModal";
-import CourseraVideoPlayer from "../components/CourseraVideoPlayer";
+import CourseAudioNarrator from "../components/CourseAudioNarrator";
+import WordInspectorPopup from "../components/WordInspectorPopup";
 
 function getInitials(name) {
   if (!name) return "CG";
@@ -49,6 +51,14 @@ export default function CourseDetail() {
   const [testPassword, setTestPassword] = useState("");
   const [phishInput, setPhishInput] = useState("");
   const [phishAnalysis, setPhishAnalysis] = useState(null);
+
+  // Read-Aloud & Word Inspector State
+  const [activeSentenceIndex, setActiveSentenceIndex] = useState(0);
+  const lessonContainerRef = useRef(null);
+
+  useEffect(() => {
+    setActiveSentenceIndex(0);
+  }, [activeLesson?.id]);
 
   function handleLessonUpdated(updatedLesson) {
     setActiveLesson(updatedLesson);
@@ -343,16 +353,10 @@ export default function CourseDetail() {
                                 isActive ? "text-amber-200" : "text-amber-600"
                               }`}
                             />
-                          ) : lesson.type === "VIDEO" ? (
-                            <PlayCircle
+                          ) : (
+                            <Headphones
                               className={`w-4 h-4 shrink-0 ${
                                 isActive ? "text-white" : "text-[#0056D2]"
-                              }`}
-                            />
-                          ) : (
-                            <FileText
-                              className={`w-4 h-4 shrink-0 ${
-                                isActive ? "text-white" : "text-emerald-600"
                               }`}
                             />
                           )}
@@ -504,14 +508,30 @@ export default function CourseDetail() {
                       </h2>
                     </div>
 
-                    {activeLesson.type === "VIDEO" ? (
-                      <CourseraVideoPlayer
-                        lesson={activeLesson}
-                        onLessonUpdate={handleLessonUpdated}
-                      />
-                    ) : (
-                      <FormattedLessonContent content={activeLesson.textContent} />
-                    )}
+                    {/* Read-Aloud Narration Player with Synchronized Teleprompter Captions */}
+                    <CourseAudioNarrator
+                      title={activeLesson.title}
+                      content={activeLesson.textContent}
+                      activeSentenceIndex={activeSentenceIndex}
+                      onSentenceChange={setActiveSentenceIndex}
+                    />
+
+                    {/* Lesson Material Container with Word Inspector Floating Definition Popover */}
+                    <div ref={lessonContainerRef} className="relative pt-2">
+                      <div className="flex items-center justify-between text-xs text-slate-500 pb-3 border-b border-slate-100">
+                        <span className="font-semibold text-slate-800">Lesson Material</span>
+                        <span className="italic text-[11px] text-slate-400">
+                          Highlight any word for instant dictionary &amp; cybersecurity meaning
+                        </span>
+                      </div>
+
+                      <div className="pt-4">
+                        <FormattedLessonContent content={activeLesson.textContent} />
+                      </div>
+
+                      {/* Interactive Floating Definition Box */}
+                      <WordInspectorPopup containerRef={lessonContainerRef} />
+                    </div>
 
                     {/* Hands-on Lesson Mini-Check */}
                     {activeLesson.title?.toLowerCase().includes("momo") ||
