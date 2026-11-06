@@ -13,6 +13,7 @@ const uploadRoutes = require("./routes/uploads");
 const cybergodRoutes = require("./routes/cybergod");
 const cyberchatRoutes = require("./routes/cyberchat");
 const dailyTipsRoutes = require("./routes/dailyTips");
+const pushNotificationsRoutes = require("./routes/pushNotifications");
 const { startDailyTipsScheduler } = require("./services/dailyTipsService");
 const { setClientOriginHint } = require("./utils/mailer");
 const errorHandler = require("./middleware/errorHandler");
@@ -133,6 +134,7 @@ app.use("/api/cybergod/chat", aiLimiter);
 app.use("/api/cybergod", cybergodRoutes);
 app.use("/api/cyberchat", cyberchatRoutes);
 app.use("/api/daily-tips", dailyTipsRoutes);
+app.use("/api/push", pushNotificationsRoutes);
 
 app.use((req, res) => res.status(404).json({ error: "Route not found." }));
 app.use(errorHandler);

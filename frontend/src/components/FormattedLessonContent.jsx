@@ -15,7 +15,7 @@ export default function FormattedLessonContent({ content, compact = false }) {
     if (!text) return "";
     // Clean up remaining asterisks or hashes
     const cleanText = text.replace(/^[#*•\s]+/, "");
-    
+
     // Split by bold pattern **...**
     const parts = cleanText.split(/(\*\*.*?\*\*)/g);
     return parts.map((part, idx) => {

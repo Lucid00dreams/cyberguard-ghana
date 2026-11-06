@@ -20,11 +20,20 @@ import {
   Eye,
   EyeOff,
   Calendar,
+  Smartphone,
+  Send,
 } from "lucide-react";
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
 import DeleteAccountSection from "./DeleteAccountSection";
+import {
+  isPushSupported,
+  fetchPushStatus,
+  subscribeToPushNotifications,
+  unsubscribeFromPushNotifications,
+  sendTestPushNotification,
+} from "../utils/pushManager";
 
 const ROLE_LABELS = {
   ADMIN: "Administrator",
@@ -70,6 +79,18 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
   const [receiveDailyTips, setReceiveDailyTips] = useState(Boolean(user?.receiveDailyTips));
   const [savingTipsPref, setSavingTipsPref] = useState(false);
 
+  // Web Push Notifications state
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushStatus, setPushStatus] = useState({
+    receiveDailyPushTips: false,
+    activeDevicesCount: 0,
+    isThisDeviceSubscribed: false,
+    permission: "default",
+  });
+  const [loadingPush, setLoadingPush] = useState(false);
+  const [testingPush, setTestingPush] = useState(false);
+  const [pushFeedback, setPushFeedback] = useState(null);
+
   useEffect(() => {
     if (user) {
       setDisplayName(user.displayName || "");
@@ -81,8 +102,71 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
       );
       setAvatarUrl(user.avatarUrl || "");
       setReceiveDailyTips(Boolean(user.receiveDailyTips));
+
+      const supported = isPushSupported();
+      setPushSupported(supported);
+      if (supported) {
+        fetchPushStatus().then(setPushStatus).catch(() => {});
+      }
     }
   }, [user]);
+
+  async function handleTogglePush() {
+    setLoadingPush(true);
+    setPushFeedback(null);
+    try {
+      if (pushStatus.isThisDeviceSubscribed) {
+        await unsubscribeFromPushNotifications();
+        const updated = await fetchPushStatus();
+        setPushStatus(updated);
+        setPushFeedback({
+          type: "success",
+          text: "Push notifications turned off on this device.",
+        });
+      } else {
+        await subscribeToPushNotifications();
+        const updated = await fetchPushStatus();
+        setPushStatus(updated);
+        setPushFeedback({
+          type: "success",
+          text: "Device subscribed! You'll receive instant 7:00 AM tips on your lock screen.",
+        });
+      }
+      setTimeout(() => setPushFeedback(null), 4000);
+    } catch (err) {
+      setPushFeedback({
+        type: "error",
+        text: err.message || "Could not update notification permission.",
+      });
+      setTimeout(() => setPushFeedback(null), 6000);
+    } finally {
+      setLoadingPush(false);
+    }
+  }
+
+  async function handleTestPush() {
+    setTestingPush(true);
+    setPushFeedback(null);
+    try {
+      const res = await sendTestPushNotification();
+      setPushFeedback({
+        type: "success",
+        text: res.message || "Test notification sent! Check your screen.",
+      });
+      setTimeout(() => setPushFeedback(null), 4000);
+    } catch (err) {
+      setPushFeedback({
+        type: "error",
+        text:
+          err.response?.data?.error ||
+          err.message ||
+          "Could not send test push. Please enable notifications first.",
+      });
+      setTimeout(() => setPushFeedback(null), 5000);
+    } finally {
+      setTestingPush(false);
+    }
+  }
 
   async function handleToggleDailyTips(e) {
     const checked = e.target.checked;
@@ -768,7 +852,7 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
           </div>
         </motion.form>
 
-        {/* CARD 4: EMAIL & PRIVACY */}
+        {/* CARD 4: NOTIFICATIONS & DATA PRIVACY */}
         <motion.div
           {...cardMotion(0.12)}
           className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between space-y-5"
@@ -777,18 +861,98 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
             <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
               <Bell className="w-4 h-4 text-[#0056D2]" />
               <h3 className="font-bold text-sm sm:text-base text-slate-900 tracking-tight">
-                Email & Data Privacy
+                Alerts & Security Briefings
               </h3>
             </div>
 
             <div className="space-y-3">
+              {/* Web Push Notification Section */}
+              <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200/80 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Smartphone className="w-4 h-4 text-[#0056D2] shrink-0" />
+                      <span className="text-xs font-bold text-slate-900">
+                        7:00 AM Mobile Web Push Tips
+                      </span>
+                      {pushStatus.isThisDeviceSubscribed && (
+                        <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Instant lock-screen alert delivered directly to your phone or computer every morning. 100% free with zero airtime or SMS charges.
+                    </p>
+                  </div>
+                </div>
+
+                {pushFeedback && (
+                  <div
+                    className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                      pushFeedback.type === "success"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-rose-100 text-rose-800"
+                    }`}
+                  >
+                    {pushFeedback.type === "success" ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                    )}
+                    <span>{pushFeedback.text}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTogglePush}
+                    disabled={loadingPush}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      pushStatus.isThisDeviceSubscribed
+                        ? "bg-slate-200 hover:bg-slate-300 text-slate-700"
+                        : "bg-[#0056D2] hover:bg-[#00419E] text-white shadow-xs"
+                    }`}
+                  >
+                    {loadingPush ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Smartphone className="w-3.5 h-3.5" />
+                    )}
+                    <span>
+                      {pushStatus.isThisDeviceSubscribed
+                        ? "Disable on this device"
+                        : "Enable on this device"}
+                    </span>
+                  </button>
+
+                  {pushStatus.isThisDeviceSubscribed && (
+                    <button
+                      type="button"
+                      onClick={handleTestPush}
+                      disabled={testingPush}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-blue-300 bg-white hover:bg-blue-50 text-[#0056D2] text-xs font-semibold transition cursor-pointer"
+                    >
+                      {testingPush ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>Send test buzz</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Email Daily Tip Toggle */}
               <label className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200/80 cursor-pointer hover:bg-slate-100/70 transition">
                 <div className="pr-4">
                   <p className="text-xs font-bold text-slate-900">
-                    Daily 7:00 AM GMT Cyber Safety Tips
+                    Daily 7:00 AM Email Briefing
                   </p>
                   <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                    Receive one short, practical cyber defense tip in your email inbox every morning at 7:00 AM GMT. Saved directly to your account.
+                    Receive one short, practical cyber defense tip in your email inbox every morning at 7:00 AM GMT.
                   </p>
                 </div>
                 <input

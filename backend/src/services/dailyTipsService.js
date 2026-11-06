@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/prisma");
 const { sendDailySafetyTipEmail, resolveClientOrigin } = require("../utils/mailer");
+const { broadcastPushNotification } = require("../utils/pushNotifier");
 
 const DEFAULT_TIMEZONE = process.env.DAILY_TIPS_TIMEZONE || "Africa/Accra";
 
@@ -529,6 +530,31 @@ async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_7AM", force = 
           },
         });
       }
+    }
+
+    // Simultaneously broadcast Web Push Notifications to all opted-in devices
+    try {
+      const pushSubscriptions = await prisma.pushSubscription.findMany({
+        where: {
+          user: { receiveDailyPushTips: true },
+        },
+      });
+
+      if (pushSubscriptions.length > 0) {
+        const pushPayload = {
+          title: `🛡️ 7:00 AM Daily Cyber Tip #${tip.index}`,
+          body: `${tip.title}: ${tip.summary}`,
+          icon: "/logo-mark.svg",
+          badge: "/favicon.svg",
+          url: tip.courseSlug ? `/courses/${tip.courseSlug}` : "/courses",
+        };
+        const pushStats = await broadcastPushNotification(pushSubscriptions, pushPayload);
+        console.log(
+          `[DailyTips] Web push broadcast complete: ${pushStats.sent} sent, ${pushStats.failed} failed (${pushStats.expired} pruned) across ${pushSubscriptions.length} devices.`
+        );
+      }
+    } catch (pushErr) {
+      console.error("[DailyTips] Web push broadcast error:", pushErr.message);
     }
 
     const updatedDispatch = await prisma.dailyTipDispatch.update({

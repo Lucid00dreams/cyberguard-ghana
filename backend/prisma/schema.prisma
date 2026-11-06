@@ -21,6 +21,7 @@ model User {
   phoneNumber       String?
   bio               String?
   receiveDailyTips  Boolean       @default(false)
+  receiveDailyPushTips Boolean    @default(true)
   tokenVersion      Int           @default(0)
   bookingsAsStudent Booking[]     @relation("StudentBookings")
   certificates      Certificate[]
@@ -39,6 +40,7 @@ model User {
   blocksInitiated   ChatBlock[]   @relation("BlocksInitiated")
   blocksReceived    ChatBlock[]   @relation("BlocksReceived")
   dailyTipLogs      DailyTipEmailLog[]
+  pushSubscriptions PushSubscription[]
 
   @@map("users")
 }
@@ -443,4 +445,19 @@ model EmailVerification {
 
   @@index([email])
   @@map("email_verifications")
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
 }
