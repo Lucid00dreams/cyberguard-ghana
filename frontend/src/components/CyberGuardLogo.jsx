@@ -42,7 +42,7 @@ export default function CyberGuardLogo({
     <svg
       width={currentSize.iconSize}
       height={currentSize.iconSize}
-      viewBox="0 0 64 64"
+      viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={`shrink-0 drop-shadow-sm transition-transform duration-200 ${
@@ -50,141 +50,81 @@ export default function CyberGuardLogo({
       }`}
       aria-label="CyberGuard Ghana Shield Emblem"
     >
-      <defs>
-        {/* Shield Background Gradient */}
-        <linearGradient id={`${uid}-shieldBg`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#0056D2" />
-          <stop offset="45%" stopColor="#0A3C96" />
-          <stop offset="100%" stopColor="#051736" />
-        </linearGradient>
+      {/* Circuit Traces Network (Slate Blue) */}
+      <g stroke="#A4B8D1" strokeWidth="3.0" strokeLinecap="round" strokeLinejoin="round">
+        {/* Left 5 Traces */}
+        <path d="M 20.2 22.5 L 33.0 22.5 L 40.0 29.5" />
+        <path d="M 13.0 35.1 L 23.2 35.1 L 30.7 38.5" />
+        <path d="M 9.9 49.8 L 30.7 49.8" />
+        <path d="M 13.0 64.8 L 23.2 64.8 L 30.7 61.4" />
+        <path d="M 20.2 77.3 L 33.0 77.3 L 40.0 70.3" />
 
-        {/* Shield Outer Rim Gradient */}
-        <linearGradient id={`${uid}-border`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#38BDF8" />
-          <stop offset="45%" stopColor="#F59E0B" />
-          <stop offset="100%" stopColor="#0284C7" />
-        </linearGradient>
+        {/* Right 5 Traces */}
+        <path d="M 79.8 22.5 L 67.0 22.5 L 60.0 29.5" />
+        <path d="M 87.0 35.1 L 76.8 35.1 L 69.3 38.5" />
+        <path d="M 90.1 49.8 L 69.3 49.8" />
+        <path d="M 87.0 64.8 L 76.8 64.8 L 69.3 61.4" />
+        <path d="M 79.8 77.3 L 67.0 77.3 L 60.0 70.3" />
+      </g>
 
-        {/* Golden Medallion Gradient */}
-        <linearGradient id={`${uid}-gold`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FDE047" />
-          <stop offset="50%" stopColor="#F59E0B" />
-          <stop offset="100%" stopColor="#D97706" />
-        </linearGradient>
+      {/* Circuit Ring Nodes (Hollow / Transparent Core) */}
+      <g stroke="#A4B8D1" strokeWidth="2.4" fill="none">
+        {/* Left Nodes */}
+        <circle cx="20.2" cy="22.5" r="2.6" />
+        <circle cx="13.0" cy="35.1" r="2.6" />
+        <circle cx="9.9" cy="49.8" r="2.6" />
+        <circle cx="13.0" cy="64.8" r="2.6" />
+        <circle cx="20.2" cy="77.3" r="2.6" />
 
-        {/* Gold Ring Gradient */}
-        <linearGradient id={`${uid}-goldRing`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#FEF08A" />
-          <stop offset="100%" stopColor="#B45309" />
-        </linearGradient>
+        {/* Right Nodes */}
+        <circle cx="79.8" cy="22.5" r="2.6" />
+        <circle cx="87.0" cy="35.1" r="2.6" />
+        <circle cx="90.1" cy="49.8" r="2.6" />
+        <circle cx="87.0" cy="64.8" r="2.6" />
+        <circle cx="79.8" cy="77.3" r="2.6" />
+      </g>
 
-        {/* Subtle Glow Filter */}
-        <filter id={`${uid}-glow`} x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur stdDeviation="1.5" result="blur" />
-          <feComposite in="SourceGraphic" in2="blur" operator="over" />
-        </filter>
-      </defs>
-
-      {/* Outer Protective Shield Silhouette */}
+      {/* Outer Protective Shield (Cyan Rim) */}
       <path
-        d="M 32 4 C 44 4, 55 9, 58 14 C 58 35, 50 51, 32 61 C 14 51, 6 35, 6 14 C 9 9, 20 4, 32 4 Z"
-        fill={`url(#${uid}-shieldBg)`}
-        stroke={`url(#${uid}-border)`}
-        strokeWidth="2.5"
-        strokeLinejoin="round"
+        d="M 50.0 23.7
+           C 55.0 25.5, 63.0 29.5, 69.3 31.2
+           L 69.3 54.5
+           C 69.3 65.0, 58.0 72.0, 50.0 74.5
+           C 42.0 72.0, 30.7 65.0, 30.7 54.5
+           L 30.7 31.2
+           C 37.0 29.5, 45.0 25.5, 50.0 23.7 Z"
+        fill="#00C4FF"
       />
 
-      {/* Inner Bevel Contour Face */}
+      {/* Shield Core Body (Dark Slate Navy) */}
       <path
-        d="M 32 8.5 C 41 8.5, 50 12.5, 52.5 16.5 C 52.5 33, 46 46, 32 54.5 C 18 46, 11.5 33, 11.5 16.5 C 14 12.5, 23 8.5, 32 8.5 Z"
-        fill="#081426"
-        stroke="#1E3A8A"
-        strokeWidth="1"
-        opacity="0.92"
+        d="M 50.0 27.2
+           C 54.0 28.6, 60.5 32.0, 65.9 33.8
+           L 65.9 53.0
+           C 65.9 61.8, 56.5 67.5, 50.0 70.8
+           C 43.5 67.5, 34.1 61.8, 34.1 53.0
+           L 34.1 33.8
+           C 39.5 32.0, 46.0 28.6, 50.0 27.2 Z"
+        fill="#2F364B"
       />
 
-      {/* High-Tech Circuit Traces */}
-      {/* Left Circuit Network */}
+      {/* Padlock Shackle */}
       <path
-        d="M 16 23 L 23 23 L 27 28"
-        stroke="#38BDF8"
-        strokeWidth="1.2"
+        d="M 44.5 48.0 L 44.5 41.5 C 44.5 37.0, 55.5 37.0, 55.5 41.5 L 55.5 48.0"
+        stroke="#00C4FF"
+        strokeWidth="2.8"
         strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.85"
-      />
-      <circle cx="16" cy="23" r="1.6" fill="#38BDF8" />
-
-      {/* Right Circuit Network */}
-      <path
-        d="M 48 23 L 41 23 L 37 28"
-        stroke="#38BDF8"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.85"
-      />
-      <circle cx="48" cy="23" r="1.6" fill="#38BDF8" />
-
-      {/* Center Top Keyline */}
-      <line
-        x1="32"
-        y1="9"
-        x2="32"
-        y2="18"
-        stroke="#F59E0B"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        opacity="0.9"
-      />
-
-      {/* Ghana Golden Core Medallion / Radar Ring */}
-      <circle
-        cx="32"
-        cy="33"
-        r="14"
-        fill={`url(#${uid}-gold)`}
-        stroke={`url(#${uid}-goldRing)`}
-        strokeWidth="1.8"
-        filter={`url(#${uid}-glow)`}
-      />
-
-      {/* Concentric Tech Dash Track */}
-      <circle
-        cx="32"
-        cy="33"
-        r="11.8"
         fill="none"
-        stroke="#FEF08A"
-        strokeWidth="0.75"
-        strokeDasharray="2 1.5"
-        opacity="0.75"
       />
 
-      {/* Iconic Ghanaian Black Star (Black Star of Africa) */}
-      <polygon
-        points="
-          32,23.5
-          34.3,29.8
-          41.0,30.0
-          35.7,34.2
-          37.6,40.7
-          32,36.8
-          26.4,40.7
-          28.3,34.2
-          23.0,30.0
-          29.7,29.8
-        "
-        fill="#050811"
-        stroke="#1E293B"
-        strokeWidth="0.5"
+      {/* Padlock Body (Hexagon-bottomed Cyan Block) */}
+      <path
+        d="M 40.5 47.0 L 59.5 47.0 L 59.5 55.5 L 50.0 60.5 L 40.5 55.5 Z"
+        fill="#00C4FF"
       />
 
-      {/* Gold Star Core Spark */}
-      <circle cx="32" cy="33" r="1.1" fill="#FDE047" opacity="0.9" />
-
-      {/* Active Green Defensive Terminal */}
-      <circle cx="32" cy="51" r="1.8" fill="#10B981" />
+      {/* Padlock Keyhole Slot (Dark Slate Navy) */}
+      <rect x="48.4" y="51.5" width="3.2" height="4.2" rx="1.0" fill="#2F364B" />
     </svg>
   );
 
