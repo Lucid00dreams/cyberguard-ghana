@@ -984,7 +984,7 @@ export default function CsaPortal() {
                 )}
 
                 {/* Incidents & Tutor Applications */}
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0 w-full">
                   <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4">
                     <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                       <h2 className="text-sm font-semibold text-slate-900">

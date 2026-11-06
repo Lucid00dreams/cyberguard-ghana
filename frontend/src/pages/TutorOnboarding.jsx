@@ -105,7 +105,7 @@ export default function TutorOnboarding() {
             onSubmit={handleSubmit}
             className="space-y-6 bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-xs"
           >
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 min-w-0 w-full">
               <label className="block space-y-1.5">
                 <span className="text-xs font-bold text-slate-700">Professional Headline *</span>
                 <input

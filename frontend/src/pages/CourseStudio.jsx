@@ -302,9 +302,7 @@ export default function CourseStudio() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-12 space-y-6 sm:space-y-8">
-      {/* Course Studio Header Banner with Background Image */}
       <div className="bg-[#001E3C] rounded-2xl sm:rounded-3xl p-5 sm:p-10 relative overflow-hidden text-white border border-slate-800 shadow-xl min-h-[160px] sm:min-h-[180px] flex items-center justify-between flex-col md:flex-row gap-6">
-        {/* Background Image Layer */}
         <div
           className="absolute inset-0 bg-cover bg-center opacity-85 scale-105"
           style={{ backgroundImage: "url('/hero-courses.png?v=1038')" }}
@@ -312,7 +310,9 @@ export default function CourseStudio() {
         <div className="absolute inset-0 bg-gradient-to-r from-slate-950/95 via-slate-950/85 to-slate-950/50" />
 
         <div className="relative z-10 max-w-2xl space-y-2">
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-md">Build and Publish Your Course</h1>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight drop-shadow-md">
+            Build and Publish Your Course
+          </h1>
           <p className="text-slate-200 text-sm leading-relaxed font-medium">
             Create interactive modules, upload high-res cover photos, add text, video, and quiz lessons for Ghanaian youth learners.
           </p>
@@ -337,13 +337,17 @@ export default function CourseStudio() {
       </div>
 
       {status && (
-        <div className={`mb-8 rounded-xl p-4 text-sm ${status.type === "success" ? "bg-green-50 text-green-700" : "bg-alert/10 text-alert"}`}>
+        <div
+          className={`rounded-xl p-4 text-sm ${
+            status.type === "success" ? "bg-green-50 text-green-700" : "bg-alert/10 text-alert"
+          }`}
+        >
           {status.message}
         </div>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-[320px_1fr] items-start">
-        <aside className="space-y-6 lg:sticky lg:top-20">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[320px_1fr] items-start min-w-0 w-full">
+        <aside className="space-y-6 lg:sticky lg:top-20 min-w-0">
           <section className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-4 sm:p-6 shadow-xs">
             <div className="flex items-center justify-between gap-3 mb-5">
               <div>
@@ -377,9 +381,13 @@ export default function CourseStudio() {
                         <p className="text-[11px] text-slate-500 mt-0.5">{course.slug}</p>
                       </div>
                       {course.isPublished ? (
-                        <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Live</span>
+                        <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                          Live
+                        </span>
                       ) : (
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">Draft</span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                          Draft
+                        </span>
                       )}
                     </div>
                   </button>
@@ -483,7 +491,7 @@ export default function CourseStudio() {
           </section>
         </aside>
 
-        <section className="space-y-6">
+        <section className="space-y-6 min-w-0">
           {!selectedCourse ? (
             <div className="rounded-3xl border border-line bg-paper p-10 text-center">
               <p className="font-semibold">Select a course from the left panel to start building it.</p>
@@ -501,7 +509,11 @@ export default function CourseStudio() {
                     <p className="text-sm text-mist mt-2">{selectedCourse.description}</p>
                   </div>
                   <div className="flex flex-wrap gap-3">
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${selectedCourse.isPublished ? "bg-green-50 text-green-700" : "bg-mist/10 text-mist"}`}>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        selectedCourse.isPublished ? "bg-green-50 text-green-700" : "bg-mist/10 text-mist"
+                      }`}
+                    >
                       {selectedCourse.isPublished ? "Published" : "Draft"}
                     </span>
                     <button
@@ -515,8 +527,8 @@ export default function CourseStudio() {
                 </div>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-                <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px] min-w-0 w-full">
+                <div className="space-y-6 min-w-0">
                   <section className="rounded-2xl sm:rounded-3xl border border-line bg-paper p-4 sm:p-6">
                     <div className="flex items-center justify-between gap-4 mb-5">
                       <div>
@@ -533,7 +545,9 @@ export default function CourseStudio() {
                           <div key={module.id} className="rounded-3xl border border-line bg-slate-50 p-4">
                             <div className="flex items-center justify-between gap-3 mb-3">
                               <div>
-                                <p className="font-semibold">{module.order}. {module.title}</p>
+                                <p className="font-semibold">
+                                  {module.order}. {module.title}
+                                </p>
                                 <p className="text-xs text-mist">{module.lessons.length} lesson(s)</p>
                               </div>
                             </div>
@@ -542,11 +556,15 @@ export default function CourseStudio() {
                                 <div key={lesson.id} className="rounded-2xl border border-line bg-paper p-4">
                                   <div className="flex items-center justify-between gap-3">
                                     <div>
-                                      <p className="font-semibold">{lesson.order}. {lesson.title}</p>
+                                      <p className="font-semibold">
+                                        {lesson.order}. {lesson.title}
+                                      </p>
                                       <p className="text-xs text-mist">{lesson.type} lesson</p>
                                     </div>
                                     {lesson.type === "QUIZ" && lesson.quiz ? (
-                                      <span className="rounded-full bg-guard/10 px-2 py-1 text-[11px] font-semibold text-guard">Quiz ready</span>
+                                      <span className="rounded-full bg-guard/10 px-2 py-1 text-[11px] font-semibold text-guard">
+                                        Quiz ready
+                                      </span>
                                     ) : lesson.type === "QUIZ" ? (
                                       <button
                                         onClick={() => createQuiz(lesson.id)}
@@ -569,7 +587,9 @@ export default function CourseStudio() {
                                         <ul className="space-y-3">
                                           {lesson.quiz.questions.map((question) => (
                                             <li key={question.id} className="rounded-2xl border border-line bg-paper p-3">
-                                              <p className="text-sm font-semibold">{question.order}. {question.prompt}</p>
+                                              <p className="text-sm font-semibold">
+                                                {question.order}. {question.prompt}
+                                              </p>
                                             </li>
                                           ))}
                                         </ul>
@@ -615,7 +635,7 @@ export default function CourseStudio() {
                           placeholder="E.g. Recognizing scam messages"
                         />
                       </label>
-                      <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 min-w-0 w-full">
                         <label className="block">
                           <span className="text-sm font-semibold">Type</span>
                           <select
@@ -651,7 +671,6 @@ export default function CourseStudio() {
                             </span>
                           </div>
 
-                          {/* Direct Video File Upload Box */}
                           <div className="rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 p-5 text-center bg-white dark:bg-slate-800/60 hover:border-blue-500 transition">
                             <input
                               ref={videoInputRef}
@@ -689,7 +708,6 @@ export default function CourseStudio() {
                               </div>
                             </label>
 
-                            {/* Auto-transcribe checkbox */}
                             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex items-center justify-center gap-2">
                               <input
                                 type="checkbox"
@@ -698,13 +716,15 @@ export default function CourseStudio() {
                                 onChange={(e) => setAutoTranscribe(e.target.checked)}
                                 className="w-4 h-4 rounded text-blue-600 cursor-pointer accent-blue-600"
                               />
-                              <label htmlFor="autoTranscribe" className="text-xs text-slate-600 dark:text-slate-300 cursor-pointer flex items-center gap-1 font-medium">
+                              <label
+                                htmlFor="autoTranscribe"
+                                className="text-xs text-slate-600 dark:text-slate-300 cursor-pointer flex items-center gap-1 font-medium"
+                              >
                                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                                 Auto-transcribe audio with synchronized timestamps
                               </label>
                             </div>
 
-                            {/* Progress indicator */}
                             {videoUploading && (
                               <div className="mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 text-xs font-semibold flex items-center justify-center gap-2 animate-pulse">
                                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -713,7 +733,6 @@ export default function CourseStudio() {
                             )}
                           </div>
 
-                          {/* Fallback Manual Video URL Input */}
                           <div>
                             <div className="flex items-center justify-between mb-1">
                               <label className="text-xs font-semibold text-slate-600 dark:text-slate-400">
@@ -739,7 +758,6 @@ export default function CourseStudio() {
                             />
                           </div>
 
-                          {/* Preview Generated Transcript Segments */}
                           {previewSegments.length > 0 && (
                             <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 space-y-2">
                               <div className="flex items-center justify-between">
@@ -787,7 +805,7 @@ export default function CourseStudio() {
                   </section>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-6 min-w-0">
                   <section className="rounded-2xl sm:rounded-3xl border border-line bg-paper p-4 sm:p-6">
                     <h3 className="text-lg font-semibold mb-4">Add a module</h3>
                     <form onSubmit={addModule} className="space-y-4">
@@ -825,7 +843,6 @@ export default function CourseStudio() {
         </section>
       </div>
 
-      {/* Account Settings Modal Drawer */}
       {showSettingsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs overflow-y-auto">
           <div className="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl overflow-hidden my-8 max-h-[90vh] overflow-y-auto">

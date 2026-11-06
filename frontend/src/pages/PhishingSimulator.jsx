@@ -548,7 +548,7 @@ export default function PhishingSimulator() {
           </div>
 
           {/* Interactive Feature Teaser List */}
-          <div className="grid sm:grid-cols-3 gap-3 text-left">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left min-w-0 w-full">
             <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
               <Zap className="w-5 h-5 text-amber-500" />
               <h4 className="font-extrabold text-slate-900 text-xs">10 Real Scenarios</h4>
@@ -720,7 +720,7 @@ export default function PhishingSimulator() {
                   <HelpCircle className="w-5 h-5 text-[#0056D2]" /> What is the correct response protocol?
                 </h3>
 
-                <div className="grid gap-3">
+                <div className="grid grid-cols-1 gap-3 min-w-0 w-full">
                   {scenario.options.map((opt) => {
                     const isSelected = selectedOption === opt.id;
                     const isAnswered = selectedOption !== null;

@@ -140,7 +140,7 @@ export default function Courses() {
             </p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 min-w-0 w-full">
             {filteredCourses.map((c, idx) => {
               const moduleCount = c._count?.modules ?? 0;
               const enrollmentCount = c._count?.enrollments ?? 0;

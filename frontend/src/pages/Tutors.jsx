@@ -107,7 +107,7 @@ export default function Tutors() {
             </p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 min-w-0 w-full">
             {tutors.map((t, idx) => (
               <motion.div
                 key={t.id}

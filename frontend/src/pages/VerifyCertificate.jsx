@@ -110,7 +110,7 @@ export default function VerifyCertificate() {
             </div>
 
             {/* Certificate Details */}
-            <div className="grid sm:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-200 min-w-0 w-full">
               <div>
                 <span className="text-xs font-medium text-slate-500 block mb-0.5">
                   Recipient Name

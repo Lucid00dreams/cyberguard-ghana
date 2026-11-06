@@ -473,8 +473,8 @@ export default function Register() {
       };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-3 sm:p-6 py-6 sm:py-10">
-      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden grid lg:grid-cols-12 lg:min-h-[640px]">
+    <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-3 sm:p-6 py-6 sm:py-10 w-full max-w-full overflow-x-hidden">
+      <div className="w-full max-w-4xl bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12 lg:min-h-[640px] min-w-0">
         {/* Left Hero Side Banner */}
         <div className="lg:col-span-5 bg-[#001E3C] relative overflow-hidden p-6 sm:p-8 text-white flex flex-col justify-between hidden lg:flex h-full">
           <div
@@ -609,7 +609,7 @@ export default function Register() {
                   <form onSubmit={handleStep1Submit} className="space-y-3" autoComplete="off">
                     {/* Date of Birth Input */}
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-1.5">
+                      <div className="text-xs font-bold text-slate-700 flex flex-wrap items-center justify-between gap-1.5">
                         <span>Date of Birth</span>
                         {calculatedAge !== null && calculatedAge >= 10 && (
                           <span
@@ -622,7 +622,7 @@ export default function Register() {
                             Age {calculatedAge} • {calculatedAge <= 18 ? "Junior Track (12–18)" : "Young Adult Track (19+)"}
                           </span>
                         )}
-                      </label>
+                      </div>
                       <div className="relative">
                         <Calendar className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input

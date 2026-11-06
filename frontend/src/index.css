@@ -24,14 +24,18 @@
   }
 
   html {
-    scroll-behavior: smooth;
+    width: 100%;
     max-width: 100%;
-    overflow-x: clip;
+    min-width: 0;
+    scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   body {
+    width: 100%;
     max-width: 100%;
-    overflow-x: clip;
+    min-width: 0;
+    overflow-x: hidden;
     position: relative;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -43,6 +47,25 @@
     transition-duration: 200ms;
     background-color: var(--color-surface);
     color: var(--color-ink);
+  }
+
+  #root {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  img, svg, video, canvas, audio, iframe, embed, object {
+    max-width: 100%;
+  }
+
+  p, span, h1, h2, h3, h4, h5, h6, a, button {
+    overflow-wrap: break-word;
   }
 
   h1,

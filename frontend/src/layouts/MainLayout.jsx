@@ -71,8 +71,8 @@ export default function MainLayout() {
       className={`${
         isDashboardRoute
           ? "h-screen h-[100dvh] overflow-hidden"
-          : "min-h-screen overflow-x-clip"
-      } flex flex-col w-full max-w-full ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}
+          : "min-h-screen overflow-x-hidden"
+      } flex flex-col w-full max-w-full min-w-0 ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}
     >
       <SessionTimeoutModal
         isOpen={sessionTimedOut}
@@ -418,7 +418,7 @@ export default function MainLayout() {
       )}
 
       <main
-        className={`flex-1 relative z-10 ${
+        className={`flex-1 relative z-10 w-full max-w-full min-w-0 ${
           isDashboardRoute
             ? "min-h-0 h-full overflow-hidden flex flex-col"
             : location.pathname.startsWith("/cyberchat")
@@ -433,88 +433,88 @@ export default function MainLayout() {
       {!isDashboardRoute && (
         <nav
           aria-label="Mobile Bottom Navigation"
-          className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-2 py-1 flex items-center justify-around h-14"
+          className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] px-1 sm:px-2 py-1 flex items-center justify-around h-14 max-w-full"
         >
           <NavLink
             to="/"
             end
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+              `flex flex-col items-center justify-center py-1 px-1 sm:px-3 rounded-xl transition flex-1 min-w-0 ${
                 isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
               }`
             }
           >
-            <Shield className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">Home</span>
+            <Shield className="w-4 h-4 shrink-0" />
+            <span className="text-[10px] font-semibold mt-0.5 truncate max-w-full">Home</span>
           </NavLink>
 
           <NavLink
             to="/courses"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+              `flex flex-col items-center justify-center py-1 px-1 sm:px-3 rounded-xl transition flex-1 min-w-0 ${
                 isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
               }`
             }
           >
-            <BookOpen className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">Courses</span>
+            <BookOpen className="w-4 h-4 shrink-0" />
+            <span className="text-[10px] font-semibold mt-0.5 truncate max-w-full">Courses</span>
           </NavLink>
 
           <NavLink
             to="/report"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+              `flex flex-col items-center justify-center py-1 px-1 sm:px-3 rounded-xl transition flex-1 min-w-0 ${
                 isActive ? "text-rose-600 font-bold" : "text-rose-500 hover:text-rose-700"
               }`
             }
           >
-            <ShieldAlert className="w-4 h-4" />
-            <span className="text-[10px] font-bold mt-0.5">Report</span>
+            <ShieldAlert className="w-4 h-4 shrink-0" />
+            <span className="text-[10px] font-bold mt-0.5 truncate max-w-full">Report</span>
           </NavLink>
 
           <NavLink
             to="/tutors"
             className={({ isActive }) =>
-              `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+              `flex flex-col items-center justify-center py-1 px-1 sm:px-3 rounded-xl transition flex-1 min-w-0 ${
                 isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
               }`
             }
           >
-            <Users className="w-4 h-4" />
-            <span className="text-[10px] font-semibold mt-0.5">Mentors</span>
+            <Users className="w-4 h-4 shrink-0" />
+            <span className="text-[10px] font-semibold mt-0.5 truncate max-w-full">Mentors</span>
           </NavLink>
 
           {user ? (
             <NavLink
               to={user.role === "ADMIN" || user.role === "CSA_OFFICER" ? "/admin" : "/dashboard"}
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                `flex flex-col items-center justify-center py-1 px-1 sm:px-3 rounded-xl transition flex-1 min-w-0 ${
                   isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
                 }`
               }
             >
-              <LayoutDashboard className="w-4 h-4" />
-              <span className="text-[10px] font-semibold mt-0.5">Portal</span>
+              <LayoutDashboard className="w-4 h-4 shrink-0" />
+              <span className="text-[10px] font-semibold mt-0.5 truncate max-w-full">Portal</span>
             </NavLink>
           ) : (
             <NavLink
               to="/login"
               className={({ isActive }) =>
-                `flex flex-col items-center justify-center py-1 px-3 rounded-xl transition ${
+                `flex flex-col items-center justify-center py-1 px-1 sm:px-3 rounded-xl transition flex-1 min-w-0 ${
                   isActive ? "text-[#0056D2] font-bold" : "text-slate-500 hover:text-slate-800"
                 }`
               }
             >
-              <Users className="w-4 h-4" />
-              <span className="text-[10px] font-semibold mt-0.5">Sign In</span>
+              <Users className="w-4 h-4 shrink-0" />
+              <span className="text-[10px] font-semibold mt-0.5 truncate max-w-full">Sign In</span>
             </NavLink>
           )}
         </nav>
       )}
 
       {!isDashboardRoute && (
-        <footer className="border-t-2 border-[#0056D2] bg-[#0B1528] text-slate-200 shadow-2xl relative z-10">
-          <div className="max-w-7xl mx-auto px-6 py-12 grid md:grid-cols-3 gap-8">
+        <footer className="border-t-2 border-[#0056D2] bg-[#0B1528] text-slate-200 shadow-2xl relative z-10 w-full overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid grid-cols-1 md:grid-cols-3 gap-8 min-w-0">
             <div className="space-y-3">
               <Link to="/" className="inline-block group">
                 <CyberGuardLogo variant="full" size="md" theme="dark" interactive />

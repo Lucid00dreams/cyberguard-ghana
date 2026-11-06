@@ -207,23 +207,20 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-3 sm:p-6">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden grid lg:grid-cols-12 lg:h-[560px]">
+    <div className="min-h-[calc(100vh-80px)] bg-slate-50 flex items-center justify-center p-3 sm:p-6 w-full max-w-full overflow-x-hidden">
+      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden grid grid-cols-1 lg:grid-cols-12 lg:h-[560px] min-w-0">
         {/* Left Hero Side Banner with Background Photo */}
         <div className="lg:col-span-5 bg-[#001E3C] relative overflow-hidden p-6 sm:p-8 text-white flex flex-col justify-between hidden lg:flex h-full">
-          {/* Background Photo Layer */}
           <div
             className="absolute inset-0 bg-cover bg-center opacity-80 scale-105"
             style={{ backgroundImage: "url('/hero-students.png?v=1038')" }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-slate-950/40" />
 
-          {/* Top Brand Tag */}
           <div className="relative z-10">
             <CyberGuardLogo variant="full" size="md" theme="dark" subtitle="National COP Academy" />
           </div>
 
-          {/* Center Value Proposition */}
           <div className="relative z-10 space-y-3 my-auto">
             <h2 className="text-2xl font-black text-white leading-tight drop-shadow-md">
               Welcome back to CyberGuard.
@@ -233,13 +230,11 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Footer Accreditation */}
           <div className="relative z-10 pt-4 border-t border-white/10 text-[11px] text-slate-300">
             National Child Online Protection (Ghana)
           </div>
         </div>
 
-        {/* Right Clean Form Section */}
         <div className="lg:col-span-7 p-4 sm:p-8 flex flex-col justify-center bg-white h-full">
           <div className="max-w-sm w-full mx-auto space-y-5">
             <div className="space-y-1">
@@ -263,7 +258,6 @@ export default function Login() {
               </div>
             )}
 
-            {/* Official Google Sign-In Button */}
             <div id="googleButtonContainer" className="w-full flex justify-center items-center min-h-[40px] overflow-hidden" />
 
             <div className="relative flex items-center justify-center my-4">
@@ -274,7 +268,6 @@ export default function Login() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
-              {/* Email Field */}
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">Email Address</label>
                 <div className="relative">
@@ -291,7 +284,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Password Field */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">Password</label>
@@ -320,7 +312,6 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}

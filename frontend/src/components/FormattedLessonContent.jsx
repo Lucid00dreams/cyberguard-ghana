@@ -38,11 +38,11 @@ export default function FormattedLessonContent({ content, compact = false }) {
   const flushList = () => {
     if (currentList.length > 0) {
       elements.push(
-        <ul key={`list-${elements.length}`} className={compact ? "space-y-1.5 my-2 pl-0.5" : "space-y-2.5 my-4 pl-1"}>
+        <ul key={`list-${elements.length}`} className={compact ? "space-y-1.5 my-2 pl-0.5 w-full min-w-0" : "space-y-2.5 my-4 pl-1 w-full min-w-0"}>
           {currentList.map((item, idx) => (
-            <li key={idx} className={`flex items-start gap-2 text-slate-700 dark:text-slate-200 ${compact ? "text-xs leading-relaxed" : "text-sm leading-relaxed"}`}>
+            <li key={idx} className={`flex items-start gap-2 text-slate-700 dark:text-slate-200 min-w-0 w-full ${compact ? "text-xs leading-relaxed" : "text-sm leading-relaxed"}`}>
               <CheckCircle2 className={`${compact ? "w-3.5 h-3.5 mt-0.5" : "w-4 h-4 mt-1"} text-emerald-600 shrink-0`} />
-              <div>{parseInlineFormatting(item)}</div>
+              <div className="min-w-0 flex-1 break-words">{parseInlineFormatting(item)}</div>
             </li>
           ))}
         </ul>
@@ -64,10 +64,10 @@ export default function FormattedLessonContent({ content, compact = false }) {
       flushList();
       const headingText = line.replace(/^#+\s*/, "").replace(/\*\*/g, "");
       elements.push(
-        <div key={`h-${index}`} className={compact ? "mt-3 mb-1.5 pt-1" : "mt-6 mb-3 pt-2"}>
-          <h3 className={`${compact ? "text-xs sm:text-sm font-black" : "text-lg sm:text-xl font-extrabold"} text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5`}>
+        <div key={`h-${index}`} className={compact ? "mt-3 mb-1.5 pt-1 min-w-0 w-full" : "mt-6 mb-3 pt-2 min-w-0 w-full"}>
+          <h3 className={`${compact ? "text-xs sm:text-sm font-black" : "text-lg sm:text-xl font-extrabold"} text-slate-900 dark:text-white tracking-tight flex items-center gap-1.5 break-words min-w-0`}>
             <span className={`${compact ? "w-1.5 h-4" : "w-2 h-6"} bg-emerald-600 rounded-full inline-block shrink-0`} />
-            <span>{headingText}</span>
+            <span className="min-w-0 flex-1 break-words">{headingText}</span>
           </h3>
         </div>
       );
@@ -85,9 +85,9 @@ export default function FormattedLessonContent({ content, compact = false }) {
     if (line.toLowerCase().includes("rule:") || line.toLowerCase().includes("important:") || line.toLowerCase().includes("protocol:")) {
       flushList();
       elements.push(
-        <div key={`callout-${index}`} className={`${compact ? "my-2.5 p-3 rounded-xl" : "my-5 p-4 rounded-2xl"} bg-emerald-50/80 border border-emerald-200/80 text-emerald-950 flex items-start gap-2.5 shadow-2xs`}>
+        <div key={`callout-${index}`} className={`${compact ? "my-2.5 p-3 rounded-xl" : "my-5 p-4 rounded-2xl"} bg-emerald-50/80 border border-emerald-200/80 text-emerald-950 flex items-start gap-2.5 shadow-2xs min-w-0 w-full overflow-hidden`}>
           <Lightbulb className={`${compact ? "w-4 h-4 mt-0.5" : "w-5 h-5 mt-0.5"} text-emerald-600 shrink-0`} />
-          <div className={`${compact ? "text-xs" : "text-sm"} leading-relaxed font-medium`}>
+          <div className={`${compact ? "text-xs" : "text-sm"} leading-relaxed font-medium min-w-0 flex-1 break-words`}>
             {parseInlineFormatting(line)}
           </div>
         </div>
@@ -98,7 +98,7 @@ export default function FormattedLessonContent({ content, compact = false }) {
     // Regular paragraph
     flushList();
     elements.push(
-      <p key={`p-${index}`} className={`${compact ? "my-1.5 text-xs" : "my-3 text-sm"} text-slate-700 leading-relaxed`}>
+      <p key={`p-${index}`} className={`${compact ? "my-1.5 text-xs" : "my-3 text-sm"} text-slate-700 leading-relaxed break-words min-w-0 w-full`}>
         {parseInlineFormatting(line)}
       </p>
     );
@@ -106,5 +106,5 @@ export default function FormattedLessonContent({ content, compact = false }) {
 
   flushList();
 
-  return <div className="space-y-0.5 font-sans">{elements}</div>;
+  return <div className="space-y-0.5 font-sans min-w-0 w-full">{elements}</div>;
 }

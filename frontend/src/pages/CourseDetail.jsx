@@ -180,9 +180,9 @@ export default function CourseDetail() {
     (enrollment?.progressPct || 0) >= 100 || enrollment?.status === "COMPLETED";
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16">
+    <div className="min-h-screen bg-[#F8FAFC] pb-16 w-full max-w-full overflow-x-hidden min-w-0">
       {/* Course Header Banner */}
-      <div className="relative overflow-hidden bg-[#001E3C] text-white min-h-[360px] flex items-center border-b border-slate-200">
+      <div className="relative overflow-hidden bg-[#001E3C] text-white min-h-[360px] flex items-center border-b border-slate-200 w-full">
         {course.coverImageUrl && (
           <div
             className="absolute inset-0 bg-cover bg-center opacity-35"
@@ -191,7 +191,7 @@ export default function CourseDetail() {
         )}
         <div className="absolute inset-0 bg-gradient-to-r from-[#001E3C]/95 via-[#001E3C]/90 to-[#001E3C]/70" />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 relative z-10 w-full grid lg:grid-cols-[1fr_350px] gap-8 items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10 w-full grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8 items-center min-w-0">
           <div className="space-y-4">
             <div className="flex items-center gap-2 text-xs font-semibold text-sky-300">
               <Link to="/courses" className="hover:underline">
@@ -300,9 +300,9 @@ export default function CourseDetail() {
       </div>
 
       {/* Main Course Player Area */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 grid lg:grid-cols-[320px_1fr] gap-6 items-start">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 items-start min-w-0 w-full">
         {/* Left Sidebar: Curriculum Navigator */}
-        <aside className="order-2 lg:order-1 bg-white rounded-2xl p-4 sm:p-5 space-y-5 border border-slate-200/90 shadow-2xs">
+        <aside className="order-2 lg:order-1 bg-white rounded-2xl p-4 sm:p-5 space-y-5 border border-slate-200/90 shadow-2xs min-w-0 w-full overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-sm font-bold text-slate-900">Course Outline</h3>
             <span className="text-xs font-medium text-slate-500">
@@ -317,7 +317,7 @@ export default function CourseDetail() {
                   <span className="w-5 h-5 rounded-md bg-blue-50 text-[#0056D2] flex items-center justify-center font-mono text-[10px] shrink-0">
                     {mIdx + 1}
                   </span>
-                  <span className="text-slate-800">{mod.title}</span>
+                  <span className="text-slate-800 break-words line-clamp-2">{mod.title}</span>
                 </div>
 
                 <div className="space-y-1">
@@ -336,7 +336,7 @@ export default function CourseDetail() {
                             : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/70"
                         }`}
                       >
-                        <div className="flex items-center gap-2.5 truncate">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1 truncate">
                           {isQuiz ? (
                             <HelpCircle
                               className={`w-4 h-4 shrink-0 ${
@@ -356,11 +356,11 @@ export default function CourseDetail() {
                               }`}
                             />
                           )}
-                          <span className="truncate">{lesson.title}</span>
+                          <span className="truncate min-w-0 flex-1">{lesson.title}</span>
                         </div>
                         {isQuiz && (
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
                               isActive
                                 ? "bg-white/20 text-white"
                                 : "bg-amber-50 text-amber-700 border border-amber-200"
@@ -379,7 +379,7 @@ export default function CourseDetail() {
         </aside>
 
         {/* Right Main Viewer */}
-        <main className="order-1 lg:order-2 bg-white rounded-2xl p-4 sm:p-8 border border-slate-200/90 shadow-2xs">
+        <main className="order-1 lg:order-2 bg-white rounded-2xl p-4 sm:p-8 border border-slate-200/90 shadow-2xs min-w-0 w-full overflow-hidden">
           {!user ? (
             <div className="text-center py-14 px-4 space-y-5 max-w-md mx-auto">
               <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center mx-auto">
@@ -603,7 +603,7 @@ export default function CourseDetail() {
                       );
 
                       return (
-                        <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4 w-full min-w-0">
                           <button
                             type="button"
                             onClick={() => prevLesson && setActiveLesson(prevLesson)}
