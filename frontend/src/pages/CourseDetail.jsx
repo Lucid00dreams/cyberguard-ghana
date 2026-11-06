@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -20,7 +20,7 @@ import { useAuth } from "../context/AuthContext";
 import CyberSpinner from "../components/CyberSpinner";
 import FormattedLessonContent from "../components/FormattedLessonContent";
 import CertificateModal from "../components/CertificateModal";
-import CourseAudioNarrator from "../components/CourseAudioNarrator";
+import CourseAudioNarrator, { extractSentences } from "../components/CourseAudioNarrator";
 import WordInspectorPopup from "../components/WordInspectorPopup";
 
 function getInitials(name) {
@@ -55,6 +55,12 @@ export default function CourseDetail() {
   // Read-Aloud & Word Inspector State
   const [activeSentenceIndex, setActiveSentenceIndex] = useState(0);
   const lessonContainerRef = useRef(null);
+
+  const lessonSentences = useMemo(
+    () => extractSentences(activeLesson?.textContent || ""),
+    [activeLesson?.textContent]
+  );
+  const activeSentenceText = lessonSentences[activeSentenceIndex] || "";
 
   useEffect(() => {
     setActiveSentenceIndex(0);
@@ -526,7 +532,21 @@ export default function CourseDetail() {
                       </div>
 
                       <div className="pt-4">
-                        <FormattedLessonContent content={activeLesson.textContent} />
+                        <FormattedLessonContent
+                          content={activeLesson.textContent}
+                          activeSentence={activeSentenceText}
+                          onSentenceClick={(clickedText) => {
+                            const cleanClick = clickedText.replace(/[*#_`]/g, "").trim().toLowerCase();
+                            const idx = lessonSentences.findIndex(
+                              (s) =>
+                                s.toLowerCase().includes(cleanClick) ||
+                                cleanClick.includes(s.toLowerCase())
+                            );
+                            if (idx !== -1) {
+                              setActiveSentenceIndex(idx);
+                            }
+                          }}
+                        />
                       </div>
 
                       {/* Interactive Floating Definition Box */}
