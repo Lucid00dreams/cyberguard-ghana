@@ -22,6 +22,48 @@
     <meta property="og:title" content="CyberGuard Ghana · National Cybersecurity Academy" />
     <meta property="og:description" content="Youth cybersecurity education, accredited mentorship, and confidential child online protection for Ghana." />
     <meta property="og:image" content="/pwa-512x512.png" />
+    <script>
+      (function () {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker
+            .register("/sw.js", { scope: "/", updateViaCache: "none" })
+            .then(function (reg) {
+              reg.update();
+            })
+            .catch(function () {});
+        }
+
+        window.__deferredPwaPrompt = null;
+        var autoPromptedThisSession = false;
+
+        function triggerNativeInstallOnGesture() {
+          if (autoPromptedThisSession || !window.__deferredPwaPrompt) return;
+          autoPromptedThisSession = true;
+          var promptEvent = window.__deferredPwaPrompt;
+          try {
+            promptEvent.prompt();
+            promptEvent.userChoice.then(function (choice) {
+              if (choice && choice.outcome === "accepted") {
+                window.__deferredPwaPrompt = null;
+                window.dispatchEvent(new CustomEvent("pwa-install-state-changed"));
+              }
+            });
+          } catch (err) {}
+        }
+
+        window.addEventListener("beforeinstallprompt", function (e) {
+          window.__deferredPwaPrompt = e;
+          window.dispatchEvent(new CustomEvent("pwa-install-state-changed"));
+          window.addEventListener("click", triggerNativeInstallOnGesture, { once: true, capture: true });
+          window.addEventListener("touchend", triggerNativeInstallOnGesture, { once: true, capture: true });
+        });
+
+        window.addEventListener("appinstalled", function () {
+          window.__deferredPwaPrompt = null;
+          window.dispatchEvent(new CustomEvent("pwa-install-state-changed"));
+        });
+      })();
+    </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>

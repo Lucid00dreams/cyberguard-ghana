@@ -21,12 +21,23 @@ ReactDOM.createRoot(document.getElementById("root")).render(
   </React.StrictMode>
 );
 
-// Register Web Push notification service worker
+// Ensure PWA & Web Push service worker is registered immediately
 if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((err) => {
-      console.warn("[ServiceWorker] Registration skipped:", err.message);
-    });
-  });
+  const registerSw = () => {
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .then((reg) => {
+        reg.update();
+      })
+      .catch((err) => {
+        console.warn("[ServiceWorker] Registration skipped:", err.message);
+      });
+  };
+
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    registerSw();
+  } else {
+    window.addEventListener("load", registerSw, { once: true });
+  }
 }
 

@@ -1,5 +1,5 @@
 // CyberGuard Ghana - Progressive Web App & Web Push Service Worker
-const CACHE_NAME = "cyberguard-pwa-v1";
+const CACHE_NAME = "cyberguard-pwa-v2";
 const PRECACHE_URLS = [
   "/",
   "/manifest.webmanifest",
@@ -11,14 +11,11 @@ const PRECACHE_URLS = [
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches
-      .open(CACHE_NAME)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .catch(() => {
-        // Ignore precache errors in dev
-      })
-  );
+  // Warm cache asynchronously so SW activation and beforeinstallprompt are never delayed
+  caches
+    .open(CACHE_NAME)
+    .then((cache) => cache.addAll(PRECACHE_URLS))
+    .catch(() => {});
 });
 
 self.addEventListener("activate", (event) => {

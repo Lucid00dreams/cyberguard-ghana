@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useSearchParams, Link, useNavigate } from "react-router-dom";
 import { Lock, Eye, EyeOff, CheckCircle2, ArrowRight, Loader2, KeyRound } from "lucide-react";
 import api from "../utils/api";
+import PasswordStrengthAdvisor from "../components/PasswordStrengthAdvisor";
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -117,6 +118,14 @@ export default function ResetPassword() {
                   {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+
+              <PasswordStrengthAdvisor
+                password={form.newPassword}
+                onSelectPassword={(suggested) => {
+                  setForm({ newPassword: suggested, confirmPassword: suggested });
+                  setShowPass(true);
+                }}
+              />
             </div>
 
             {/* Confirm Password */}

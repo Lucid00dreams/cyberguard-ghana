@@ -26,6 +26,7 @@ import {
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import CyberGuardLogo from "../components/CyberGuardLogo";
+import PasswordStrengthAdvisor from "../components/PasswordStrengthAdvisor";
 
 const EASE_OUT = [0.22, 1, 0.36, 1];
 
@@ -682,6 +683,15 @@ export default function Register() {
                           {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         </button>
                       </div>
+
+                      <PasswordStrengthAdvisor
+                        password={password}
+                        userHint={email}
+                        onSelectPassword={(suggested) => {
+                          setPassword(suggested);
+                          setShowPassword(true);
+                        }}
+                      />
                     </div>
 
                     {/* Daily Tips Opt-In */}
