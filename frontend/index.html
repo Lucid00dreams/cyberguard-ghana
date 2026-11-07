@@ -8,12 +8,28 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="alternate icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0056D2" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="CyberGuard" />
+    <meta name="application-name" content="CyberGuard Ghana" />
     <meta name="referrer" content="no-referrer-when-downgrade" />
     <meta property="og:title" content="CyberGuard Ghana · National Cybersecurity Academy" />
     <meta property="og:description" content="Youth cybersecurity education, accredited mentorship, and confidential child online protection for Ghana." />
-    <meta property="og:image" content="/logo.svg" />
+    <meta property="og:image" content="/pwa-512x512.png" />
+    <script>
+      window.__deferredPwaPrompt = null;
+      window.addEventListener("beforeinstallprompt", function (e) {
+        e.preventDefault();
+        window.__deferredPwaPrompt = e;
+        window.dispatchEvent(new CustomEvent("pwa-prompt-ready"));
+      });
+    </script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>

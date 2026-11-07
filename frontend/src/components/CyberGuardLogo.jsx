@@ -23,13 +23,13 @@ export default function CyberGuardLogo({
   subtitle = "National COP Academy",
   interactive = false,
 }) {
-  // Size metrics
+  // Standard app-icon size metrics
   const sizeMap = {
-    xs: { iconSize: 22, textClass: "text-sm", subClass: "text-[8px]" },
-    sm: { iconSize: 28, textClass: "text-base", subClass: "text-[9px]" },
-    md: { iconSize: 38, textClass: "text-lg", subClass: "text-[10px]" },
-    lg: { iconSize: 48, textClass: "text-xl sm:text-2xl", subClass: "text-xs" },
-    xl: { iconSize: 64, textClass: "text-2xl sm:text-3xl", subClass: "text-xs sm:text-sm" },
+    xs: { iconSize: 28, textClass: "text-sm", subClass: "text-[8px]" },
+    sm: { iconSize: 36, textClass: "text-base", subClass: "text-[9px]" },
+    md: { iconSize: 44, textClass: "text-lg", subClass: "text-[10px]" },
+    lg: { iconSize: 54, textClass: "text-xl sm:text-2xl", subClass: "text-xs" },
+    xl: { iconSize: 68, textClass: "text-2xl sm:text-3xl", subClass: "text-xs sm:text-sm" },
   };
 
   const currentSize = sizeMap[size] || sizeMap.md;
@@ -42,7 +42,7 @@ export default function CyberGuardLogo({
     <svg
       width={currentSize.iconSize}
       height={currentSize.iconSize}
-      viewBox="0 0 100 100"
+      viewBox="5 16 90 68"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={`shrink-0 drop-shadow-sm transition-transform duration-200 ${

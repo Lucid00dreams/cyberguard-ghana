@@ -18,6 +18,7 @@ import {
   ChevronDown,
   LogOut,
   MessageSquare,
+  Download,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
@@ -25,6 +26,7 @@ import UserAvatar from "../components/UserAvatar";
 import SessionTimeoutModal from "../components/SessionTimeoutModal";
 import CyberGodChatbot from "../components/CyberGodChatbot";
 import CyberGuardLogo from "../components/CyberGuardLogo";
+import PwaInstallPrompt from "../components/PwaInstallPrompt";
 
 const navLinkClass = ({ isActive }) =>
   `relative text-xs font-semibold whitespace-nowrap transition-colors px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 ${isActive
@@ -394,7 +396,24 @@ export default function MainLayout() {
                 )}
 
                 {/* Emergency 292 Helpline Card inside Mobile Menu */}
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      window.dispatchEvent(new CustomEvent("open-pwa-install"));
+                    }}
+                    className="w-full p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/80 flex items-center justify-between text-xs text-[#0056D2] font-bold hover:bg-blue-100/80 transition cursor-pointer"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Download className="w-4 h-4 shrink-0" />
+                      <span>Install CyberGuard App to Home Screen</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md bg-[#0056D2] text-white text-[10px] font-bold">
+                      Get App
+                    </span>
+                  </button>
+
                   <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
                       <PhoneCall className="w-4 h-4 text-amber-600 shrink-0" />
@@ -592,6 +611,9 @@ export default function MainLayout() {
           </div>
         </footer>
       )}
+
+      {/* PWA Home Screen Install Prompt */}
+      <PwaInstallPrompt />
 
       {/* CyberGod AI Floating Chatbot */}
       <CyberGodChatbot />
