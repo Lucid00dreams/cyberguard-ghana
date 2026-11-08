@@ -21,8 +21,8 @@ import {
 import api from "../utils/api";
 
 /**
- * Curated Studio Neural Voices powered by free high-fidelity Edge TTS
- * Features real human actors with distinct regional accents and personalities.
+ * Curated Studio Neural Voices powered by free high-fidelity Edge TTS (Voice Studio architecture)
+ * Uses genuine human voice models with authentic regional accents.
  */
 export const NEURAL_VOICES = [
   {
@@ -108,11 +108,6 @@ export const NEURAL_VOICES = [
 ];
 
 /**
- * In-memory Blob URL cache for zero-latency playback across sentences & voices
- */
-const audioBlobCache = new Map();
-
-/**
  * Clean markdown symbols from text so Speech engines read smooth natural English
  */
 export function cleanTextForSpeech(raw) {
@@ -149,31 +144,13 @@ export function extractSentences(rawContent) {
 /**
  * Build backend neural TTS stream URL
  */
-function buildNeuralStreamUrl(text, voiceId, rate) {
-  const base = api.defaults.baseURL || "/api";
+function buildNeuralStreamUrl(text, voiceId, rate = 1) {
+  const base =
+    api.defaults.baseURL ||
+    import.meta.env.VITE_API_URL ||
+    "https://cyberguard-ghana.onrender.com/api";
   const cleanBase = base.replace(/\/$/, "");
   return `${cleanBase}/tts/stream?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voiceId)}&rate=${rate}`;
-}
-
-/**
- * Fetch and cache raw audio as local Blob URL for glitch-free playback
- */
-async function fetchAudioBlobUrl(text, voiceId, rate) {
-  const cacheKey = `${voiceId}:${rate}:${text}`;
-  if (audioBlobCache.has(cacheKey)) {
-    return audioBlobCache.get(cacheKey);
-  }
-
-  const streamUrl = buildNeuralStreamUrl(text, voiceId, rate);
-  const response = await fetch(streamUrl);
-  if (!response.ok) {
-    throw new Error(`TTS server error (${response.status})`);
-  }
-
-  const blob = await response.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  audioBlobCache.set(cacheKey, blobUrl);
-  return blobUrl;
 }
 
 export default function CourseAudioNarrator({
@@ -188,13 +165,12 @@ export default function CourseAudioNarrator({
   const [previewingVoiceId, setPreviewingVoiceId] = useState(null);
   const [audioError, setAudioError] = useState("");
 
-  // Selected voice: ensure we always default to real studio voices
+  // Selected voice: automatically purge any legacy robotic desktop voice from localStorage
   const [selectedVoiceId, setSelectedVoiceId] = useState(() => {
     const saved = localStorage.getItem("cg_preferred_voice");
     if (saved && NEURAL_VOICES.some((v) => v.id === saved)) {
       return saved;
     }
-    // Clean up any legacy robotic browser voice name stored in earlier sessions
     localStorage.setItem("cg_preferred_voice", "en-NG-EzinneNeural");
     return "en-NG-EzinneNeural";
   });
@@ -214,6 +190,7 @@ export default function CourseAudioNarrator({
   // Audio elements & playback state refs
   const activeAudioRef = useRef(null);
   const previewAudioRef = useRef(null);
+  const preloadAudioRef = useRef(null);
   const currentIndexRef = useRef(activeSentenceIndex);
   const isPlayingRef = useRef(false);
   const mainBarRef = useRef(null);
@@ -258,7 +235,7 @@ export default function CourseAudioNarrator({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Load fallback device voices only as supplementary option
+  // Load fallback device voices if Web Speech API is present
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
@@ -284,14 +261,19 @@ export default function CourseAudioNarrator({
     return deviceVoices.find((v) => v.voiceURI === selectedVoiceId) || null;
   }, [currentNeuralVoice, deviceVoices, selectedVoiceId]);
 
-  // Stop all playback engines
+  // Stop all playback engines cleanly
   const stopAllPlayback = useCallback(() => {
     if (activeAudioRef.current) {
       activeAudioRef.current.pause();
+      activeAudioRef.current.onplaying = null;
+      activeAudioRef.current.onended = null;
+      activeAudioRef.current.onerror = null;
       activeAudioRef.current = null;
     }
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
+      previewAudioRef.current.onended = null;
+      previewAudioRef.current.onerror = null;
       previewAudioRef.current = null;
     }
     if (typeof window !== "undefined" && window.speechSynthesis) {
@@ -309,20 +291,26 @@ export default function CourseAudioNarrator({
     };
   }, [stopAllPlayback]);
 
-  // Preload upcoming sentence audio for instantaneous transitions
+  // Preload upcoming sentence audio
   const preloadUpcoming = useCallback(
     (nextIdx, voiceId) => {
       if (!voiceId || nextIdx >= sentences.length) return;
       const nextText = sentences[nextIdx];
       if (!nextText) return;
-      fetchAudioBlobUrl(nextText, voiceId, playbackRate).catch(() => {});
+
+      const nextUrl = buildNeuralStreamUrl(nextText, voiceId, playbackRate);
+      if (!preloadAudioRef.current) {
+        preloadAudioRef.current = new Audio();
+      }
+      preloadAudioRef.current.src = nextUrl;
+      preloadAudioRef.current.preload = "auto";
     },
     [playbackRate, sentences]
   );
 
-  // Play a specific sentence using Real Studio Neural Voices
+  // Play a specific sentence using genuine neural voices
   const speakSentence = useCallback(
-    async (index, voiceToUse = selectedVoiceId) => {
+    (index, voiceToUse = selectedVoiceId) => {
       if (index < 0 || index >= sentences.length) {
         setIsPlaying(false);
         setIsLoadingAudio(false);
@@ -336,10 +324,16 @@ export default function CourseAudioNarrator({
       const text = sentences[index];
       if (!text) return;
 
-      // Stop previous audio instance completely
+      // Stop any existing speech / preview
       if (activeAudioRef.current) {
         activeAudioRef.current.pause();
-        activeAudioRef.current = null;
+        activeAudioRef.current.onplaying = null;
+        activeAudioRef.current.onended = null;
+        activeAudioRef.current.onerror = null;
+      }
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+        setPreviewingVoiceId(null);
       }
       if (typeof window !== "undefined" && window.speechSynthesis) {
         window.speechSynthesis.cancel();
@@ -347,62 +341,63 @@ export default function CourseAudioNarrator({
 
       const neuralVoice = NEURAL_VOICES.find((v) => v.id === voiceToUse);
 
-      // 1. PRIMARY ENGINE: REAL NEURAL STUDIO AUDIO
+      // 1. PRIMARY ENGINE: REAL NEURAL STUDIO AUDIO (SYNCHRONOUS USER GESTURE SAFE)
       if (neuralVoice) {
         setIsLoadingAudio(true);
         setAudioError("");
 
-        try {
-          const blobUrl = await fetchAudioBlobUrl(text, neuralVoice.id, playbackRate);
+        const streamUrl = buildNeuralStreamUrl(text, neuralVoice.id, playbackRate);
+        const audio = activeAudioRef.current || new Audio();
+        activeAudioRef.current = audio;
 
-          // If playback was cancelled during fetch
-          if (!isPlayingRef.current) {
-            setIsLoadingAudio(false);
-            return;
-          }
+        audio.src = streamUrl;
+        audio.playbackRate = 1.0;
+        audio.muted = isMuted;
 
-          const audio = new Audio(blobUrl);
-          activeAudioRef.current = audio;
-          audio.playbackRate = 1.0;
-          audio.muted = isMuted;
+        audio.onplaying = () => {
+          setIsLoadingAudio(false);
+          setIsPlaying(true);
+          // Preload upcoming sentence
+          preloadUpcoming(index + 1, neuralVoice.id);
+        };
 
-          audio.onplay = () => {
-            setIsLoadingAudio(false);
-            setIsPlaying(true);
-            // Preload upcoming sentence in background for zero buffering
-            preloadUpcoming(index + 1, neuralVoice.id);
-          };
-
-          audio.onended = () => {
-            if (isPlayingRef.current) {
-              const nextIdx = index + 1;
-              if (nextIdx < sentences.length) {
-                currentIndexRef.current = nextIdx;
-                if (onSentenceChange) onSentenceChange(nextIdx);
-                // Natural breath pause (90ms) before next sentence
-                setTimeout(() => {
-                  if (isPlayingRef.current) {
-                    speakSentence(nextIdx, voiceToUse);
-                  }
-                }, 90);
-              } else {
-                setIsPlaying(false);
-                if (onComplete) onComplete();
-              }
+        audio.onended = () => {
+          if (isPlayingRef.current) {
+            const nextIdx = index + 1;
+            if (nextIdx < sentences.length) {
+              currentIndexRef.current = nextIdx;
+              if (onSentenceChange) onSentenceChange(nextIdx);
+              // Natural conversational cadence pause (90ms)
+              setTimeout(() => {
+                if (isPlayingRef.current) {
+                  speakSentence(nextIdx, voiceToUse);
+                }
+              }, 90);
+            } else {
+              setIsPlaying(false);
+              if (onComplete) onComplete();
             }
-          };
+          }
+        };
 
-          audio.onerror = (e) => {
-            console.error("[CourseAudioNarrator] Audio decode error:", e);
+        audio.onerror = () => {
+          // Ignore abort errors from user skips or pauses
+          if (audio.error && audio.error.code !== 1) {
+            console.error("[CourseAudioNarrator] Stream decode error:", audio.error);
             setIsLoadingAudio(false);
             setAudioError("Audio stream interrupted. Tap play to retry.");
-          };
+          }
+        };
 
-          await audio.play();
-        } catch (err) {
-          console.error("[CourseAudioNarrator] Failed to fetch neural speech:", err);
-          setIsLoadingAudio(false);
-          setAudioError("Connection to speech service delayed. Tap play to retry.");
+        // Call play synchronously within user activation
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            if (err.name !== "AbortError") {
+              console.warn("[CourseAudioNarrator] Autoplay blocked:", err);
+              setIsLoadingAudio(false);
+            }
+          });
         }
         return;
       }
@@ -430,7 +425,7 @@ export default function CourseAudioNarrator({
                 if (isPlayingRef.current) {
                   speakSentence(nextIdx, voiceToUse);
                 }
-              }, 120);
+              }, 100);
             } else {
               setIsPlaying(false);
               if (onComplete) onComplete();
@@ -451,7 +446,7 @@ export default function CourseAudioNarrator({
     [sentences, selectedVoiceId, playbackRate, isMuted, onSentenceChange, preloadUpcoming, onComplete, deviceVoices]
   );
 
-  // Toggle Play / Pause
+  // Toggle Play / Pause: synchronously triggers audio for instant playback
   const handleTogglePlay = () => {
     if (sentences.length === 0) return;
 
@@ -505,11 +500,11 @@ export default function CourseAudioNarrator({
     localStorage.setItem("cg_preferred_rate", String(nextRate));
 
     if (isPlaying) {
-      setTimeout(() => speakSentence(activeSentenceIndex, selectedVoiceId), 50);
+      speakSentence(activeSentenceIndex, selectedVoiceId);
     }
   };
 
-  // Select voice from dropdown: updates state & immediately speaks with the new voice
+  // Select voice from dropdown: immediately begins speaking with chosen persona
   const handleSelectVoice = (voiceId) => {
     setSelectedVoiceId(voiceId);
     localStorage.setItem("cg_preferred_voice", voiceId);
@@ -527,10 +522,10 @@ export default function CourseAudioNarrator({
   };
 
   // Preview an actual voice sample directly in the dropdown
-  const handlePreviewVoice = async (e, voice) => {
+  const handlePreviewVoice = (e, voice) => {
     e.stopPropagation();
 
-    // If currently playing preview for this voice, toggle off
+    // Toggle off if already previewing
     if (previewingVoiceId === voice.id) {
       if (previewAudioRef.current) {
         previewAudioRef.current.pause();
@@ -540,31 +535,33 @@ export default function CourseAudioNarrator({
       return;
     }
 
-    if (previewAudioRef.current) {
-      previewAudioRef.current.pause();
-      previewAudioRef.current = null;
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio();
     }
+    const preview = previewAudioRef.current;
+    preview.pause();
 
     setPreviewingVoiceId(voice.id);
 
-    try {
-      const sampleText = `Hello! I am ${voice.name}, your CyberGuard cybersecurity instructor.`;
-      const blobUrl = await fetchAudioBlobUrl(sampleText, voice.id, 1);
-      const audio = new Audio(blobUrl);
-      previewAudioRef.current = audio;
+    const sampleText = `Hello! I am ${voice.name}, your CyberGuard cybersecurity instructor.`;
+    preview.src = buildNeuralStreamUrl(sampleText, voice.id, 1);
 
-      audio.onended = () => {
-        setPreviewingVoiceId(null);
-      };
-
-      audio.onerror = () => {
-        setPreviewingVoiceId(null);
-      };
-
-      await audio.play();
-    } catch (err) {
-      console.warn("[CourseAudioNarrator] Preview failed:", err);
+    preview.onended = () => {
       setPreviewingVoiceId(null);
+    };
+
+    preview.onerror = () => {
+      setPreviewingVoiceId(null);
+    };
+
+    const playPromise = preview.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        if (err.name !== "AbortError") {
+          console.warn("[CourseAudioNarrator] Preview failed:", err);
+        }
+        setPreviewingVoiceId(null);
+      });
     }
   };
 
@@ -617,7 +614,7 @@ export default function CourseAudioNarrator({
                 {currentNeuralVoice && (
                   <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
                     <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
-                    Studio Neural Voice
+                    Studio Voice
                   </span>
                 )}
               </div>
@@ -708,7 +705,7 @@ export default function CourseAudioNarrator({
                   {/* Curated Studio Neural Voices Section */}
                   <div className="pb-2">
                     <div className="px-2.5 py-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <span>Real Studio Voices</span>
+                      <span>Real Studio Voices (Voice Studio)</span>
                       <span className="flex items-center gap-1 text-[10px] text-emerald-600 font-semibold lowercase">
                         <Sparkles className="w-2.5 h-2.5" /> free neural
                       </span>
@@ -797,7 +794,7 @@ export default function CourseAudioNarrator({
                                 💻 {v.name}
                               </span>
                               {isSelected && (
-                                <Check className="w-3.5 h-3.5 text-[#0056D2] shrink-0" />
+                                <Check className="w-3.5 h-3.5 text-[#0056D2]" />
                               )}
                             </button>
                           );
