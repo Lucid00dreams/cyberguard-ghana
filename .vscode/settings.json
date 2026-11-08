@@ -1,7 +1,4 @@
 {
   "css.lint.unknownAtRules": "ignore",
-  "dart.analysisExcludedFolders": [
-    "cyberguard-ghana/mobile",
-    "mobile"
-  ]
+  "js/ts.implicitProjectConfig.checkJs": false
 }

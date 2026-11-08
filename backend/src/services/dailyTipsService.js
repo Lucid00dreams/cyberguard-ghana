@@ -505,9 +505,9 @@ async function setDailyTipsScheduleConfig({ hour, minute = 0, enabled = true }) 
 
 /**
  * Dispatch the daily cyber safety tip to all opted-in users and log every email sent.
- * @param {Object} options
- * @param {"SCHEDULED_DAILY" | "SCHEDULED_7AM" | "MANUAL_ADMIN"} options.triggerType
- * @param {boolean} options.force - When true, allows manual admin re-dispatch even if today's scheduled run already completed.
+ * @param {Object} [options]
+ * @param {"SCHEDULED_DAILY" | "SCHEDULED_7AM" | "MANUAL_ADMIN"} [options.triggerType]
+ * @param {boolean} [options.force] - When true, allows manual admin re-dispatch even if today's scheduled run already completed.
  */
 async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_DAILY", force = false } = {}) {
   if (isDispatching) {
