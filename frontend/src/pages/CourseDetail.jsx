@@ -198,14 +198,13 @@ export default function CourseDetail() {
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 w-full max-w-full overflow-x-hidden min-w-0">
       {/* Course Header Banner */}
-      <div className="relative overflow-hidden bg-[#001E3C] text-white min-h-[360px] flex items-center border-b border-slate-200 w-full">
-        {course.coverImageUrl && (
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-35"
-            style={{ backgroundImage: `url('${course.coverImageUrl}')` }}
-          />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#001E3C]/95 via-[#001E3C]/90 to-[#001E3C]/70" />
+      <div className="relative overflow-hidden bg-slate-950 text-white min-h-[380px] sm:min-h-[420px] flex items-center border-b border-slate-800 w-full">
+        <div
+          className="absolute inset-0 bg-cover bg-center opacity-85 scale-100 transition-transform duration-700"
+          style={{ backgroundImage: `url('${course.coverImageUrl || "/hero-courses.png?v=1038"}')` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/85 via-45% to-slate-950/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/30" />
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 relative z-10 w-full grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-8 items-center min-w-0">
           <div className="space-y-4">
@@ -252,15 +251,15 @@ export default function CourseDetail() {
           </div>
 
           {/* Enroll / Progress Card */}
-          <div className="space-y-4 bg-white/10 p-6 rounded-2xl border border-white/15 backdrop-blur-md">
+          <div className="space-y-4 bg-slate-900/80 p-6 rounded-2xl border border-white/15 backdrop-blur-md shadow-2xl">
             <div className="space-y-1">
-              <span className="text-xs font-semibold text-sky-300">
+              <span className="text-xs font-semibold text-sky-400">
                 {enrolled ? "Enrolled" : "Free course"}
               </span>
               <h3 className="text-lg font-bold text-white">
                 {enrolled ? "Your progress" : "Start learning"}
               </h3>
-              <p className="text-xs text-slate-200 leading-relaxed">
+              <p className="text-xs text-slate-300 leading-relaxed">
                 {enrolled
                   ? "Work through each module and pass the final quiz to earn your certificate."
                   : "Free access to all lessons, practice checks, and a verifiable certificate."}
@@ -391,60 +390,109 @@ export default function CourseDetail() {
         {/* Right Main Viewer */}
         <main className="order-1 lg:order-2 bg-white rounded-2xl p-4 sm:p-8 border border-slate-200/90 shadow-2xs min-w-0 w-full overflow-hidden">
           {!user ? (
-            <div className="text-center py-14 px-4 space-y-5 max-w-md mx-auto">
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0056D2] border border-blue-100 flex items-center justify-center mx-auto">
-                <Lock className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900">
-                  Sign in to start this course
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
-                  Sign in or create a free account to read lessons, track your progress, and earn your completion certificate.
-                </p>
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs max-w-xl mx-auto">
+              <div className="h-44 sm:h-52 relative overflow-hidden bg-slate-950">
+                <img
+                  src={course.coverImageUrl || "/hero-courses.png?v=1038"}
+                  alt={course.title}
+                  className="w-full h-full object-cover opacity-85"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-900 border border-slate-200/80 shadow-2xs">
+                  {course.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
+                </div>
+                <div className="absolute bottom-3 left-4 right-4">
+                  <span className="text-[11px] font-bold text-sky-400 block">{course.category || "Cyber Safety"}</span>
+                  <h3 className="text-base sm:text-lg font-bold text-white truncate">{course.title}</h3>
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
-                <Link
-                  to="/login"
-                  state={{ from: location, intercepted: true }}
-                  className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-5 py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2"
-                >
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-                <Link
-                  to="/register"
-                  state={{ from: location, intercepted: true }}
-                  className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-bold px-5 py-2.5 rounded-xl transition text-xs flex items-center justify-center"
-                >
-                  Create Free Account
-                </Link>
+              <div className="p-6 sm:p-8 space-y-6 text-center">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900">
+                    Sign in to Start This Course
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                    Sign in or create a free account to read lessons, listen to audio narration, track your progress, and earn your verified completion certificate.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 justify-center pt-1">
+                  <Link
+                    to="/login"
+                    state={{ from: location, intercepted: true }}
+                    className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold px-6 py-2.5 rounded-xl transition text-xs flex items-center justify-center gap-2"
+                  >
+                    <span>Sign In</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                  <Link
+                    to="/register"
+                    state={{ from: location, intercepted: true }}
+                    className="border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 font-bold px-6 py-2.5 rounded-xl transition text-xs flex items-center justify-center"
+                  >
+                    Create Free Account
+                  </Link>
+                </div>
               </div>
             </div>
           ) : !enrolled ? (
-            <div className="text-center py-14 px-4 space-y-5 max-w-md mx-auto">
-              <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto">
-                <BookOpen className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-xl font-extrabold text-slate-900">
-                  Enroll to unlock lessons
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
-                  Enroll in <span className="font-semibold text-slate-900">{course.title}</span> for free to access every module and assessment quiz.
-                </p>
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs max-w-xl mx-auto">
+              <div className="h-44 sm:h-52 relative overflow-hidden bg-slate-950">
+                <img
+                  src={course.coverImageUrl || "/hero-courses.png?v=1038"}
+                  alt={course.title}
+                  className="w-full h-full object-cover opacity-85 hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
+                <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg text-[11px] font-semibold text-slate-900 border border-slate-200/80 shadow-2xs">
+                  {course.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
+                </div>
+                <div className="absolute bottom-3 left-4 right-4">
+                  <span className="text-[11px] font-bold text-sky-400 block">{course.category || "Cyber Safety"}</span>
+                  <h3 className="text-base sm:text-lg font-bold text-white truncate">{course.title}</h3>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleEnroll}
-                disabled={enrolling}
-                className="w-full bg-[#0056D2] hover:bg-[#00419E] text-white font-bold py-3 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 text-xs cursor-pointer"
-              >
-                <span>{enrolling ? "Enrolling..." : "Enroll for Free"}</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+              <div className="p-6 sm:p-8 space-y-6">
+                <div>
+                  <h2 className="text-xl font-extrabold text-slate-900">
+                    Enroll for Free to Unlock All Lessons
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-2 leading-relaxed">
+                    Enroll in <span className="font-semibold text-slate-900">{course.title}</span> to get unlimited access to every module, real voice audio narration, and certificate assessment.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-700">
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <BookOpen className="w-4 h-4 text-[#0056D2] shrink-0" />
+                    <span>{course.modules?.length || 0} Modules ({totalLessons} Lessons)</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <Award className="w-4 h-4 text-amber-500 shrink-0" />
+                    <span>Verifiable Certificate</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <Headphones className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>Real Voice Read Aloud</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <Shield className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span>100% Free Forever</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleEnroll}
+                  disabled={enrolling}
+                  className="w-full bg-[#0056D2] hover:bg-[#00419E] text-white font-bold py-3.5 rounded-xl transition disabled:opacity-60 flex items-center justify-center gap-2 text-sm shadow-sm cursor-pointer"
+                >
+                  <span>{enrolling ? "Enrolling..." : "Enroll for Free & Begin"}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           ) : !activeLesson ? (
             <p className="text-slate-500 text-sm text-center py-12">
