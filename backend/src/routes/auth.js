@@ -904,11 +904,11 @@ router.get("/users", requireAuth, requireRole("ADMIN"), async (req, res, next) =
         ...(role ? { role } : {}),
         ...(search
           ? {
-              OR: [
-                { displayName: { contains: search, mode: "insensitive" } },
-                { email: { contains: search, mode: "insensitive" } },
-              ],
-            }
+            OR: [
+              { displayName: { contains: search, mode: "insensitive" } },
+              { email: { contains: search, mode: "insensitive" } },
+            ],
+          }
           : {}),
       },
       select: {

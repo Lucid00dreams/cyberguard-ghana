@@ -6,6 +6,12 @@
     "jsx": "react-jsx",
     "checkJs": false
   },
-  "exclude": ["node_modules", "dist", "build", "backend/node_modules", "frontend/node_modules", "frontend/dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "backend/node_modules",
+    "frontend/node_modules",
+    "frontend/dist"
+  ]
 }
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   Play,
   Pause,
@@ -14,10 +14,89 @@ import {
   Subtitles,
   Check,
   X,
+  Loader2,
+  Radio,
 } from "lucide-react";
+import api from "../utils/api";
 
 /**
- * Clean markdown symbols from text so SpeechSynthesis reads smooth natural English
+ * Curated Studio Neural Voices powered by free high-fidelity Edge TTS
+ */
+export const NEURAL_VOICES = [
+  {
+    id: "en-NG-EzinneNeural",
+    name: "Ezinne",
+    accent: "West African",
+    region: "Ghana / Nigeria",
+    gender: "Female",
+    description: "Warm, relatable West African educator",
+    flag: "🇬🇭",
+    isNeural: true,
+  },
+  {
+    id: "en-NG-AbeoNeural",
+    name: "Abeo",
+    accent: "West African",
+    region: "Ghana / Nigeria",
+    gender: "Male",
+    description: "Confident, engaging tech mentor",
+    flag: "🇬🇭",
+    isNeural: true,
+  },
+  {
+    id: "en-US-AriaNeural",
+    name: "Aria",
+    accent: "US English",
+    region: "North America",
+    gender: "Female",
+    description: "Clear, studio-grade Coursera instructor",
+    flag: "🇺🇸",
+    isNeural: true,
+  },
+  {
+    id: "en-US-GuyNeural",
+    name: "Guy",
+    accent: "US English",
+    region: "North America",
+    gender: "Male",
+    description: "Conversational, friendly narrator",
+    flag: "🇺🇸",
+    isNeural: true,
+  },
+  {
+    id: "en-GB-SoniaNeural",
+    name: "Sonia",
+    accent: "British English",
+    region: "United Kingdom",
+    gender: "Female",
+    description: "Crisp, formal academy lecturer",
+    flag: "🇬🇧",
+    isNeural: true,
+  },
+  {
+    id: "en-GB-RyanNeural",
+    name: "Ryan",
+    accent: "British English",
+    region: "United Kingdom",
+    gender: "Male",
+    description: "Articulate, resonant British tutor",
+    flag: "🇬🇧",
+    isNeural: true,
+  },
+  {
+    id: "en-ZA-LeahNeural",
+    name: "Leah",
+    accent: "South African",
+    region: "Southern Africa",
+    gender: "Female",
+    description: "Melodic, calm African English guide",
+    flag: "🇿🇦",
+    isNeural: true,
+  },
+];
+
+/**
+ * Clean markdown symbols from text so Speech engines read smooth natural English
  */
 export function cleanTextForSpeech(raw) {
   if (!raw) return "";
@@ -34,7 +113,7 @@ export function cleanTextForSpeech(raw) {
 }
 
 /**
- * Split lesson text into discrete sentences for robust SpeechSynthesis streaming
+ * Split lesson text into discrete sentences for robust streaming and synchronized highlighting
  */
 export function extractSentences(rawContent) {
   if (!rawContent) return [];
@@ -51,65 +130,12 @@ export function extractSentences(rawContent) {
 }
 
 /**
- * Rank and prioritize high-fidelity Neural / Natural voices over legacy robotic voices
+ * Build backend neural TTS stream URL
  */
-export function rankAndSortVoices(allVoices) {
-  if (!allVoices || allVoices.length === 0) return [];
-
-  const englishVoices = allVoices.filter((v) =>
-    v.lang?.toLowerCase().startsWith("en")
-  );
-  const pool = englishVoices.length > 0 ? englishVoices : allVoices;
-
-  return [...pool].sort((a, b) => {
-    const aName = a.name.toLowerCase();
-    const bName = b.name.toLowerCase();
-    const aLang = a.lang.toLowerCase();
-    const bLang = b.lang.toLowerCase();
-
-    let aScore = 0;
-    let bScore = 0;
-
-    // Prioritize Neural / Natural / Online voices (Edge/Chrome/Safari)
-    if (aName.includes("natural") || aName.includes("online (natural)")) aScore += 120;
-    if (bName.includes("natural") || bName.includes("online (natural)")) bScore += 120;
-
-    if (aName.includes("neural") || aName.includes("premium")) aScore += 90;
-    if (bName.includes("neural") || bName.includes("premium")) bScore += 90;
-
-    if (aName.includes("google")) aScore += 70;
-    if (bName.includes("google")) bScore += 70;
-
-    if (aName.includes("samantha") || aName.includes("siri") || aName.includes("daniel")) aScore += 60;
-    if (bName.includes("samantha") || bName.includes("siri") || bName.includes("daniel")) bScore += 60;
-
-    // English African accents if present
-    if (aLang.includes("gh") || aLang.includes("ng") || aLang.includes("za")) aScore += 40;
-    if (bLang.includes("gh") || bLang.includes("ng") || bLang.includes("za")) bScore += 40;
-
-    // English US/UK priority
-    if (aLang === "en-us" || aLang === "en-gb") aScore += 30;
-    if (bLang === "en-us" || bLang === "en-gb") bScore += 30;
-
-    // Demote legacy robotic desktop voices
-    if (aName.includes("desktop") || aName.includes("david") || aName.includes("zira")) aScore -= 60;
-    if (bName.includes("desktop") || bName.includes("david") || bName.includes("zira")) bScore -= 60;
-
-    return bScore - aScore;
-  });
-}
-
-function formatVoiceName(name) {
-  if (!name) return "Natural Voice";
-  return name
-    .replace(/Microsoft/gi, "")
-    .replace(/Online\s*\(Natural\)/gi, "Natural")
-    .replace(/Desktop/gi, "")
-    .replace(/English\s*\(.*?\)/gi, "")
-    .replace(/United States|United Kingdom/gi, "")
-    .replace(/[-_]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim() || name;
+function buildNeuralStreamUrl(text, voiceId, rate) {
+  const base = api.defaults.baseURL || "/api";
+  const cleanBase = base.replace(/\/$/, "");
+  return `${cleanBase}/tts/stream?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voiceId)}&rate=${rate}`;
 }
 
 export default function CourseAudioNarrator({
@@ -120,22 +146,35 @@ export default function CourseAudioNarrator({
   onComplete = undefined,
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
-  const [voices, setVoices] = useState([]);
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState(() => {
-    return localStorage.getItem("cg_preferred_voice") || "";
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [previewingVoiceId, setPreviewingVoiceId] = useState(null);
+
+  // Selected voice: either a neural voice ID (e.g. "en-NG-EzinneNeural") or a local voice URI
+  const [selectedVoiceId, setSelectedVoiceId] = useState(() => {
+    return localStorage.getItem("cg_preferred_voice") || "en-NG-EzinneNeural";
   });
-  const [playbackRate, setPlaybackRate] = useState(1);
+
+  const [playbackRate, setPlaybackRate] = useState(() => {
+    const saved = localStorage.getItem("cg_preferred_rate");
+    return saved ? parseFloat(saved) : 1;
+  });
+
   const [isMuted, setIsMuted] = useState(false);
   const [voicePickerOpen, setVoicePickerOpen] = useState(false);
-  const [speechSupported, setSpeechSupported] = useState(true);
   const [scrolledPast, setScrolledPast] = useState(false);
+  const [deviceVoices, setDeviceVoices] = useState([]);
 
   const sentences = useMemo(() => extractSentences(content), [content]);
+
+  // Audio elements & playback state refs
+  const audioRef = useRef(null);
+  const nextAudioRef = useRef(null);
+  const previewAudioRef = useRef(null);
   const currentIndexRef = useRef(activeSentenceIndex);
   const isPlayingRef = useRef(false);
   const mainBarRef = useRef(null);
 
-  // Sync ref with controlled activeSentenceIndex
+  // Synchronize ref with parent controlled activeSentenceIndex
   useEffect(() => {
     currentIndexRef.current = activeSentenceIndex;
   }, [activeSentenceIndex]);
@@ -144,12 +183,11 @@ export default function CourseAudioNarrator({
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
 
-  // Track scroll position to show floating sticky mini-player when reading down the page
+  // Track scroll position to show sticky floating mini-player
   useEffect(() => {
     const handleScroll = () => {
       if (!mainBarRef.current) return;
       const rect = mainBarRef.current.getBoundingClientRect();
-      // Scrolled past if top player is out of view
       setScrolledPast(rect.bottom < 0);
     };
 
@@ -157,77 +195,190 @@ export default function CourseAudioNarrator({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Load and rank available voices
+  // Load fallback device voices if Web Speech API is present
   useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setSpeechSupported(false);
-      return;
-    }
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
-    const loadVoices = () => {
-      const allVoices = window.speechSynthesis.getVoices();
-      if (!allVoices || allVoices.length === 0) return;
-
-      const ranked = rankAndSortVoices(allVoices);
-      setVoices(ranked);
-
-      if (ranked.length > 0) {
-        const saved = localStorage.getItem("cg_preferred_voice");
-        const match = ranked.find((v) => v.voiceURI === saved);
-        if (match) {
-          setSelectedVoiceURI(match.voiceURI);
-        } else {
-          // Auto-select top-ranked natural voice
-          setSelectedVoiceURI(ranked[0].voiceURI);
-        }
-      }
+    const loadLocal = () => {
+      const all = window.speechSynthesis.getVoices() || [];
+      const english = all.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+      setDeviceVoices(english.length > 0 ? english : all);
     };
 
-    loadVoices();
+    loadLocal();
     if (window.speechSynthesis.onvoiceschanged !== undefined) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
+      window.speechSynthesis.onvoiceschanged = loadLocal;
     }
-
-    return () => {
-      if (typeof window !== "undefined" && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-      }
-    };
   }, []);
 
-  const selectedVoice = useMemo(() => {
-    return voices.find((v) => v.voiceURI === selectedVoiceURI) || voices[0] || null;
-  }, [voices, selectedVoiceURI]);
+  // Determine current active voice object
+  const currentNeuralVoice = useMemo(() => {
+    return NEURAL_VOICES.find((v) => v.id === selectedVoiceId) || null;
+  }, [selectedVoiceId]);
 
-  // Speak a specific sentence by index with natural pacing
-  const speakSentence = (index) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    if (index < 0 || index >= sentences.length) {
+  const currentDeviceVoice = useMemo(() => {
+    if (currentNeuralVoice) return null;
+    return deviceVoices.find((v) => v.voiceURI === selectedVoiceId) || null;
+  }, [currentNeuralVoice, deviceVoices, selectedVoiceId]);
+
+  // Stop all playback engines
+  const stopAllPlayback = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+      audioRef.current.load();
+    }
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.removeAttribute("src");
+    }
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    setIsPlaying(false);
+    setIsLoadingAudio(false);
+    setPreviewingVoiceId(null);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      stopAllPlayback();
+    };
+  }, [stopAllPlayback]);
+
+  // Preload upcoming sentence audio for instantaneous transitions
+  const preloadUpcoming = useCallback(
+    (nextIdx) => {
+      if (!currentNeuralVoice || nextIdx >= sentences.length) return;
+      const nextText = sentences[nextIdx];
+      if (!nextText) return;
+
+      const url = buildNeuralStreamUrl(nextText, currentNeuralVoice.id, playbackRate);
+      if (!nextAudioRef.current) {
+        nextAudioRef.current = new Audio();
+      }
+      nextAudioRef.current.src = url;
+      nextAudioRef.current.preload = "auto";
+    },
+    [currentNeuralVoice, playbackRate, sentences]
+  );
+
+  // Play a specific sentence
+  const speakSentence = useCallback(
+    (index) => {
+      if (index < 0 || index >= sentences.length) {
+        setIsPlaying(false);
+        setIsLoadingAudio(false);
+        if (onComplete) onComplete();
+        return;
+      }
+
+      currentIndexRef.current = index;
+      if (onSentenceChange) onSentenceChange(index);
+
+      const text = sentences[index];
+      if (!text) return;
+
+      // 1. NEURAL STUDIO TTS PLAYBACK (DEFAULT & PRIMARY)
+      if (currentNeuralVoice) {
+        if (typeof window !== "undefined" && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+
+        if (!audioRef.current) {
+          audioRef.current = new Audio();
+        }
+
+        const audio = audioRef.current;
+        audio.pause();
+
+        const streamUrl = buildNeuralStreamUrl(text, currentNeuralVoice.id, playbackRate);
+        audio.src = streamUrl;
+        audio.playbackRate = 1.0;
+        audio.muted = isMuted;
+
+        setIsLoadingAudio(true);
+
+        audio.oncanplay = () => {
+          setIsLoadingAudio(false);
+          if (isPlayingRef.current) {
+            audio.play().catch((err) => {
+              console.warn("[CourseAudioNarrator] Audio play rejected:", err);
+            });
+          }
+        };
+
+        audio.onplay = () => {
+          setIsPlaying(true);
+          setIsLoadingAudio(false);
+          // Preload upcoming sentence while current one is playing
+          preloadUpcoming(index + 1);
+        };
+
+        audio.onended = () => {
+          if (isPlayingRef.current) {
+            const nextIdx = index + 1;
+            if (nextIdx < sentences.length) {
+              currentIndexRef.current = nextIdx;
+              if (onSentenceChange) onSentenceChange(nextIdx);
+              // Smooth natural breathing pause (100ms) between sentences
+              setTimeout(() => {
+                if (isPlayingRef.current) {
+                  speakSentence(nextIdx);
+                }
+              }, 100);
+            } else {
+              setIsPlaying(false);
+              if (onComplete) onComplete();
+            }
+          }
+        };
+
+        audio.onerror = (e) => {
+          console.warn("[CourseAudioNarrator] Neural stream error, falling back to Web Speech:", e);
+          setIsLoadingAudio(false);
+          // Fallback seamlessly to local browser synthesis so audio never fails
+          fallbackWebSpeech(text, index);
+        };
+
+        audio.load();
+        audio.play().catch(() => {
+          // Will play on `oncanplay`
+        });
+        return;
+      }
+
+      // 2. FALLBACK DEVICE WEB SPEECH SYNTHESIS
+      fallbackWebSpeech(text, index);
+    },
+    [sentences, currentNeuralVoice, playbackRate, isMuted, onSentenceChange, preloadUpcoming, onComplete]
+  );
+
+  // Fallback to client-side window.speechSynthesis
+  const fallbackWebSpeech = (text, index) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
       setIsPlaying(false);
-      if (onComplete) onComplete();
+      setIsLoadingAudio(false);
       return;
     }
 
     window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
 
-    const textToSpeak = sentences[index];
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
+    if (currentDeviceVoice) {
+      utterance.voice = currentDeviceVoice;
     }
-    // Set conversational natural rate
-    utterance.rate = playbackRate * 0.96;
+    utterance.rate = playbackRate * 0.95;
     utterance.pitch = 1.0;
     utterance.volume = isMuted ? 0 : 1;
 
     utterance.onstart = () => {
       setIsPlaying(true);
-      if (onSentenceChange) onSentenceChange(index);
+      setIsLoadingAudio(false);
     };
 
     utterance.onend = () => {
-      // Natural breath pause between sentences (120ms) before continuing
       if (isPlayingRef.current) {
         const nextIdx = index + 1;
         if (nextIdx < sentences.length) {
@@ -247,82 +398,145 @@ export default function CourseAudioNarrator({
 
     utterance.onerror = (e) => {
       if (e.error === "canceled" || e.error === "interrupted") return;
-      console.warn("[CourseAudioNarrator] Speech error:", e.error);
+      console.warn("[CourseAudioNarrator] Web Speech error:", e.error);
       setIsPlaying(false);
+      setIsLoadingAudio(false);
     };
 
     window.speechSynthesis.speak(utterance);
   };
 
+  // Toggle Play / Pause
   const handleTogglePlay = () => {
-    if (!speechSupported || sentences.length === 0) return;
+    if (sentences.length === 0) return;
 
     if (isPlaying) {
-      window.speechSynthesis.cancel();
-      setIsPlaying(false);
+      stopAllPlayback();
     } else {
+      setIsPlaying(true);
       speakSentence(activeSentenceIndex);
     }
   };
 
+  // Restart from sentence 0
   const handleRestart = () => {
-    window.speechSynthesis.cancel();
+    stopAllPlayback();
     currentIndexRef.current = 0;
     if (onSentenceChange) onSentenceChange(0);
+    setIsPlaying(true);
     speakSentence(0);
   };
 
+  // Skip Forward
   const handleSkipNext = () => {
     const nextIdx = Math.min(sentences.length - 1, activeSentenceIndex + 1);
     if (nextIdx !== activeSentenceIndex) {
       currentIndexRef.current = nextIdx;
       if (onSentenceChange) onSentenceChange(nextIdx);
-      if (isPlaying) speakSentence(nextIdx);
+      if (isPlaying) {
+        speakSentence(nextIdx);
+      }
     }
   };
 
+  // Skip Backward
   const handleSkipPrev = () => {
     const prevIdx = Math.max(0, activeSentenceIndex - 1);
     if (prevIdx !== activeSentenceIndex) {
       currentIndexRef.current = prevIdx;
       if (onSentenceChange) onSentenceChange(prevIdx);
-      if (isPlaying) speakSentence(prevIdx);
+      if (isPlaying) {
+        speakSentence(prevIdx);
+      }
     }
   };
 
-  const handleSeek = (newIndex) => {
-    const validIdx = Math.max(0, Math.min(sentences.length - 1, newIndex));
-    currentIndexRef.current = validIdx;
-    if (onSentenceChange) onSentenceChange(validIdx);
-    if (isPlaying) speakSentence(validIdx);
-  };
-
-  const handleVoiceSelect = (voiceURI) => {
-    setSelectedVoiceURI(voiceURI);
-    localStorage.setItem("cg_preferred_voice", voiceURI);
-    setVoicePickerOpen(false);
-
-    if (isPlaying) {
-      setTimeout(() => speakSentence(activeSentenceIndex), 50);
-    }
-  };
-
+  // Cycle speed (1x -> 1.25x -> 1.5x -> 0.8x)
   const handleRateChange = () => {
     const rates = [1, 1.25, 1.5, 0.8];
     const nextIdx = (rates.indexOf(playbackRate) + 1) % rates.length;
     const nextRate = rates[nextIdx];
     setPlaybackRate(nextRate);
+    localStorage.setItem("cg_preferred_rate", String(nextRate));
+
     if (isPlaying) {
       setTimeout(() => speakSentence(activeSentenceIndex), 50);
     }
   };
 
-  const progressPercent = sentences.length > 0
-    ? Math.round(((activeSentenceIndex + 1) / sentences.length) * 100)
-    : 0;
+  // Select voice from dropdown
+  const handleSelectVoice = (voiceId) => {
+    setSelectedVoiceId(voiceId);
+    localStorage.setItem("cg_preferred_voice", voiceId);
+    setVoicePickerOpen(false);
+
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+    }
+    setPreviewingVoiceId(null);
+
+    if (isPlaying) {
+      setTimeout(() => speakSentence(activeSentenceIndex), 50);
+    }
+  };
+
+  // Preview a voice sample
+  const handlePreviewVoice = (e, voice) => {
+    e.stopPropagation();
+
+    // If currently previewing this voice, stop it
+    if (previewingVoiceId === voice.id) {
+      if (previewAudioRef.current) {
+        previewAudioRef.current.pause();
+      }
+      setPreviewingVoiceId(null);
+      return;
+    }
+
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio();
+    }
+
+    const preview = previewAudioRef.current;
+    preview.pause();
+
+    const sampleText = `Hello! I am ${voice.name}, your CyberGuard cybersecurity course narrator.`;
+    const previewUrl = buildNeuralStreamUrl(sampleText, voice.id, 1);
+
+    preview.src = previewUrl;
+    setPreviewingVoiceId(voice.id);
+
+    preview.onended = () => {
+      setPreviewingVoiceId(null);
+    };
+
+    preview.onerror = () => {
+      setPreviewingVoiceId(null);
+    };
+
+    preview.play().catch(() => {
+      setPreviewingVoiceId(null);
+    });
+  };
+
+  const progressPercent =
+    sentences.length > 0
+      ? Math.round(((activeSentenceIndex + 1) / sentences.length) * 100)
+      : 0;
 
   const currentSentence = sentences[activeSentenceIndex] || "";
   const estMinutes = Math.max(1, Math.round(sentences.length * 0.15));
+
+  // Voice name display
+  const voiceDisplay = useMemo(() => {
+    if (currentNeuralVoice) {
+      return `${currentNeuralVoice.flag} ${currentNeuralVoice.name} (${currentNeuralVoice.accent})`;
+    }
+    if (currentDeviceVoice) {
+      return `💻 ${currentDeviceVoice.name.slice(0, 18)}`;
+    }
+    return "🇬🇭 Ezinne (West Africa)";
+  }, [currentNeuralVoice, currentDeviceVoice]);
 
   return (
     <>
@@ -344,7 +558,9 @@ export default function CourseAudioNarrator({
                   : "bg-[#0056D2] hover:bg-[#00419E] text-white shadow-blue-500/20 hover:scale-105"
               }`}
             >
-              {isPlaying ? (
+              {isLoadingAudio ? (
+                <Loader2 className="w-5 h-5 animate-spin text-white" />
+              ) : isPlaying ? (
                 <Pause className="w-5 h-5 fill-current" />
               ) : (
                 <Play className="w-5 h-5 fill-current ml-0.5" />
@@ -360,12 +576,18 @@ export default function CourseAudioNarrator({
                 <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
                   ⏱️ ~{estMinutes} min
                 </span>
+                {currentNeuralVoice && (
+                  <span className="hidden md:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                    <Sparkles className="w-2.5 h-2.5 text-emerald-600" />
+                    Studio Neural Voice
+                  </span>
+                )}
               </div>
 
               <p className="text-[11px] text-slate-500 truncate mt-0.5">
                 {isPlaying
                   ? `Sentence ${activeSentenceIndex + 1} of ${sentences.length} (${progressPercent}%)`
-                  : "Click play or tap any sentence in the text to listen"}
+                  : "Click play or tap any sentence in the lesson to listen"}
               </p>
             </div>
           </div>
@@ -411,47 +633,112 @@ export default function CourseAudioNarrator({
                 onClick={() => setVoicePickerOpen((prev) => !prev)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-700 transition cursor-pointer"
               >
-                <span className="truncate max-w-[100px] sm:max-w-[140px]">
-                  {formatVoiceName(selectedVoice?.name)}
+                <span className="truncate max-w-[120px] sm:max-w-[170px]">
+                  {voiceDisplay}
                 </span>
                 <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
               </button>
 
               {voicePickerOpen && (
-                <div className="absolute right-0 mt-2 w-64 sm:w-72 max-h-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-50 divide-y divide-slate-100">
-                  <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    Select Voice ({voices.length})
-                  </div>
-                  <div className="space-y-0.5 pt-1">
-                    {voices.map((v) => {
-                      const isSelected = v.voiceURI === selectedVoiceURI;
-                      const isNatural = v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Neural");
-                      return (
-                        <button
-                          key={v.voiceURI}
-                          type="button"
-                          onClick={() => handleVoiceSelect(v.voiceURI)}
-                          className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between transition cursor-pointer ${
-                            isSelected
-                              ? "bg-blue-50 text-[#0056D2] font-bold border border-blue-200/80"
-                              : "hover:bg-slate-50 text-slate-700"
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1 mr-2 truncate">
-                            <span className="truncate block font-medium">
-                              {formatVoiceName(v.name)}
-                            </span>
-                            {isNatural && (
-                              <span className="text-[9px] font-mono text-emerald-600 block">
-                                ⭐ High Fidelity Neural
-                              </span>
-                            )}
+                <div className="absolute right-0 mt-2 w-72 sm:w-84 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl p-2 z-50 divide-y divide-slate-100">
+                  {/* Curated Studio Neural Voices Section */}
+                  <div className="pb-2">
+                    <div className="px-2.5 py-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      <span>Real Studio Voices (Recommended)</span>
+                      <Sparkles className="w-3 h-3 text-emerald-600" />
+                    </div>
+
+                    <div className="space-y-1 pt-1">
+                      {NEURAL_VOICES.map((v) => {
+                        const isSelected = v.id === selectedVoiceId;
+                        const isPreviewing = previewingVoiceId === v.id;
+
+                        return (
+                          <div
+                            key={v.id}
+                            onClick={() => handleSelectVoice(v.id)}
+                            className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition cursor-pointer ${
+                              isSelected
+                                ? "bg-blue-50 text-[#0056D2] font-bold border border-blue-200/80"
+                                : "hover:bg-slate-50 text-slate-700"
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1 mr-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-base">{v.flag}</span>
+                                <span className="font-bold text-slate-900 truncate">
+                                  {v.name}
+                                </span>
+                                <span className="text-[10px] px-1.5 py-0.2 rounded font-semibold bg-slate-100 text-slate-600">
+                                  {v.accent}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                                {v.description}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {/* Audio Sample Preview Button */}
+                              <button
+                                type="button"
+                                onClick={(e) => handlePreviewVoice(e, v)}
+                                title={`Preview ${v.name}'s voice`}
+                                className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                                  isPreviewing
+                                    ? "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                                    : "bg-white text-slate-500 hover:text-slate-900 border-slate-200 hover:bg-slate-100"
+                                }`}
+                              >
+                                {isPreviewing ? (
+                                  <Radio className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Volume2 className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+
+                              {isSelected && (
+                                <Check className="w-4 h-4 text-[#0056D2]" />
+                              )}
+                            </div>
                           </div>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#0056D2] shrink-0" />}
-                        </button>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
+
+                  {/* Optional Local Device Voices Section */}
+                  {deviceVoices.length > 0 && (
+                    <div className="pt-2">
+                      <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        Device System Voices ({deviceVoices.length})
+                      </div>
+                      <div className="space-y-0.5 pt-1 max-h-32 overflow-y-auto">
+                        {deviceVoices.slice(0, 8).map((v) => {
+                          const isSelected = v.voiceURI === selectedVoiceId;
+                          return (
+                            <button
+                              key={v.voiceURI}
+                              type="button"
+                              onClick={() => handleSelectVoice(v.voiceURI)}
+                              className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between transition cursor-pointer ${
+                                isSelected
+                                  ? "bg-blue-50 text-[#0056D2] font-bold border border-blue-200/80"
+                                  : "hover:bg-slate-50 text-slate-600"
+                              }`}
+                            >
+                              <span className="truncate block font-medium">
+                                💻 {v.name}
+                              </span>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-[#0056D2] shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -476,7 +763,7 @@ export default function CourseAudioNarrator({
           />
         </div>
 
-        {/* ACTIVE LIVE CAPTION BAR (When playing) */}
+        {/* ACTIVE LIVE CAPTION BAR */}
         {isPlaying && currentSentence && (
           <div className="px-4 py-2.5 bg-blue-50/70 border-t border-blue-100/80 flex items-center gap-2.5 transition-all duration-200">
             <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0" />
@@ -487,7 +774,7 @@ export default function CourseAudioNarrator({
         )}
       </div>
 
-      {/* STICKY FLOATING MINI-PLAYER (Appears when reading and scrolled past the top bar) */}
+      {/* STICKY FLOATING MINI-PLAYER (When scrolled down lesson content) */}
       {isPlaying && scrolledPast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 text-white px-4 py-2.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 backdrop-blur-xl transition-all duration-200 max-w-[92vw]">
           <button
@@ -495,7 +782,11 @@ export default function CourseAudioNarrator({
             onClick={handleTogglePlay}
             className="w-8 h-8 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 flex items-center justify-center shrink-0 cursor-pointer"
           >
-            <Pause className="w-4 h-4 fill-current" />
+            {isPlaying ? (
+              <Pause className="w-4 h-4 fill-current" />
+            ) : (
+              <Play className="w-4 h-4 fill-current ml-0.5" />
+            )}
           </button>
 
           <div className="min-w-0 max-w-[160px] sm:max-w-xs truncate text-xs font-semibold">

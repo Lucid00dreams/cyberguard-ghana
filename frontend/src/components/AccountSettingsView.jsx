@@ -107,7 +107,7 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
       const supported = isPushSupported();
       setPushSupported(supported);
       if (supported) {
-        fetchPushStatus().then(setPushStatus).catch(() => {});
+        fetchPushStatus().then(setPushStatus).catch(() => { });
       }
     }
   }, [user]);
@@ -370,19 +370,19 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
 
   const memberSinceLabel = user?.createdAt
     ? new Date(user.createdAt).toLocaleDateString("en-GH", {
-        month: "short",
-        year: "numeric",
-      })
+      month: "short",
+      year: "numeric",
+    })
     : "Active";
 
   const cardMotion = (delay = 0) =>
     prefersReducedMotion
       ? {}
       : {
-          initial: { opacity: 0, y: 10 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.24, delay, ease: [0.22, 1, 0.36, 1] },
-        };
+        initial: { opacity: 0, y: 10 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.24, delay, ease: [0.22, 1, 0.36, 1] },
+      };
 
   return (
     <div className={`${isModal ? "p-6" : "space-y-6"} max-w-6xl mx-auto`}>
@@ -415,11 +415,10 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.18 }}
-            className={`p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs font-semibold ${
-              profileFeedback.type === "success"
+            className={`p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs font-semibold ${profileFeedback.type === "success"
                 ? "bg-emerald-50 border border-emerald-200 text-emerald-900"
                 : "bg-rose-50 border border-rose-200 text-rose-900"
-            }`}
+              }`}
           >
             <div className="flex items-center gap-2">
               {profileFeedback.type === "success" ? (
@@ -550,9 +549,8 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 font-medium">7:00 AM daily tips</span>
               <span
-                className={`font-semibold ${
-                  receiveDailyTips ? "text-emerald-700" : "text-slate-500"
-                }`}
+                className={`font-semibold ${receiveDailyTips ? "text-emerald-700" : "text-slate-500"
+                  }`}
               >
                 {receiveDailyTips ? "Subscribed" : "Off"}
               </span>
@@ -753,11 +751,10 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
 
             {passwordFeedback && (
               <div
-                className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 ${
-                  passwordFeedback.type === "success"
+                className={`p-3.5 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 ${passwordFeedback.type === "success"
                     ? "bg-emerald-50 border border-emerald-200 text-emerald-900"
                     : "bg-rose-50 border border-rose-200 text-rose-900"
-                }`}
+                  }`}
               >
                 <span>{passwordFeedback.text}</span>
                 <button
@@ -903,11 +900,10 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
 
                 {pushFeedback && (
                   <div
-                    className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
-                      pushFeedback.type === "success"
+                    className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${pushFeedback.type === "success"
                         ? "bg-emerald-100 text-emerald-800"
                         : "bg-rose-100 text-rose-800"
-                    }`}
+                      }`}
                   >
                     {pushFeedback.type === "success" ? (
                       <CheckCircle2 className="w-4 h-4 shrink-0" />
@@ -923,11 +919,10 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
                     type="button"
                     onClick={handleTogglePush}
                     disabled={loadingPush}
-                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                      pushStatus.isThisDeviceSubscribed
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${pushStatus.isThisDeviceSubscribed
                         ? "bg-slate-200 hover:bg-slate-300 text-slate-700"
                         : "bg-[#0056D2] hover:bg-[#00419E] text-white shadow-xs"
-                    }`}
+                      }`}
                   >
                     {loadingPush ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />

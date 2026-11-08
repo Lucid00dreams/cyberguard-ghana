@@ -105,10 +105,10 @@ export default function Landing() {
     prefersReducedMotion
       ? {}
       : {
-          initial: { opacity: 0, y: 18 },
-          animate: { opacity: 1, y: 0 },
-          transition: { duration: 0.5, delay, ease: EASE_OUT },
-        };
+        initial: { opacity: 0, y: 18 },
+        animate: { opacity: 1, y: 0 },
+        transition: { duration: 0.5, delay, ease: EASE_OUT },
+      };
 
   return (
     <div className="space-y-16 pb-16 bg-[#F8FAFC]">
@@ -254,11 +254,10 @@ export default function Landing() {
                 key={cat}
                 type="button"
                 onClick={() => setFaqCategory(cat)}
-                className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg whitespace-nowrap transition border cursor-pointer ${
-                  faqCategory === cat
+                className={`text-xs font-semibold px-3.5 py-1.5 rounded-lg whitespace-nowrap transition border cursor-pointer ${faqCategory === cat
                     ? "bg-[#0056D2] text-white border-[#0056D2] shadow-xs"
                     : "bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 {cat}
               </button>
@@ -291,9 +290,8 @@ export default function Landing() {
                       </h3>
                     </div>
                     <ChevronDown
-                      className={`w-5 h-5 text-slate-400 shrink-0 mt-1 transition-transform duration-200 ${
-                        isOpen ? "rotate-180 text-[#0056D2]" : ""
-                      }`}
+                      className={`w-5 h-5 text-slate-400 shrink-0 mt-1 transition-transform duration-200 ${isOpen ? "rotate-180 text-[#0056D2]" : ""
+                        }`}
                     />
                   </button>
 
@@ -418,9 +416,8 @@ function PillarCard({ icon, title, desc, to, cta, accent = false, index = 0, red
 
       <Link
         to={to}
-        className={`mt-6 inline-block text-xs font-bold relative z-10 transition ${
-          accent ? "text-red-600 hover:text-red-700 hover:underline" : "text-[#0056D2] hover:text-[#00419E] hover:underline"
-        }`}
+        className={`mt-6 inline-block text-xs font-bold relative z-10 transition ${accent ? "text-red-600 hover:text-red-700 hover:underline" : "text-[#0056D2] hover:text-[#00419E] hover:underline"
+          }`}
       >
         {cta} &rarr;
       </Link>
