@@ -388,7 +388,7 @@ export default function CourseDetail() {
         </aside>
 
         {/* Right Main Viewer */}
-        <main className="order-1 lg:order-2 bg-white rounded-2xl p-4 sm:p-8 border border-slate-200/90 shadow-2xs min-w-0 w-full overflow-hidden">
+        <main className="order-1 lg:order-2 bg-white rounded-2xl p-4 sm:p-8 border border-slate-200/90 shadow-2xs min-w-0 w-full">
           {!user ? (
             <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white shadow-xs max-w-xl mx-auto">
               <div className="h-44 sm:h-52 relative overflow-hidden bg-slate-950">
