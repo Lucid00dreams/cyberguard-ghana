@@ -27,6 +27,7 @@ import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import UserAvatar from "./UserAvatar";
 import DeleteAccountSection from "./DeleteAccountSection";
+import PasswordStrengthAdvisor from "./PasswordStrengthAdvisor";
 import {
   isPushSupported,
   fetchPushStatus,
@@ -802,6 +803,19 @@ export default function AccountSettingsView({ isModal = false, onClose }) {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
                   />
                 </div>
+
+                <PasswordStrengthAdvisor
+                  password={passwordForm.newPassword}
+                  userHint={user?.email || ""}
+                  onSelectPassword={(suggested) => {
+                    setPasswordForm((prev) => ({
+                      ...prev,
+                      newPassword: suggested,
+                      confirmPassword: suggested,
+                    }));
+                    setShowPassword(true);
+                  }}
+                />
               </div>
 
               <div className="space-y-1.5">

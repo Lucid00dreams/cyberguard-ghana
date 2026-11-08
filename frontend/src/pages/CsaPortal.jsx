@@ -27,6 +27,7 @@ import {
   Send,
   Loader2,
   ArrowUpRight,
+  ChevronRight,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "../utils/api";
@@ -50,48 +51,57 @@ const VALID_TABS = [
 const TAB_META = {
   overview: {
     label: "Overview",
-    title: "Admin overview",
-    description: "Summary of accounts, incident reports, tutor applications, and curriculum.",
+    shortLabel: "Overview",
+    title: "Admin Overview",
+    description: "Platform metrics, recent accounts, incident reports, and pending tutor applications.",
   },
   users: {
     label: "Users",
-    title: "Users & permissions",
-    description: "Manage account roles or remove accounts across the platform.",
+    shortLabel: "Users",
+    title: "Users & Permissions",
+    description: "Manage learner, tutor, and officer roles or remove accounts across the platform.",
   },
   "daily-tips": {
-    label: "Daily tips log",
-    title: "Daily cyber safety tips log",
-    description: "Delivery history, subscriber list, and automated broadcast schedule.",
+    label: "Daily Tips",
+    shortLabel: "Daily Tips",
+    title: "Daily Cyber Safety Tips",
+    description: "Automated broadcast schedule, subscriber directory, and delivery audit logs.",
   },
   reports: {
-    label: "Incident reports",
-    title: "Incident reports",
-    description: "Review submitted cyber incident reports, update status, and export PDF case briefs.",
+    label: "Incident Reports",
+    shortLabel: "Reports",
+    title: "Incident Reports",
+    description: "Review confidential cyber incident submissions, update case status, and export PDF briefs.",
   },
   approvals: {
-    label: "Tutor applications",
-    title: "Tutor applications",
-    description: "Review educators applying to host 1-on-1 mentorship sessions.",
+    label: "Tutor Applications",
+    shortLabel: "Approvals",
+    title: "Tutor Applications",
+    description: "Review and approve educators applying to host 1-on-1 mentorship sessions.",
   },
   tutors: {
-    label: "Verified tutors",
-    title: "Verified tutors",
-    description: "Approved mentors currently active in the mentorship directory.",
+    label: "Verified Tutors",
+    shortLabel: "Tutors",
+    title: "Verified Tutors",
+    description: "Accredited mentors currently active in the public mentorship directory.",
   },
   courses: {
     label: "Courses",
-    title: "Course catalog",
-    description: "Preview published courses, manage catalog entries, or create lessons in Course Studio.",
+    shortLabel: "Courses",
+    title: "Course Catalog",
+    description: "Manage published curriculum modules or launch Course Studio to author new lessons.",
   },
   certificates: {
     label: "Certificates",
-    title: "Issued certificates",
-    description: "Search completion credentials issued to learners.",
+    shortLabel: "Certs",
+    title: "Issued Certificates",
+    description: "Audit and verify completion credentials issued to learners.",
   },
   settings: {
     label: "Settings",
-    title: "Account & profile settings",
-    description: "Manage your administrator profile, password, and email preferences.",
+    shortLabel: "Settings",
+    title: "Account & Profile Settings",
+    description: "Manage your administrator profile, password, and notification preferences.",
   },
 };
 
@@ -102,11 +112,18 @@ const ROLE_LABELS = {
   STUDENT: "Student",
 };
 
+const ROLE_BADGE_STYLES = {
+  ADMIN: "bg-indigo-50 text-indigo-700 border-indigo-200/80",
+  CSA_OFFICER: "bg-blue-50 text-[#0056D2] border-blue-200/80",
+  TUTOR: "bg-emerald-50 text-emerald-700 border-emerald-200/80",
+  STUDENT: "bg-slate-100 text-slate-700 border-slate-200/80",
+};
+
 const INCIDENT_STATUS_STYLES = {
   SUBMITTED: "bg-slate-100 text-slate-700 border-slate-200",
-  UNDER_REVIEW: "bg-amber-50/80 text-amber-800 border-amber-200/80",
-  ESCALATED: "bg-rose-50/80 text-rose-800 border-rose-200/80",
-  RESOLVED: "bg-emerald-50/80 text-emerald-800 border-emerald-200/80",
+  UNDER_REVIEW: "bg-amber-50 text-amber-800 border-amber-200",
+  ESCALATED: "bg-rose-50 text-rose-800 border-rose-200",
+  RESOLVED: "bg-emerald-50 text-emerald-800 border-emerald-200",
   DISMISSED: "bg-slate-100 text-slate-500 border-slate-200",
 };
 
@@ -115,6 +132,7 @@ export default function CsaPortal() {
   const prefersReducedMotion = useReducedMotion();
   const adminScrollRef = useRef(null);
   const searchInputRef = useRef(null);
+  const mobileSearchInputRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialTab = VALID_TABS.includes(searchParams.get("tab"))
@@ -137,6 +155,7 @@ export default function CsaPortal() {
   const [courseSearch, setCourseSearch] = useState("");
   const [certSearch, setCertSearch] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
 
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -217,6 +236,8 @@ export default function CsaPortal() {
     if (e) e.preventDefault();
     const query = globalSearch.trim();
     if (!query) return;
+
+    setMobileSearchOpen(false);
 
     if (/^CG-/i.test(query) && active !== "certificates") {
       selectAdminTab("reports");
@@ -607,13 +628,14 @@ export default function CsaPortal() {
     {
       title: "Administration",
       items: [
-        { key: "overview", label: "Overview", icon: LayoutGrid, count: null },
+        { key: "overview", label: "Overview", shortLabel: "Overview", icon: LayoutGrid, count: null },
         ...(isSuperAdmin
           ? [
-              { key: "users", label: "Users", icon: Users, count: totalUsersCount },
+              { key: "users", label: "Users", shortLabel: "Users", icon: Users, count: totalUsersCount },
               {
                 key: "daily-tips",
-                label: "Daily tips log",
+                label: "Daily Tips",
+                shortLabel: "Daily Tips",
                 icon: Mail,
                 count: dailyTipsData.summary?.activeSubscribers ?? null,
               },
@@ -624,26 +646,27 @@ export default function CsaPortal() {
     {
       title: "Moderation",
       items: [
-        { key: "reports", label: "Incident reports", icon: AlertTriangle, count: reports.length },
+        { key: "reports", label: "Incident Reports", shortLabel: "Reports", icon: AlertTriangle, count: reports.length },
         {
           key: "approvals",
-          label: "Tutor applications",
+          label: "Tutor Applications",
+          shortLabel: "Approvals",
           icon: UserCheck,
           count: pendingTutors.length,
         },
-        { key: "tutors", label: "Verified tutors", icon: ShieldCheck, count: tutors.length },
+        { key: "tutors", label: "Verified Tutors", shortLabel: "Tutors", icon: ShieldCheck, count: tutors.length },
       ],
     },
     {
       title: "Learning",
       items: [
-        { key: "courses", label: "Courses", icon: BookOpen, count: courses.length },
-        { key: "certificates", label: "Certificates", icon: Award, count: certificates.length },
+        { key: "courses", label: "Courses", shortLabel: "Courses", icon: BookOpen, count: courses.length },
+        { key: "certificates", label: "Certificates", shortLabel: "Certs", icon: Award, count: certificates.length },
       ],
     },
     {
       title: "Account",
-      items: [{ key: "settings", label: "Settings", icon: SlidersHorizontal, count: null }],
+      items: [{ key: "settings", label: "Settings", shortLabel: "Settings", icon: SlidersHorizontal, count: null }],
     },
     {
       title: "Shortcuts",
@@ -652,7 +675,7 @@ export default function CsaPortal() {
         { key: "cyberchat", label: "Mentor Chat", icon: Lock, isLink: true, to: "/cyberchat" },
         {
           key: "reportPortal",
-          label: "Public report form",
+          label: "Public Report Form",
           icon: ExternalLink,
           isLink: true,
           to: "/report",
@@ -677,47 +700,47 @@ export default function CsaPortal() {
       };
 
   return (
-    <div className="h-screen h-[100dvh] overflow-hidden bg-[#F8FAFC] text-slate-900 flex flex-col lg:flex-row font-sans selection:bg-slate-900 selection:text-white">
+    <div className="h-screen h-[100dvh] w-full max-w-full min-w-0 overflow-hidden bg-[#F8FAFC] text-slate-900 flex flex-col lg:flex-row font-sans selection:bg-slate-900 selection:text-white">
       {/* Mobile Drawer Backdrop */}
       {mobileSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/35 z-30 lg:hidden"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px] z-30 lg:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
-      {/* Stationary Neutral Light Sidebar */}
+      {/* Stationary Sidebar (Desktop) & Slide-Over Drawer (Mobile) */}
       <aside
-        className={`w-64 bg-white text-slate-800 border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:static lg:h-full lg:translate-x-0 lg:shadow-none ${
-          mobileSidebarOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"
+        className={`w-64 max-w-[82vw] bg-white text-slate-800 border-r border-slate-200/90 flex flex-col justify-between shrink-0 z-40 transition-transform duration-200 fixed inset-y-0 left-0 h-full lg:static lg:h-full lg:translate-x-0 lg:shadow-none ${
+          mobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
         {/* Brand Header */}
-        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-100">
-          <div className="flex items-center gap-2 min-w-0">
-            <Link to="/" className="flex items-center shrink-0" title="Return to home">
-              <CyberGuardLogo variant="compact" size="sm" interactive />
-            </Link>
-            <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/80 text-[10px] font-semibold">
-              Admin
-            </span>
-          </div>
+        <div className="h-15 sm:h-16 px-4 flex items-center justify-between border-b border-slate-100 shrink-0">
+          <Link
+            to="/"
+            onClick={() => setMobileSidebarOpen(false)}
+            className="flex items-center min-w-0 shrink-0"
+            title="Return to public website"
+          >
+            <CyberGuardLogo variant="full" size="xs" subtitle="CSA Admin Console" interactive />
+          </Link>
 
           <button
             type="button"
             onClick={() => setMobileSidebarOpen(false)}
-            className="lg:hidden text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+            className="lg:hidden text-slate-500 hover:text-slate-800 p-1.5 rounded-lg hover:bg-slate-100 transition cursor-pointer shrink-0"
             aria-label="Close navigation"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto overscroll-contain py-4 px-3 space-y-5">
+        {/* Sidebar Navigation */}
+        <nav className="flex-1 overflow-y-auto overscroll-contain py-3.5 px-3 space-y-4">
           {sidebarSections.map((section) => (
             <div key={section.title} className="space-y-0.5">
-              <div className="px-3 pb-1 text-[11px] font-semibold text-slate-400">
+              <div className="px-3 pb-1 text-[10px] font-mono uppercase tracking-wider font-bold text-slate-400">
                 {section.title}
               </div>
 
@@ -731,7 +754,7 @@ export default function CsaPortal() {
                       key={item.key}
                       to={item.to}
                       onClick={() => setMobileSidebarOpen(false)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition"
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <Icon className="w-4 h-4 text-slate-400 shrink-0" />
@@ -747,16 +770,16 @@ export default function CsaPortal() {
                     key={item.key}
                     type="button"
                     onClick={() => selectAdminTab(item.key)}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs transition cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition cursor-pointer ${
                       isActive
-                        ? "bg-slate-100 text-slate-900 font-semibold"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-normal"
+                        ? "bg-[#0056D2]/10 text-[#0056D2] font-bold"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 font-medium"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <Icon
                         className={`w-4 h-4 shrink-0 ${
-                          isActive ? "text-slate-900" : "text-slate-400"
+                          isActive ? "text-[#0056D2]" : "text-slate-400"
                         }`}
                       />
                       <span className="truncate">{item.label}</span>
@@ -764,9 +787,9 @@ export default function CsaPortal() {
 
                     {item.count !== null && item.count !== undefined && item.count > 0 && (
                       <span
-                        className={`text-[11px] font-mono px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
                           isActive
-                            ? "bg-white text-slate-800 border border-slate-200/80"
+                            ? "bg-[#0056D2] text-white"
                             : "bg-slate-100 text-slate-600"
                         }`}
                       >
@@ -781,20 +804,20 @@ export default function CsaPortal() {
         </nav>
 
         {/* Account Footer */}
-        <div className="border-t border-slate-100 p-3 bg-slate-50/50 flex items-center justify-between gap-2">
+        <div className="border-t border-slate-100 p-3 bg-slate-50/70 flex items-center justify-between gap-2 shrink-0">
           <button
             type="button"
             onClick={() => selectAdminTab("settings")}
             title="Account settings"
             className="flex items-center gap-2.5 min-w-0 text-left hover:opacity-90 transition cursor-pointer flex-1"
           >
-            <UserAvatar user={user} size="sm" rounded="rounded-full" />
+            <UserAvatar user={user} size="sm" rounded="rounded-xl" />
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-900 truncate">
+              <p className="text-xs font-bold text-slate-900 truncate">
                 {user?.displayName || "Administrator"}
               </p>
-              <p className="text-[11px] text-slate-500 truncate">
-                {user?.email || ROLE_LABELS[user?.role] || "Admin"}
+              <p className="text-[10px] text-slate-500 font-mono truncate">
+                {ROLE_LABELS[user?.role] || "Admin"}
               </p>
             </div>
           </button>
@@ -816,7 +839,7 @@ export default function CsaPortal() {
               type="button"
               onClick={logout}
               title="Sign out"
-              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
             </button>
@@ -827,88 +850,166 @@ export default function CsaPortal() {
       {/* Main Administrative Workspace */}
       <div
         ref={adminScrollRef}
-        className="flex-1 min-w-0 flex flex-col h-full overflow-y-auto overscroll-contain bg-[#F8FAFC]"
+        className="flex-1 min-w-0 w-full max-w-full flex flex-col h-full overflow-y-auto overflow-x-hidden overscroll-contain bg-[#F8FAFC]"
       >
-        {/* Top Bar */}
-        <header className="h-16 shrink-0 bg-white/95 backdrop-blur-xs border-b border-slate-200/80 px-4 sm:px-8 flex items-center justify-between gap-4 sticky top-0 z-20">
-          <div className="flex items-center gap-3 min-w-0">
-            <button
-              type="button"
-              onClick={() => setMobileSidebarOpen(true)}
-              className="lg:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer"
-              aria-label="Open navigation"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+        {/* Sticky Top Bar */}
+        <header className="shrink-0 bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-20 w-full">
+          <div className="h-14 sm:h-16 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2">
+            {/* Left: Drawer Button + Breadcrumb */}
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setMobileSidebarOpen(true)}
+                className="lg:hidden text-slate-700 hover:text-slate-900 p-2 rounded-xl border border-slate-200/80 bg-slate-50/80 hover:bg-slate-100 cursor-pointer shrink-0"
+                aria-label="Open navigation"
+              >
+                <Menu className="w-4 h-4" />
+              </button>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500 truncate">
-              <span className="font-medium text-slate-500">Admin</span>
-              <span className="text-slate-300">/</span>
-              <span className="font-semibold text-slate-900 truncate">{currentMeta.label}</span>
+              <div className="flex items-center gap-1.5 sm:gap-2 text-xs min-w-0">
+                <span className="hidden xs:inline font-medium text-slate-400 shrink-0">Admin</span>
+                <span className="hidden xs:inline text-slate-300 shrink-0">/</span>
+                <span className="font-bold text-slate-900 truncate text-xs sm:text-sm">
+                  {currentMeta.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Right: Search + Refresh + Public Site */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              {/* Desktop Quick Search */}
+              <form
+                onSubmit={handleGlobalSearchSubmit}
+                className="hidden md:flex items-center relative w-56 lg:w-68"
+              >
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  placeholder="Quick search..."
+                  className="w-full pl-8 pr-14 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#0056D2] transition"
+                />
+                <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white rounded border border-slate-200 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                  Ctrl K
+                </kbd>
+              </form>
+
+              {/* Mobile Search Toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileSearchOpen((prev) => {
+                    const next = !prev;
+                    if (next) {
+                      setTimeout(() => mobileSearchInputRef.current?.focus(), 60);
+                    }
+                    return next;
+                  });
+                }}
+                aria-label="Toggle quick search"
+                className={`md:hidden p-2 rounded-xl border transition cursor-pointer ${
+                  mobileSearchOpen
+                    ? "bg-blue-50 border-blue-200 text-[#0056D2]"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <Search className="w-4 h-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={loadOverview}
+                disabled={loading}
+                title="Refresh data"
+                className="inline-flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-semibold transition cursor-pointer disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 sm:w-3.5 sm:h-3.5 ${loading ? "animate-spin text-[#0056D2]" : ""}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+
+              <Link
+                to="/"
+                title="Open public site"
+                className="inline-flex items-center gap-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-600 hover:text-slate-900 transition"
+              >
+                <Globe className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-slate-500" />
+                <span className="hidden sm:inline">Public site</span>
+              </Link>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
-            {/* Compact Quick Search */}
+          {/* Expandable Mobile Quick Search Bar */}
+          {mobileSearchOpen && (
             <form
               onSubmit={handleGlobalSearchSubmit}
-              className="hidden md:flex items-center relative w-64 lg:w-72"
+              className="md:hidden px-3 pb-2.5 pt-0.5 border-t border-slate-100 bg-white flex items-center gap-2"
             >
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
-                placeholder="Quick search..."
-                className="w-full pl-8 pr-14 py-1.5 rounded-lg bg-slate-50 border border-slate-200/90 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-slate-400 transition"
-              />
-              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-400 bg-white rounded border border-slate-200 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                Ctrl K
-              </kbd>
+              <div className="relative flex-1 min-w-0">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  ref={mobileSearchInputRef}
+                  type="text"
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  placeholder="Search users, CG-ref codes, courses..."
+                  className="w-full pl-8 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-[#0056D2]"
+                />
+                {globalSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setGlobalSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <button
+                type="submit"
+                className="px-3 py-2 rounded-xl bg-[#0056D2] text-white text-xs font-bold shrink-0"
+              >
+                Go
+              </button>
             </form>
+          )}
 
-            <button
-              type="button"
-              onClick={loadOverview}
-              disabled={loading}
-              title="Refresh data"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-medium transition cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            <Link
-              to="/"
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-600 hover:text-slate-900 transition"
-            >
-              <Globe className="w-3.5 h-3.5 text-slate-400" />
-              <span>Public site</span>
-            </Link>
+          {/* Mobile Quick Tab Strip with Icons & Counts */}
+          <div className="lg:hidden bg-slate-50/90 border-t border-slate-200/70 px-2.5 sm:px-4 py-1.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar w-full max-w-full">
+            {mobileTabs.map((t) => {
+              const TabIcon = t.icon;
+              const isTabActive = active === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => selectAdminTab(t.key)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] whitespace-nowrap transition cursor-pointer shrink-0 ${
+                    isTabActive
+                      ? "bg-slate-900 text-white font-bold shadow-2xs"
+                      : "bg-white text-slate-600 border border-slate-200/80 hover:bg-slate-100 font-semibold"
+                  }`}
+                >
+                  <TabIcon className={`w-3.5 h-3.5 shrink-0 ${isTabActive ? "text-sky-400" : "text-slate-400"}`} />
+                  <span>{t.shortLabel || t.label}</span>
+                  {t.count !== null && t.count !== undefined && t.count > 0 && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded-full text-[9px] font-mono font-bold ${
+                        isTabActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
         </header>
 
-        {/* Mobile Quick Tab Strip */}
-        <div className="lg:hidden bg-white border-b border-slate-200/80 px-4 py-2 flex items-center gap-1.5 overflow-x-auto">
-          {mobileTabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => selectAdminTab(t.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap transition cursor-pointer ${
-                active === t.key
-                  ? "bg-slate-900 text-white font-semibold"
-                  : "text-slate-600 hover:bg-slate-100 font-medium"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Main Content */}
-        <main className="flex-1 p-4 sm:p-8 max-w-6xl w-full mx-auto space-y-6">
+        {/* Main Content Container */}
+        <main className="flex-1 p-3 sm:p-6 lg:p-8 pb-24 sm:pb-12 max-w-6xl w-full mx-auto space-y-4 sm:space-y-6 min-w-0">
           {/* Status Banner */}
           <AnimatePresence>
             {actionStatus && (
@@ -917,13 +1018,13 @@ export default function CsaPortal() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.15 }}
-                className={`p-3.5 rounded-xl border text-xs font-medium flex justify-between items-center gap-3 ${
+                className={`p-3 sm:p-3.5 rounded-xl border text-xs font-semibold flex justify-between items-center gap-3 ${
                   actionStatus.type === "error"
-                    ? "bg-rose-50/80 border-rose-200 text-rose-900"
-                    : "bg-white border-slate-200 text-slate-800 shadow-2xs"
+                    ? "bg-rose-50 border-rose-200 text-rose-900"
+                    : "bg-emerald-50/90 border-emerald-200 text-emerald-950 shadow-2xs"
                 }`}
               >
-                <span>{actionStatus.text}</span>
+                <span className="min-w-0 break-words">{actionStatus.text}</span>
                 <button
                   type="button"
                   onClick={() => setActionStatus(null)}
@@ -938,12 +1039,12 @@ export default function CsaPortal() {
 
           {/* Page Heading (AccountSettingsView renders its own heading) */}
           {active !== "settings" && (
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2.5 sm:gap-4">
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 tracking-tight">
                   {currentMeta.title}
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                   {currentMeta.description}
                 </p>
               </div>
@@ -951,49 +1052,51 @@ export default function CsaPortal() {
               {active === "courses" && (
                 <Link
                   to="/course-studio"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition shrink-0"
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl bg-[#0056D2] hover:bg-[#00419E] text-white font-bold text-xs transition shrink-0 shadow-xs w-full sm:w-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>New course</span>
+                  <span>Create Course in Studio</span>
                 </Link>
               )}
             </div>
           )}
 
           <AnimatePresence mode="wait">
-            {/* PANEL 1: OVERVIEW */}
+            {/* ================================================================= */}
+            {/* PANEL 1: OVERVIEW                                                 */}
+            {/* ================================================================= */}
             {active === "overview" && (
-              <motion.div key="overview" {...panelMotion} className="space-y-6">
-                {/* 4 Summary Metric Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <motion.div key="overview" {...panelMotion} className="space-y-4 sm:space-y-6 min-w-0">
+                {/* 4 Summary Metric Cards (2x2 Grid on Mobile, 4-Col on Desktop) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
                   <MetricCard
-                    label="Registered users"
+                    label="Registered Users"
                     value={totalUsersCount}
                     sublabel={`${stats?.students ?? 0} learners`}
                     icon={Users}
                     onClick={isSuperAdmin ? () => selectAdminTab("users") : undefined}
                   />
                   <MetricCard
-                    label="Incident reports"
+                    label="Incident Reports"
                     value={stats?.reports ?? reports.length}
                     sublabel="Submitted cases"
                     icon={AlertTriangle}
                     onClick={() => selectAdminTab("reports")}
                   />
                   <MetricCard
-                    label="Published courses"
+                    label="Published Courses"
                     value={stats?.courses ?? courses.length}
-                    sublabel={`${stats?.certificates ?? certificates.length} certificates issued`}
+                    sublabel={`${stats?.certificates ?? certificates.length} certs issued`}
                     icon={BookOpen}
                     onClick={() => selectAdminTab("courses")}
                   />
                   <MetricCard
-                    label="Verified tutors"
+                    label="Verified Tutors"
                     value={stats?.vettedTutors ?? tutors.length}
                     sublabel={
                       pendingTutors.length > 0
                         ? `${pendingTutors.length} awaiting review`
-                        : "No pending applications"
+                        : "All applications vetted"
                     }
                     icon={ShieldCheck}
                     onClick={() =>
@@ -1002,17 +1105,92 @@ export default function CsaPortal() {
                   />
                 </div>
 
+                {/* Quick Admin Actions Strip */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-4 shadow-2xs">
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-slate-400">
+                      Quick Actions
+                    </span>
+                    {isSuperAdmin && (
+                      <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+                        Daily Broadcast: <strong className="text-slate-800">{scheduleConfig.displayTime} GMT</strong> ({scheduleConfig.enabled ? "Active" : "Paused"})
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <Link
+                      to="/course-studio"
+                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-xs font-bold text-slate-800 hover:text-[#0056D2] transition"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Plus className="w-3.5 h-3.5 text-[#0056D2] shrink-0" />
+                        <span className="truncate">Course Studio</span>
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() => selectAdminTab("reports")}
+                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-xs font-bold text-slate-800 hover:text-[#0056D2] transition cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <span className="truncate">Triage Reports</span>
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    </button>
+
+                    {isSuperAdmin ? (
+                      <button
+                        type="button"
+                        onClick={() => selectAdminTab("daily-tips")}
+                        className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-xs font-bold text-slate-800 hover:text-[#0056D2] transition cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <Mail className="w-3.5 h-3.5 text-[#0056D2] shrink-0" />
+                          <span className="truncate">Tips Schedule</span>
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => selectAdminTab("approvals")}
+                        className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-xs font-bold text-slate-800 hover:text-[#0056D2] transition cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span className="truncate">Tutor Reviews</span>
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      </button>
+                    )}
+
+                    <Link
+                      to="/cyberchat"
+                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-xl bg-slate-50 hover:bg-blue-50/60 border border-slate-200/80 hover:border-blue-200 text-xs font-bold text-slate-800 hover:text-[#0056D2] transition"
+                    >
+                      <span className="flex items-center gap-2 truncate">
+                        <Lock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span className="truncate">Mentor Chat</span>
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    </Link>
+                  </div>
+                </div>
+
                 {/* Recent Users (Superadmin) */}
                 {isSuperAdmin && (
-                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <h2 className="text-sm font-semibold text-slate-900">Recent accounts</h2>
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xs min-w-0">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                      <h2 className="text-sm font-bold text-slate-900">Recent Accounts</h2>
                       <button
                         type="button"
                         onClick={() => selectAdminTab("users")}
-                        className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                        className="text-xs font-semibold text-[#0056D2] hover:underline cursor-pointer shrink-0"
                       >
-                        View all ({totalUsersCount})
+                        Manage all ({totalUsersCount})
                       </button>
                     </div>
 
@@ -1025,24 +1203,33 @@ export default function CsaPortal() {
                         {users.slice(0, 5).map((u) => (
                           <div
                             key={u.id}
-                            className="py-3 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                            className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-3 min-w-0"
                           >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <UserAvatar user={u} size="sm" rounded="rounded-full" />
-                              <div className="min-w-0">
-                                <p className="text-xs font-semibold text-slate-900 truncate">
-                                  {u.displayName}
-                                </p>
+                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+                              <UserAvatar user={u} size="sm" rounded="rounded-xl" />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <p className="text-xs font-bold text-slate-900 truncate">
+                                    {u.displayName}
+                                  </p>
+                                </div>
                                 <p className="text-[11px] text-slate-500 truncate">{u.email}</p>
+                                <p className="text-[10px] text-slate-400 sm:hidden mt-0.5">
+                                  {u._count?.enrollments || 0} courses · {u._count?.certificates || 0} certs
+                                </p>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-2.5 text-[11px] text-slate-500 shrink-0">
-                              <span>
+                              <span className="hidden sm:inline">
                                 {u._count?.enrollments || 0} courses ·{" "}
                                 {u._count?.certificates || 0} certs
                               </span>
-                              <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200/80 text-slate-700 font-medium">
+                              <span
+                                className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${
+                                  ROLE_BADGE_STYLES[u.role] || ROLE_BADGE_STYLES.STUDENT
+                                }`}
+                              >
                                 {ROLE_LABELS[u.role] || u.role}
                               </span>
                             </div>
@@ -1053,19 +1240,19 @@ export default function CsaPortal() {
                   </div>
                 )}
 
-                {/* Incidents & Tutor Applications */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 min-w-0 w-full">
-                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <h2 className="text-sm font-semibold text-slate-900">
-                        Recent incident reports
+                {/* Incidents & Tutor Applications Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 min-w-0 w-full">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xs min-w-0">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                      <h2 className="text-sm font-bold text-slate-900">
+                        Recent Incident Reports
                       </h2>
                       <button
                         type="button"
                         onClick={() => selectAdminTab("reports")}
-                        className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                        className="text-xs font-semibold text-[#0056D2] hover:underline cursor-pointer shrink-0"
                       >
-                        Manage ({reports.length})
+                        View all ({reports.length})
                       </button>
                     </div>
 
@@ -1078,10 +1265,10 @@ export default function CsaPortal() {
                         {reports.slice(0, 4).map((r) => (
                           <div
                             key={r.id}
-                            className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center gap-3 text-xs"
+                            className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center gap-3 text-xs min-w-0"
                           >
-                            <div className="min-w-0">
-                              <span className="font-mono font-semibold text-slate-800">
+                            <div className="min-w-0 flex-1">
+                              <span className="font-mono font-bold text-slate-900">
                                 {r.refCode}
                               </span>
                               <p className="text-[11px] text-slate-500 truncate mt-0.5">
@@ -1089,7 +1276,7 @@ export default function CsaPortal() {
                               </p>
                             </div>
                             <span
-                              className={`px-2 py-0.5 rounded-md border font-mono text-[10px] font-semibold shrink-0 ${
+                              className={`px-2 py-0.5 rounded-md border font-mono text-[10px] font-bold shrink-0 ${
                                 INCIDENT_STATUS_STYLES[r.status] ||
                                 "bg-slate-100 text-slate-700 border-slate-200"
                               }`}
@@ -1102,15 +1289,15 @@ export default function CsaPortal() {
                     )}
                   </div>
 
-                  <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4">
-                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                      <h2 className="text-sm font-semibold text-slate-900">
-                        Pending tutor applications
+                  <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xs min-w-0">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                      <h2 className="text-sm font-bold text-slate-900">
+                        Pending Tutor Applications
                       </h2>
                       <button
                         type="button"
                         onClick={() => selectAdminTab("approvals")}
-                        className="text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
+                        className="text-xs font-semibold text-[#0056D2] hover:underline cursor-pointer shrink-0"
                       >
                         Review ({pendingTutors.length})
                       </button>
@@ -1125,10 +1312,10 @@ export default function CsaPortal() {
                         {pendingTutors.slice(0, 4).map((t) => (
                           <div
                             key={t.id}
-                            className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center gap-3 text-xs"
+                            className="p-3 rounded-xl bg-slate-50/70 border border-slate-200/70 flex justify-between items-center gap-3 text-xs min-w-0"
                           >
-                            <div className="min-w-0">
-                              <p className="font-semibold text-slate-900 truncate">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-bold text-slate-900 truncate">
                                 {t.user?.displayName}
                               </p>
                               <p className="text-[11px] text-slate-500 truncate">{t.headline}</p>
@@ -1136,7 +1323,7 @@ export default function CsaPortal() {
                             <button
                               type="button"
                               onClick={() => approveTutor(t.id)}
-                              className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-[11px] transition shrink-0 cursor-pointer"
+                              className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] transition shrink-0 cursor-pointer"
                             >
                               Approve
                             </button>
@@ -1149,16 +1336,19 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 2: USERS */}
+            {/* ================================================================= */}
+            {/* PANEL 2: USERS                                                    */}
+            {/* ================================================================= */}
             {active === "users" && isSuperAdmin && (
               <motion.div
                 key="users"
                 {...panelMotion}
-                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+                className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs min-w-0"
               >
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                  <div className="flex flex-wrap items-center gap-2 flex-1">
-                    <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
+                {/* Mobile-Optimized Search & Role Filter Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
+                    <div className="relative flex-1 min-w-0 sm:max-w-xs">
                       <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
@@ -1168,46 +1358,48 @@ export default function CsaPortal() {
                         onKeyDown={(e) => {
                           if (e.key === "Enter") loadUsers(userSearch, userRoleFilter);
                         }}
-                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
                       />
                     </div>
 
-                    <select
-                      value={userRoleFilter}
-                      onChange={(e) => setUserRoleFilter(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400 focus:bg-white transition"
-                    >
-                      <option value="">All roles</option>
-                      <option value="STUDENT">Students</option>
-                      <option value="TUTOR">Tutors</option>
-                      <option value="CSA_OFFICER">CSA Officers</option>
-                      <option value="ADMIN">Admins</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={userRoleFilter}
+                        onChange={(e) => setUserRoleFilter(e.target.value)}
+                        className="flex-1 sm:flex-initial px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
+                      >
+                        <option value="">All roles</option>
+                        <option value="STUDENT">Students</option>
+                        <option value="TUTOR">Tutors</option>
+                        <option value="CSA_OFFICER">CSA Officers</option>
+                        <option value="ADMIN">Admins</option>
+                      </select>
 
-                    <button
-                      type="button"
-                      onClick={() => loadUsers(userSearch, userRoleFilter)}
-                      className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer"
-                    >
-                      Search
-                    </button>
-
-                    {(userSearch || userRoleFilter) && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setUserSearch("");
-                          setUserRoleFilter("");
-                          loadUsers("", "");
-                        }}
-                        className="px-2.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-900 cursor-pointer"
+                        onClick={() => loadUsers(userSearch, userRoleFilter)}
+                        className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shrink-0"
                       >
-                        Reset
+                        Search
                       </button>
-                    )}
+
+                      {(userSearch || userRoleFilter) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserSearch("");
+                            setUserRoleFilter("");
+                            loadUsers("", "");
+                          }}
+                          className="px-2.5 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer shrink-0"
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <span className="text-xs text-slate-500 font-mono">
+                  <span className="text-[11px] sm:text-xs text-slate-500 font-mono shrink-0">
                     {users.length} {users.length === 1 ? "account" : "accounts"}
                   </span>
                 </div>
@@ -1221,61 +1413,68 @@ export default function CsaPortal() {
                     {users.map((u) => (
                       <div
                         key={u.id}
-                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                        className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 hover:bg-white hover:border-slate-300 transition flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 min-w-0"
                       >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <UserAvatar user={u} size="md" rounded="rounded-full" />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-slate-900 text-sm">
+                        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                          <UserAvatar user={u} size="md" rounded="rounded-xl" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900 text-xs sm:text-sm truncate max-w-full">
                                 {u.displayName}
                               </span>
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                  ROLE_BADGE_STYLES[u.role] || ROLE_BADGE_STYLES.STUDENT
+                                }`}
+                              >
                                 {ROLE_LABELS[u.role] || u.role}
                               </span>
                               {u.ageBand && (
                                 <span className="text-[10px] font-medium text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/80">
-                                  {u.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
+                                  {u.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19+"}
                                 </span>
                               )}
                               {u.receiveDailyTips && (
-                                <span className="text-[10px] font-medium text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200/80 inline-flex items-center gap-1">
-                                  <Mail className="w-2.5 h-2.5 text-slate-400" /> Daily tips
+                                <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/70 inline-flex items-center gap-1">
+                                  <Mail className="w-2.5 h-2.5" /> Tips On
                                 </span>
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2.5 text-xs text-slate-500 mt-1 flex-wrap">
-                              <span className="truncate">{u.email}</span>
-                              <span className="text-slate-300">·</span>
+                            <p className="text-xs text-slate-500 truncate mt-0.5">{u.email}</p>
+
+                            <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1 flex-wrap">
                               <span>Joined {new Date(u.createdAt).toLocaleDateString()}</span>
-                              <span className="text-slate-300">·</span>
+                              <span>·</span>
                               <span>
-                                {u._count?.enrollments || 0} enrollments,{" "}
-                                {u._count?.certificates || 0} certs
+                                {u._count?.enrollments || 0} courses, {u._count?.certificates || 0} certs
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
-                          <label className="text-[11px] font-medium text-slate-500">Role</label>
-                          <select
-                            value={u.role}
-                            onChange={(e) => changeUserRole(u.id, e.target.value)}
-                            className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 hover:border-slate-300 focus:outline-none focus:border-slate-400 cursor-pointer"
-                          >
-                            <option value="STUDENT">Student</option>
-                            <option value="TUTOR">Tutor</option>
-                            <option value="CSA_OFFICER">CSA Officer</option>
-                            <option value="ADMIN">Admin</option>
-                          </select>
+                        <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 shrink-0">
+                          <div className="flex items-center gap-2 flex-1 sm:flex-initial">
+                            <label className="text-[11px] font-semibold text-slate-500 shrink-0">
+                              Role:
+                            </label>
+                            <select
+                              value={u.role}
+                              onChange={(e) => changeUserRole(u.id, e.target.value)}
+                              className="flex-1 sm:flex-initial text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 hover:border-slate-300 focus:outline-none focus:border-[#0056D2] cursor-pointer"
+                            >
+                              <option value="STUDENT">Student</option>
+                              <option value="TUTOR">Tutor</option>
+                              <option value="CSA_OFFICER">CSA Officer</option>
+                              <option value="ADMIN">Admin</option>
+                            </select>
+                          </div>
 
                           <button
                             type="button"
                             onClick={() => deleteUser(u.id, u.displayName)}
                             title="Delete user account"
-                            className="p-2 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-50/70 border border-transparent hover:border-rose-200/80 transition cursor-pointer"
+                            className="p-2 rounded-lg text-slate-400 hover:text-rose-700 hover:bg-rose-50 border border-slate-200/60 sm:border-transparent hover:border-rose-200 transition cursor-pointer shrink-0"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1287,28 +1486,36 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 2B: DAILY CYBER SAFETY TIPS LOG */}
+            {/* ================================================================= */}
+            {/* PANEL 3: DAILY CYBER SAFETY TIPS LOG & SCHEDULE                   */}
+            {/* ================================================================= */}
             {active === "daily-tips" && isSuperAdmin && (
-              <motion.div key="daily-tips" {...panelMotion} className="space-y-6">
-                <div className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
-                      <Clock className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span>
-                        Automatic daily broadcast: {dailyTipsData.summary?.nextScheduledRunLabel || `${scheduleConfig.displayTime} GMT`} (
-                        {dailyTipsData.summary?.timezone || "Africa/Accra"})
+              <motion.div key="daily-tips" {...panelMotion} className="space-y-4 sm:space-y-6 min-w-0">
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs min-w-0">
+                  {/* Top Bar: Schedule Summary + Action Buttons */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 sm:pb-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 min-w-0">
+                      <Clock className="w-4 h-4 text-[#0056D2] shrink-0" />
+                      <span className="leading-snug">
+                        Next broadcast:{" "}
+                        <strong className="text-slate-900">
+                          {dailyTipsData.summary?.nextScheduledRunLabel || `${scheduleConfig.displayTime} GMT`}
+                        </strong>{" "}
+                        <span className="text-slate-400">
+                          ({dailyTipsData.summary?.timezone || "Africa/Accra"})
+                        </span>
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
                       <button
                         type="button"
                         onClick={() => loadDailyTipsLogs()}
                         disabled={dailyTipsLoading}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer"
                       >
                         <RefreshCw
-                          className={`w-3.5 h-3.5 ${dailyTipsLoading ? "animate-spin" : ""}`}
+                          className={`w-3.5 h-3.5 ${dailyTipsLoading ? "animate-spin text-[#0056D2]" : ""}`}
                         />
                         <span>Refresh</span>
                       </button>
@@ -1317,7 +1524,7 @@ export default function CsaPortal() {
                         type="button"
                         onClick={exportDailyTipLogsCsv}
                         disabled={!dailyTipsData.emailLogs?.length}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition disabled:opacity-40 cursor-pointer"
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition disabled:opacity-40 cursor-pointer"
                       >
                         <FileDown className="w-3.5 h-3.5 text-slate-400" />
                         <span>Export CSV</span>
@@ -1330,17 +1537,17 @@ export default function CsaPortal() {
                           dispatchingNow || (dailyTipsData.summary?.activeSubscribers ?? 0) === 0
                         }
                         title="Send today's cyber safety tip to all opted-in subscribers"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition disabled:opacity-40 cursor-pointer"
+                        className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 sm:py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition disabled:opacity-40 cursor-pointer"
                       >
                         {dispatchingNow ? (
                           <>
                             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Sending...</span>
+                            <span>Sending Broadcast...</span>
                           </>
                         ) : (
                           <>
                             <Send className="w-3.5 h-3.5" />
-                            <span>Send today&apos;s tip now</span>
+                            <span>Send Today&apos;s Tip Now</span>
                           </>
                         )}
                       </button>
@@ -1348,15 +1555,15 @@ export default function CsaPortal() {
                   </div>
 
                   {/* ADMIN SCHEDULE CONTROL PANEL */}
-                  <div className="p-4 rounded-xl bg-slate-50/90 border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                  <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50/90 border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3.5">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-blue-600 shrink-0" />
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Clock className="w-4 h-4 text-[#0056D2] shrink-0" />
                         <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                           Broadcast Schedule Controls
                         </span>
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
                             scheduleConfig.enabled
                               ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : "bg-amber-50 text-amber-700 border border-amber-200"
@@ -1365,15 +1572,21 @@ export default function CsaPortal() {
                           {scheduleConfig.enabled ? "Active" : "Paused"}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-slate-500 leading-relaxed">
                         Dispatches automated tips (email &amp; web push) daily at{" "}
-                        <strong className="text-slate-800">{scheduleConfig.displayTime} GMT</strong> (Africa/Accra timezone).
+                        <strong className="text-slate-800">{scheduleConfig.displayTime} GMT</strong>.
                       </p>
                     </div>
 
-                    <form onSubmit={handleSaveSchedule} className="flex flex-wrap items-center gap-2.5">
-                      <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 shadow-2xs">
-                        <label htmlFor="tips-schedule-time" className="text-[11px] font-medium text-slate-500">
+                    <form
+                      onSubmit={handleSaveSchedule}
+                      className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+                    >
+                      <div className="flex items-center justify-between sm:justify-start gap-2 bg-white border border-slate-200 rounded-xl px-3 py-2 sm:py-1.5 shadow-2xs">
+                        <label
+                          htmlFor="tips-schedule-time"
+                          className="text-xs font-semibold text-slate-500"
+                        >
                           Time (GMT):
                         </label>
                         <input
@@ -1381,86 +1594,88 @@ export default function CsaPortal() {
                           type="time"
                           value={scheduleInputTime}
                           onChange={(e) => setScheduleInputTime(e.target.value)}
-                          className="text-xs font-semibold text-slate-900 bg-transparent focus:outline-none"
+                          className="text-xs font-bold text-slate-900 bg-transparent focus:outline-none"
                         />
                       </div>
 
-                      <button
-                        type="submit"
-                        disabled={scheduleSaving || scheduleInputTime === scheduleConfig.timeString}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition disabled:opacity-40 cursor-pointer shadow-2xs"
-                      >
-                        {scheduleSaving ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        ) : (
-                          <Check className="w-3.5 h-3.5" />
-                        )}
-                        <span>Set Time</span>
-                      </button>
+                      <div className="grid grid-cols-2 sm:flex items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={scheduleSaving || scheduleInputTime === scheduleConfig.timeString}
+                          className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded-xl bg-[#0056D2] hover:bg-[#00419E] text-white text-xs font-bold transition disabled:opacity-40 cursor-pointer shadow-2xs"
+                        >
+                          {scheduleSaving ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <Check className="w-3.5 h-3.5" />
+                          )}
+                          <span>Set Time</span>
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={handleToggleScheduleStatus}
-                        disabled={scheduleSaving}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition cursor-pointer ${
-                          scheduleConfig.enabled
-                            ? "border-amber-200 bg-amber-50/70 hover:bg-amber-100/70 text-amber-800"
-                            : "border-emerald-200 bg-emerald-50/70 hover:bg-emerald-100/70 text-emerald-800"
-                        }`}
-                      >
-                        {scheduleConfig.enabled ? "Pause Auto-Send" : "Resume Auto-Send"}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={handleToggleScheduleStatus}
+                          disabled={scheduleSaving}
+                          className={`inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                            scheduleConfig.enabled
+                              ? "border-amber-200 bg-amber-50 hover:bg-amber-100/70 text-amber-800"
+                              : "border-emerald-200 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-800"
+                          }`}
+                        >
+                          {scheduleConfig.enabled ? "Pause Auto-Send" : "Resume Auto-Send"}
+                        </button>
+                      </div>
                     </form>
                   </div>
 
-                  {/* Uniform Neutral Summary Metrics */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                  {/* 4 Summary Metrics (2x2 Grid on Mobile) */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
                       <p className="text-[11px] font-medium text-slate-500">Subscribers</p>
-                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                      <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1 font-display">
                         {dailyTipsData.summary?.activeSubscribers ?? 0}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Opted-in accounts</p>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Opted-in accounts</p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
-                      <p className="text-[11px] font-medium text-slate-500">
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                      <p className="text-[11px] font-medium text-slate-500 truncate">
                         Sent today ({dailyTipsData.summary?.todayDateStr || "Today"})
                       </p>
-                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                      <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1 font-display">
                         {dailyTipsData.summary?.sentTodayCount ?? 0}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">
                         Next: {dailyTipsData.summary?.nextScheduledRunLabel || "07:00 GMT"}
                       </p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
                       <p className="text-[11px] font-medium text-slate-500">Total delivered</p>
-                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                      <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1 font-display">
                         {dailyTipsData.summary?.totalEmailsSent ?? 0}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">All-time emails sent</p>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">All-time emails</p>
                     </div>
 
-                    <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50/70 border border-slate-200/80">
                       <p className="text-[11px] font-medium text-slate-500">Delivery errors</p>
-                      <p className="text-2xl font-bold text-slate-900 mt-1 font-display">
+                      <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-1 font-display">
                         {dailyTipsData.summary?.totalFailed ?? 0}
                       </p>
-                      <p className="text-[11px] text-slate-400 mt-0.5">Bounce or relay errors</p>
+                      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Bounce/relay errors</p>
                     </div>
                   </div>
 
-                  {/* Calm Light Preview Card for Today's Tip */}
+                  {/* Preview Card for Today's Tip */}
                   {dailyTipsData.summary?.todaysTip && (
-                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium">
-                        <span>Today&apos;s tip #{dailyTipsData.summary.todaysTip.index}</span>
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-blue-50/40 border border-blue-200/60 space-y-1">
+                      <div className="flex items-center gap-2 text-[11px] text-[#0056D2] font-bold">
+                        <span>Today&apos;s Tip #{dailyTipsData.summary.todaysTip.index}</span>
                         <span>·</span>
                         <span>{dailyTipsData.summary.todaysTip.category}</span>
                       </div>
-                      <p className="text-sm font-semibold text-slate-900">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900">
                         {dailyTipsData.summary.todaysTip.title}
                       </p>
                       <p className="text-xs text-slate-600 leading-relaxed">
@@ -1471,13 +1686,13 @@ export default function CsaPortal() {
 
                   {/* Sub-view Switcher & Filters */}
                   <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-1">
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-fit">
+                    <div className="grid grid-cols-3 sm:inline-flex items-center gap-1 bg-slate-100 p-1 rounded-xl w-full sm:w-fit">
                       <button
                         type="button"
                         onClick={() => setTipLogSubView("daily")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                        className={`px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition cursor-pointer truncate ${
                           tipLogSubView === "daily"
-                            ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                            ? "bg-white text-slate-900 shadow-2xs"
                             : "text-slate-600 hover:text-slate-900"
                         }`}
                       >
@@ -1486,20 +1701,20 @@ export default function CsaPortal() {
                       <button
                         type="button"
                         onClick={() => setTipLogSubView("emails")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                        className={`px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition cursor-pointer truncate ${
                           tipLogSubView === "emails"
-                            ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                            ? "bg-white text-slate-900 shadow-2xs"
                             : "text-slate-600 hover:text-slate-900"
                         }`}
                       >
-                        All emails ({dailyTipsData.emailLogs.length})
+                        Emails ({dailyTipsData.emailLogs.length})
                       </button>
                       <button
                         type="button"
                         onClick={() => setTipLogSubView("subscribers")}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                        className={`px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-semibold transition cursor-pointer truncate ${
                           tipLogSubView === "subscribers"
-                            ? "bg-white text-slate-900 font-semibold shadow-2xs"
+                            ? "bg-white text-slate-900 shadow-2xs"
                             : "text-slate-600 hover:text-slate-900"
                         }`}
                       >
@@ -1507,80 +1722,83 @@ export default function CsaPortal() {
                       </button>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        type="date"
-                        value={tipLogDate}
-                        onChange={(e) => setTipLogDate(e.target.value)}
-                        className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-800 focus:outline-none focus:border-slate-400 focus:bg-white"
-                        title="Filter by dispatch date"
-                      />
-
-                      <select
-                        value={tipLogStatus}
-                        onChange={(e) => setTipLogStatus(e.target.value)}
-                        className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400 focus:bg-white"
-                      >
-                        <option value="">All statuses</option>
-                        <option value="SENT">Sent</option>
-                        <option value="FAILED">Failed</option>
-                      </select>
-
-                      <div className="relative flex-1 sm:w-52">
-                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="grid grid-cols-2 sm:flex items-center gap-2">
                         <input
-                          type="text"
-                          value={tipLogSearch}
-                          onChange={(e) => setTipLogSearch(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") loadDailyTipsLogs(tipLogSearch);
-                          }}
-                          placeholder="Recipient email..."
-                          className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 focus:outline-none focus:border-slate-400 focus:bg-white"
+                          type="date"
+                          value={tipLogDate}
+                          onChange={(e) => setTipLogDate(e.target.value)}
+                          className="px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-800 focus:outline-none focus:border-[#0056D2] focus:bg-white w-full sm:w-auto"
+                          title="Filter by dispatch date"
                         />
+
+                        <select
+                          value={tipLogStatus}
+                          onChange={(e) => setTipLogStatus(e.target.value)}
+                          className="px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0056D2] focus:bg-white w-full sm:w-auto"
+                        >
+                          <option value="">All statuses</option>
+                          <option value="SENT">Sent</option>
+                          <option value="FAILED">Failed</option>
+                        </select>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => loadDailyTipsLogs(tipLogSearch)}
-                        className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer"
-                      >
-                        Filter
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1 sm:w-48">
+                          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            value={tipLogSearch}
+                            onChange={(e) => setTipLogSearch(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") loadDailyTipsLogs(tipLogSearch);
+                            }}
+                            placeholder="Recipient email..."
+                            className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 focus:outline-none focus:border-[#0056D2] focus:bg-white"
+                          />
+                        </div>
 
-                      {(tipLogDate || tipLogStatus || tipLogSearch) && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setTipLogDate("");
-                            setTipLogStatus("");
-                            setTipLogSearch("");
-                            loadDailyTipsLogs("");
-                          }}
-                          className="px-2.5 py-2 rounded-xl text-xs font-medium text-slate-500 hover:text-slate-900 cursor-pointer"
+                          onClick={() => loadDailyTipsLogs(tipLogSearch)}
+                          className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition cursor-pointer shrink-0"
                         >
-                          Reset
+                          Filter
                         </button>
-                      )}
+
+                        {(tipLogDate || tipLogStatus || tipLogSearch) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTipLogDate("");
+                              setTipLogStatus("");
+                              setTipLogSearch("");
+                              loadDailyTipsLogs("");
+                            }}
+                            className="px-2 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-900 cursor-pointer shrink-0"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   {/* Sub-view 1: Daily Dispatches */}
                   {tipLogSubView === "daily" && (
-                    <div className="space-y-4 pt-2">
+                    <div className="space-y-4 pt-1">
                       {dailyTipsLoading ? (
                         <div className="py-10 text-center text-xs text-slate-500">
-                          Loading email logs...
+                          Loading dispatch logs...
                         </div>
                       ) : dailyTipsData.dispatches.length === 0 ? (
-                        <div className="py-12 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/40 space-y-1.5">
+                        <div className="py-10 px-4 text-center border border-dashed border-slate-200 rounded-2xl bg-slate-50/40 space-y-1.5">
                           <Mail className="w-5 h-5 text-slate-400 mx-auto" />
-                          <p className="text-sm font-semibold text-slate-800">
+                          <p className="text-sm font-bold text-slate-800">
                             No daily dispatches recorded yet
                           </p>
                           <p className="text-xs text-slate-500 max-w-md mx-auto">
-                            Tips are sent automatically at 07:00 GMT to opted-in accounts, or use
-                            &ldquo;Send today&apos;s tip now&rdquo; above.
+                            Tips are sent automatically at {scheduleConfig.displayTime} GMT to opted-in accounts, or use &ldquo;Send Today&apos;s Tip Now&rdquo; above.
                           </p>
                         </div>
                       ) : (
@@ -1589,15 +1807,15 @@ export default function CsaPortal() {
                             key={d.id}
                             className="rounded-xl border border-slate-200 overflow-hidden bg-white"
                           >
-                            <div className="p-4 bg-slate-50/60 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                              <div className="space-y-1">
+                            <div className="p-3.5 sm:p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div className="space-y-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-mono text-xs font-semibold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
+                                  <span className="font-mono text-xs font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded-md">
                                     {d.dispatchDate}
                                   </span>
-                                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                                  <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
                                     {d.triggerType === "SCHEDULED_7AM"
-                                      ? "07:00 scheduled"
+                                      ? "Scheduled"
                                       : "Manual send"}
                                   </span>
                                   <span className="text-[11px] text-slate-400">
@@ -1607,18 +1825,17 @@ export default function CsaPortal() {
                                     })}
                                   </span>
                                 </div>
-                                <h3 className="text-sm font-semibold text-slate-900">
+                                <h3 className="text-xs sm:text-sm font-bold text-slate-900">
                                   Tip #{d.tipIndex}: {d.tipTitle}
                                 </h3>
-                                <p className="text-xs text-slate-500">{d.subject}</p>
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0">
-                                <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-700 text-xs font-medium">
+                                <span className="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
                                   {d.sentCount} sent
                                 </span>
                                 {d.failedCount > 0 && (
-                                  <span className="px-2.5 py-1 rounded-md bg-rose-50/80 border border-rose-200 text-rose-800 text-xs font-medium">
+                                  <span className="px-2.5 py-1 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold">
                                     {d.failedCount} failed
                                   </span>
                                 )}
@@ -1630,47 +1847,73 @@ export default function CsaPortal() {
                                 No matching recipient rows for this dispatch.
                               </p>
                             ) : (
-                              <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse text-xs">
-                                  <thead>
-                                    <tr className="border-b border-slate-200/80 text-[11px] text-slate-500 bg-white">
-                                      <th className="py-2.5 px-4 font-medium">Recipient</th>
-                                      <th className="py-2.5 px-4 font-medium">Name</th>
-                                      <th className="py-2.5 px-4 font-medium">Time sent</th>
-                                      <th className="py-2.5 px-4 font-medium">Status</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="divide-y divide-slate-100 bg-white">
-                                    {d.logs.map((log) => (
-                                      <tr key={log.id} className="hover:bg-slate-50/60">
-                                        <td className="py-2.5 px-4 font-mono text-slate-800">
-                                          {log.recipientEmail}
-                                        </td>
-                                        <td className="py-2.5 px-4 text-slate-600">
-                                          {log.recipientName}
-                                        </td>
-                                        <td className="py-2.5 px-4 text-slate-500 font-mono text-[11px]">
-                                          {new Date(log.sentAt).toLocaleString()}
-                                        </td>
-                                        <td className="py-2.5 px-4">
-                                          {log.status === "SENT" ? (
-                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50/80 text-emerald-800 border border-emerald-200/80 text-[10px] font-semibold">
-                                              <CheckCircle2 className="w-3 h-3" /> Sent
-                                            </span>
-                                          ) : (
-                                            <span
-                                              title={log.errorMessage || "Delivery failed"}
-                                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50/80 text-rose-800 border border-rose-200/80 text-[10px] font-semibold"
-                                            >
-                                              Failed
-                                            </span>
-                                          )}
-                                        </td>
+                              <>
+                                {/* Mobile Recipient List */}
+                                <div className="md:hidden divide-y divide-slate-100">
+                                  {d.logs.map((log) => (
+                                    <div key={log.id} className="p-3 flex items-center justify-between gap-2 text-xs">
+                                      <div className="min-w-0 flex-1">
+                                        <p className="font-semibold text-slate-900 truncate">{log.recipientName}</p>
+                                        <p className="font-mono text-[11px] text-slate-500 truncate">{log.recipientEmail}</p>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        {log.status === "SENT" ? (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                            <CheckCircle2 className="w-3 h-3" /> Sent
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 border border-rose-200 text-[10px] font-bold">
+                                            Failed
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Desktop Table */}
+                                <div className="hidden md:block overflow-x-auto">
+                                  <table className="w-full text-left border-collapse text-xs">
+                                    <thead>
+                                      <tr className="border-b border-slate-200/80 text-[11px] text-slate-500 bg-white">
+                                        <th className="py-2.5 px-4 font-semibold">Recipient</th>
+                                        <th className="py-2.5 px-4 font-semibold">Name</th>
+                                        <th className="py-2.5 px-4 font-semibold">Time sent</th>
+                                        <th className="py-2.5 px-4 font-semibold">Status</th>
                                       </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 bg-white">
+                                      {d.logs.map((log) => (
+                                        <tr key={log.id} className="hover:bg-slate-50/60">
+                                          <td className="py-2.5 px-4 font-mono text-slate-800">
+                                            {log.recipientEmail}
+                                          </td>
+                                          <td className="py-2.5 px-4 text-slate-600">
+                                            {log.recipientName}
+                                          </td>
+                                          <td className="py-2.5 px-4 text-slate-500 font-mono text-[11px]">
+                                            {new Date(log.sentAt).toLocaleString()}
+                                          </td>
+                                          <td className="py-2.5 px-4">
+                                            {log.status === "SENT" ? (
+                                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold">
+                                                <CheckCircle2 className="w-3 h-3" /> Sent
+                                              </span>
+                                            ) : (
+                                              <span
+                                                title={log.errorMessage || "Delivery failed"}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-800 border border-rose-200 text-[10px] font-bold"
+                                              >
+                                                Failed
+                                              </span>
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </>
                             )}
                           </div>
                         ))
@@ -1680,100 +1923,163 @@ export default function CsaPortal() {
 
                   {/* Sub-view 2: All Recipient Emails */}
                   {tipLogSubView === "emails" && (
-                    <div className="pt-2">
+                    <div className="pt-1">
                       {dailyTipsData.emailLogs.length === 0 ? (
                         <p className="py-10 text-center text-xs text-slate-400">
                           No email log entries match your filter.
                         </p>
                       ) : (
-                        <div className="overflow-x-auto rounded-xl border border-slate-200">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] text-slate-500">
-                                <th className="py-2.5 px-4 font-medium">Date</th>
-                                <th className="py-2.5 px-4 font-medium">Recipient</th>
-                                <th className="py-2.5 px-4 font-medium">Name</th>
-                                <th className="py-2.5 px-4 font-medium">Tip</th>
-                                <th className="py-2.5 px-4 font-medium">Time</th>
-                                <th className="py-2.5 px-4 font-medium">Status</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
-                              {dailyTipsData.emailLogs.map((log) => (
-                                <tr key={log.id} className="hover:bg-slate-50/60">
-                                  <td className="py-2.5 px-4 font-mono text-slate-700">
+                        <>
+                          {/* Mobile Card List */}
+                          <div className="md:hidden space-y-2">
+                            {dailyTipsData.emailLogs.map((log) => (
+                              <div
+                                key={log.id}
+                                className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 space-y-1.5 text-xs"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-[11px] font-bold text-slate-700">
                                     {log.dispatchDate}
-                                  </td>
-                                  <td className="py-2.5 px-4 font-mono text-slate-900">
-                                    {log.recipientEmail}
-                                  </td>
-                                  <td className="py-2.5 px-4 text-slate-600">{log.recipientName}</td>
-                                  <td className="py-2.5 px-4 text-slate-800">{log.tipTitle}</td>
-                                  <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
-                                    {new Date(log.sentAt).toLocaleTimeString([], {
-                                      hour: "2-digit",
-                                      minute: "2-digit",
-                                      second: "2-digit",
-                                    })}
-                                  </td>
-                                  <td className="py-2.5 px-4">
-                                    <span
-                                      className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
-                                        log.status === "SENT"
-                                          ? "bg-emerald-50/80 text-emerald-800 border-emerald-200/80"
-                                          : "bg-rose-50/80 text-rose-800 border-rose-200/80"
-                                      }`}
-                                    >
-                                      {log.status === "SENT" ? "Sent" : "Failed"}
-                                    </span>
-                                  </td>
+                                  </span>
+                                  <span
+                                    className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                      log.status === "SENT"
+                                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                        : "bg-rose-50 text-rose-800 border-rose-200"
+                                    }`}
+                                  >
+                                    {log.status === "SENT" ? "Sent" : "Failed"}
+                                  </span>
+                                </div>
+                                <p className="font-bold text-slate-900 truncate">{log.recipientName}</p>
+                                <p className="font-mono text-[11px] text-slate-500 truncate">{log.recipientEmail}</p>
+                                <p className="text-[11px] text-slate-600 truncate">{log.tipTitle}</p>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Desktop Table */}
+                          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] text-slate-500">
+                                  <th className="py-2.5 px-4 font-semibold">Date</th>
+                                  <th className="py-2.5 px-4 font-semibold">Recipient</th>
+                                  <th className="py-2.5 px-4 font-semibold">Name</th>
+                                  <th className="py-2.5 px-4 font-semibold">Tip</th>
+                                  <th className="py-2.5 px-4 font-semibold">Time</th>
+                                  <th className="py-2.5 px-4 font-semibold">Status</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 bg-white">
+                                {dailyTipsData.emailLogs.map((log) => (
+                                  <tr key={log.id} className="hover:bg-slate-50/60">
+                                    <td className="py-2.5 px-4 font-mono text-slate-700">
+                                      {log.dispatchDate}
+                                    </td>
+                                    <td className="py-2.5 px-4 font-mono text-slate-900">
+                                      {log.recipientEmail}
+                                    </td>
+                                    <td className="py-2.5 px-4 text-slate-600">{log.recipientName}</td>
+                                    <td className="py-2.5 px-4 text-slate-800">{log.tipTitle}</td>
+                                    <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500">
+                                      {new Date(log.sentAt).toLocaleTimeString([], {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                        second: "2-digit",
+                                      })}
+                                    </td>
+                                    <td className="py-2.5 px-4">
+                                      <span
+                                        className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                                          log.status === "SENT"
+                                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                            : "bg-rose-50 text-rose-800 border-rose-200"
+                                        }`}
+                                      >
+                                        {log.status === "SENT" ? "Sent" : "Failed"}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
 
                   {/* Sub-view 3: Subscribers */}
                   {tipLogSubView === "subscribers" && (
-                    <div className="pt-2">
+                    <div className="pt-1">
                       {dailyTipsData.subscribers.length === 0 ? (
                         <p className="py-10 text-center text-xs text-slate-400">
                           No accounts are currently subscribed to daily tips.
                         </p>
                       ) : (
-                        <div className="overflow-x-auto rounded-xl border border-slate-200">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] text-slate-500">
-                                <th className="py-2.5 px-4 font-medium">Email</th>
-                                <th className="py-2.5 px-4 font-medium">Name</th>
-                                <th className="py-2.5 px-4 font-medium">Role</th>
-                                <th className="py-2.5 px-4 font-medium">Joined</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 bg-white">
-                              {dailyTipsData.subscribers.map((sub) => (
-                                <tr key={sub.id} className="hover:bg-slate-50/60">
-                                  <td className="py-2.5 px-4 font-mono text-slate-900">
-                                    {sub.email}
-                                  </td>
-                                  <td className="py-2.5 px-4 text-slate-700">{sub.displayName}</td>
-                                  <td className="py-2.5 px-4">
-                                    <span className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-[10px] font-medium text-slate-700">
-                                      {ROLE_LABELS[sub.role] || sub.role}
-                                    </span>
-                                  </td>
-                                  <td className="py-2.5 px-4 text-slate-500">
-                                    {new Date(sub.createdAt).toLocaleDateString()}
-                                  </td>
+                        <>
+                          {/* Mobile Subscriber Cards */}
+                          <div className="md:hidden space-y-2">
+                            {dailyTipsData.subscribers.map((sub) => (
+                              <div
+                                key={sub.id}
+                                className="p-3 rounded-xl border border-slate-200 bg-slate-50/50 flex items-center justify-between gap-2 text-xs"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-bold text-slate-900 truncate">{sub.displayName}</p>
+                                  <p className="font-mono text-[11px] text-slate-500 truncate">{sub.email}</p>
+                                  <p className="text-[10px] text-slate-400 mt-0.5">
+                                    Joined {new Date(sub.createdAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                <span
+                                  className={`px-2 py-0.5 rounded-md border text-[10px] font-bold shrink-0 ${
+                                    ROLE_BADGE_STYLES[sub.role] || ROLE_BADGE_STYLES.STUDENT
+                                  }`}
+                                >
+                                  {ROLE_LABELS[sub.role] || sub.role}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Desktop Table */}
+                          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] text-slate-500">
+                                  <th className="py-2.5 px-4 font-semibold">Email</th>
+                                  <th className="py-2.5 px-4 font-semibold">Name</th>
+                                  <th className="py-2.5 px-4 font-semibold">Role</th>
+                                  <th className="py-2.5 px-4 font-semibold">Joined</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 bg-white">
+                                {dailyTipsData.subscribers.map((sub) => (
+                                  <tr key={sub.id} className="hover:bg-slate-50/60">
+                                    <td className="py-2.5 px-4 font-mono text-slate-900">
+                                      {sub.email}
+                                    </td>
+                                    <td className="py-2.5 px-4 text-slate-700">{sub.displayName}</td>
+                                    <td className="py-2.5 px-4">
+                                      <span
+                                        className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${
+                                          ROLE_BADGE_STYLES[sub.role] || ROLE_BADGE_STYLES.STUDENT
+                                        }`}
+                                      >
+                                        {ROLE_LABELS[sub.role] || sub.role}
+                                      </span>
+                                    </td>
+                                    <td className="py-2.5 px-4 text-slate-500">
+                                      {new Date(sub.createdAt).toLocaleDateString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -1781,30 +2087,32 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 3: INCIDENT REPORTS */}
+            {/* ================================================================= */}
+            {/* PANEL 4: INCIDENT REPORTS                                         */}
+            {/* ================================================================= */}
             {active === "reports" && (
               <motion.div
                 key="reports"
                 {...panelMotion}
-                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+                className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs min-w-0"
               >
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                  <div className="flex flex-wrap items-center gap-2 flex-1">
-                    <div className="relative flex-1 min-w-[200px] sm:max-w-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-100">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
+                    <div className="relative flex-1 min-w-0 sm:max-w-xs">
                       <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         placeholder="Search ref code or narrative..."
                         value={reportSearch}
                         onChange={(e) => setReportSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
                       />
                     </div>
 
                     <select
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
-                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-medium text-slate-700 focus:outline-none focus:border-slate-400 focus:bg-white"
+                      className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0056D2] focus:bg-white"
                     >
                       <option value="">All categories</option>
                       <option value="SEXTORTION">Sextortion</option>
@@ -1815,7 +2123,7 @@ export default function CsaPortal() {
                     </select>
                   </div>
 
-                  <span className="text-xs text-slate-500 font-mono">
+                  <span className="text-[11px] sm:text-xs text-slate-500 font-mono shrink-0">
                     {filteredReports.length} {filteredReports.length === 1 ? "report" : "reports"}
                   </span>
                 </div>
@@ -1829,26 +2137,47 @@ export default function CsaPortal() {
                     {filteredReports.map((r) => (
                       <div
                         key={r.id}
-                        className="p-5 rounded-xl border border-slate-200/80 bg-slate-50/40 space-y-3"
+                        className="p-3.5 sm:p-5 rounded-xl border border-slate-200/80 bg-slate-50/40 space-y-3 min-w-0"
                       >
-                        <div className="flex flex-wrap justify-between items-center gap-2">
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            <span className="font-mono text-xs font-semibold text-slate-800 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                        {/* Case Header */}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2.5 py-1 rounded-md border border-slate-200">
                               {r.refCode}
                             </span>
-                            <span className="text-xs font-semibold text-slate-800">
+                            <span className="text-xs font-bold text-slate-800">
                               {r.category}
                             </span>
-                            <span className="text-[11px] text-slate-400">
-                              {new Date(r.createdAt).toLocaleString()}
+                            <span
+                              className={`px-2 py-0.5 rounded-md border font-mono text-[10px] font-bold ${
+                                INCIDENT_STATUS_STYLES[r.status] ||
+                                "bg-slate-100 text-slate-700 border-slate-200"
+                              }`}
+                            >
+                              {r.status.replace("_", " ")}
                             </span>
                           </div>
 
-                          <div className="flex items-center gap-2">
+                          <span className="text-[11px] text-slate-400 font-mono">
+                            {new Date(r.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+
+                        {/* Case Narrative */}
+                        <p className="text-xs text-slate-700 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200/80 break-words">
+                          {r.narrative}
+                        </p>
+
+                        {/* Officer Action Footer */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                          <span className="text-[11px] text-slate-500 font-medium">
+                            Update case disposition or export official brief:
+                          </span>
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
                             <select
                               value={r.status}
                               onChange={(e) => updateIncidentStatus(r.id, e.target.value)}
-                              className="text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-slate-400 cursor-pointer"
+                              className="flex-1 sm:flex-initial text-xs font-semibold px-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:border-[#0056D2] cursor-pointer"
                             >
                               <option value="SUBMITTED">Submitted</option>
                               <option value="UNDER_REVIEW">Under review</option>
@@ -1860,17 +2189,13 @@ export default function CsaPortal() {
                             <button
                               type="button"
                               onClick={() => exportPdf(r.id, r.refCode)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition cursor-pointer"
+                              className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 sm:py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition cursor-pointer shrink-0"
                             >
-                              <FileDown className="w-3.5 h-3.5 text-slate-400" />
-                              <span>PDF brief</span>
+                              <FileDown className="w-3.5 h-3.5 text-[#0056D2]" />
+                              <span>PDF Brief</span>
                             </button>
                           </div>
                         </div>
-
-                        <p className="text-xs text-slate-700 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200/80">
-                          {r.narrative}
-                        </p>
                       </div>
                     ))}
                   </div>
@@ -1878,12 +2203,14 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 4: TUTOR APPLICATIONS */}
+            {/* ================================================================= */}
+            {/* PANEL 5: TUTOR APPLICATIONS                                       */}
+            {/* ================================================================= */}
             {active === "approvals" && (
               <motion.div
                 key="approvals"
                 {...panelMotion}
-                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4"
+                className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 space-y-4 shadow-2xs min-w-0"
               >
                 {pendingTutors.length === 0 ? (
                   <p className="text-slate-400 text-xs text-center py-12">
@@ -1894,25 +2221,28 @@ export default function CsaPortal() {
                     {pendingTutors.map((t) => (
                       <div
                         key={t.id}
-                        className="p-5 rounded-xl border border-slate-200/80 bg-slate-50/40 space-y-3"
+                        className="p-4 sm:p-5 rounded-xl border border-slate-200/80 bg-slate-50/40 space-y-3 min-w-0"
                       >
-                        <div className="flex justify-between items-start gap-4">
-                          <div>
-                            <h3 className="font-semibold text-sm text-slate-900">
-                              {t.user?.displayName}
-                            </h3>
-                            <p className="text-xs text-slate-500 mt-0.5">{t.headline}</p>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <UserAvatar user={t.user} size="md" rounded="rounded-xl" />
+                            <div className="min-w-0">
+                              <h3 className="font-bold text-sm text-slate-900 truncate">
+                                {t.user?.displayName}
+                              </h3>
+                              <p className="text-xs text-slate-500 mt-0.5 break-words">{t.headline}</p>
+                            </div>
                           </div>
                           <button
                             type="button"
                             onClick={() => approveTutor(t.id)}
-                            className="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-3.5 py-2 rounded-xl text-xs transition shrink-0 cursor-pointer"
+                            className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2.5 sm:py-2 rounded-xl text-xs transition shrink-0 cursor-pointer"
                           >
-                            Approve tutor
+                            Approve Tutor
                           </button>
                         </div>
                         {t.bio && (
-                          <p className="text-xs text-slate-600 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200/80">
+                          <p className="text-xs text-slate-600 leading-relaxed bg-white p-3.5 rounded-xl border border-slate-200/80 break-words">
                             {t.bio}
                           </p>
                         )}
@@ -1923,12 +2253,14 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 5: VERIFIED TUTORS */}
+            {/* ================================================================= */}
+            {/* PANEL 6: VERIFIED TUTORS                                          */}
+            {/* ================================================================= */}
             {active === "tutors" && (
               <motion.div
                 key="tutors"
                 {...panelMotion}
-                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-4"
+                className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 space-y-4 shadow-2xs min-w-0"
               >
                 {tutors.length === 0 ? (
                   <p className="text-slate-400 text-xs text-center py-12">
@@ -1939,20 +2271,23 @@ export default function CsaPortal() {
                     {tutors.map((t) => (
                       <div
                         key={t.id}
-                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white hover:border-slate-300 transition"
+                        className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white hover:border-slate-300 transition min-w-0"
                       >
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 text-sm">
-                            {t.user?.displayName}
-                          </p>
-                          <p className="text-xs text-slate-500 truncate">{t.headline}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <UserAvatar user={t.user} size="md" rounded="rounded-xl" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                              {t.user?.displayName}
+                            </p>
+                            <p className="text-xs text-slate-500 truncate">{t.headline}</p>
+                          </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => removeTutor(t.id, t.user?.displayName)}
-                          className="text-xs font-medium text-slate-600 hover:text-rose-700 hover:bg-rose-50/70 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-rose-200 transition shrink-0 cursor-pointer"
+                          className="w-full sm:w-auto text-center text-xs font-bold text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 px-3.5 py-2 sm:py-1.5 rounded-xl border border-slate-200 hover:border-rose-200 transition shrink-0 cursor-pointer"
                         >
-                          Revoke verification
+                          Revoke Verification
                         </button>
                       </div>
                     ))}
@@ -1961,25 +2296,27 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 6: COURSES */}
+            {/* ================================================================= */}
+            {/* PANEL 7: COURSES                                                  */}
+            {/* ================================================================= */}
             {active === "courses" && (
               <motion.div
                 key="courses"
                 {...panelMotion}
-                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+                className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs min-w-0"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                  <div className="relative w-full sm:w-64">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-100">
+                  <div className="relative w-full sm:w-72">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Filter courses..."
+                      placeholder="Filter courses by title or category..."
                       value={courseSearch}
                       onChange={(e) => setCourseSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
                     />
                   </div>
-                  <span className="text-xs text-slate-500 font-mono">
+                  <span className="text-[11px] sm:text-xs text-slate-500 font-mono">
                     {filteredCourses.length} {filteredCourses.length === 1 ? "course" : "courses"}
                   </span>
                 </div>
@@ -1993,25 +2330,33 @@ export default function CsaPortal() {
                     {filteredCourses.map((c) => (
                       <div
                         key={c.id}
-                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white hover:border-slate-300 transition"
+                        className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-white hover:border-slate-300 transition min-w-0"
                       >
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 text-sm truncate">{c.title}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            {c.category} · {c.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19–23"}
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-900 text-xs sm:text-sm break-words">
+                            {c.title}
                           </p>
+                          <div className="flex items-center gap-2 flex-wrap mt-1">
+                            <span className="text-[11px] font-medium text-slate-500">
+                              {c.category}
+                            </span>
+                            <span className="text-slate-300">·</span>
+                            <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-semibold text-slate-600">
+                              {c.ageBand === "JUNIOR" ? "Ages 12–18" : "Ages 19+"}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 shrink-0">
                           <Link
                             to={`/courses/${c.slug}`}
-                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                            className="text-center px-3.5 py-2 sm:py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
                           >
                             Preview
                           </Link>
                           <button
                             type="button"
                             onClick={() => removeCourse(c.id, c.title)}
-                            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs font-medium text-slate-600 hover:text-rose-700 hover:bg-rose-50/70 hover:border-rose-200 transition cursor-pointer"
+                            className="text-center px-3.5 py-2 sm:py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-200 transition cursor-pointer"
                           >
                             Delete
                           </button>
@@ -2023,14 +2368,16 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 7: CERTIFICATES */}
+            {/* ================================================================= */}
+            {/* PANEL 8: CERTIFICATES                                             */}
+            {/* ================================================================= */}
             {active === "certificates" && (
               <motion.div
                 key="certificates"
                 {...panelMotion}
-                className="bg-white border border-slate-200/90 rounded-2xl p-6 space-y-5"
+                className="bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-6 space-y-4 sm:space-y-5 shadow-2xs min-w-0"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pb-3.5 sm:pb-4 border-b border-slate-100">
                   <div className="relative w-full sm:w-72">
                     <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
@@ -2038,10 +2385,10 @@ export default function CsaPortal() {
                       placeholder="Search ref code, learner, or course..."
                       value={certSearch}
                       onChange={(e) => setCertSearch(e.target.value)}
-                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-slate-400 focus:bg-white transition"
+                      className="w-full pl-8 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/80 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0056D2] focus:bg-white transition"
                     />
                   </div>
-                  <span className="text-xs text-slate-500 font-mono">
+                  <span className="text-[11px] sm:text-xs text-slate-500 font-mono">
                     {filteredCerts.length}{" "}
                     {filteredCerts.length === 1 ? "certificate" : "certificates"}
                   </span>
@@ -2056,19 +2403,30 @@ export default function CsaPortal() {
                     {filteredCerts.map((c) => (
                       <div
                         key={c.id}
-                        className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-white hover:border-slate-300 transition"
+                        className="p-3.5 sm:p-4 rounded-xl border border-slate-200/80 bg-slate-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs hover:bg-white hover:border-slate-300 transition min-w-0"
                       >
-                        <div>
-                          <p className="font-semibold text-slate-900">{c.user?.displayName}</p>
-                          <p className="text-slate-500 mt-0.5">{c.course?.title}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                            {c.user?.displayName}
+                          </p>
+                          <p className="text-slate-500 mt-0.5 break-words">{c.course?.title}</p>
                         </div>
-                        <div className="sm:text-right flex sm:flex-col items-center sm:items-end justify-between gap-2">
-                          <span className="font-mono font-semibold text-slate-800 bg-white px-2.5 py-1 rounded-md border border-slate-200">
-                            {c.certRef}
-                          </span>
-                          <span className="text-[11px] text-slate-400">
-                            {new Date(c.issuedAt).toLocaleDateString()}
-                          </span>
+                        <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 shrink-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded-md border border-slate-200">
+                              {c.certRef}
+                            </span>
+                            <span className="text-[11px] text-slate-400">
+                              {new Date(c.issuedAt).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <Link
+                            to={`/verify-certificate/${c.certRef}`}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 text-[#0056D2] hover:bg-blue-100 font-bold text-[11px] transition shrink-0"
+                          >
+                            <span>Verify</span>
+                            <ArrowUpRight className="w-3 h-3" />
+                          </Link>
                         </div>
                       </div>
                     ))}
@@ -2077,9 +2435,11 @@ export default function CsaPortal() {
               </motion.div>
             )}
 
-            {/* PANEL 8: SETTINGS */}
+            {/* ================================================================= */}
+            {/* PANEL 9: SETTINGS                                                 */}
+            {/* ================================================================= */}
             {active === "settings" && (
-              <motion.div key="settings" {...panelMotion}>
+              <motion.div key="settings" {...panelMotion} className="min-w-0">
                 <AccountSettingsView />
               </motion.div>
             )}
@@ -2096,21 +2456,23 @@ export default function CsaPortal() {
           }}
         >
           <div
-            className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-6 space-y-5"
+            className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-5 sm:p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
                   <AlertTriangle className="w-4 h-4" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-900">{confirmDialog.title}</h3>
+                <h3 className="text-sm font-bold text-slate-900 break-words">
+                  {confirmDialog.title}
+                </h3>
               </div>
               <button
                 type="button"
                 disabled={confirmBusy}
                 onClick={() => setConfirmDialog(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2118,12 +2480,12 @@ export default function CsaPortal() {
 
             <p className="text-xs text-slate-600 leading-relaxed">{confirmDialog.message}</p>
 
-            <div className="flex items-center justify-end gap-2 pt-1">
+            <div className="grid grid-cols-2 sm:flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
                 disabled={confirmBusy}
                 onClick={() => setConfirmDialog(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition cursor-pointer"
+                className="px-4 py-2.5 sm:py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2139,7 +2501,7 @@ export default function CsaPortal() {
                     setConfirmBusy(false);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 sm:py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition disabled:opacity-50 cursor-pointer"
               >
                 {confirmBusy ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -2161,20 +2523,22 @@ function MetricCard({ label, value, sublabel, icon: Icon, onClick }) {
   return (
     <Wrapper
       {...(onClick ? { type: "button", onClick } : {})}
-      className={`w-full text-left bg-white border border-slate-200/90 rounded-2xl p-5 transition ${
-        onClick ? "hover:border-slate-300 cursor-pointer" : ""
+      className={`w-full text-left bg-white border border-slate-200/90 rounded-2xl p-3.5 sm:p-5 transition shadow-2xs min-w-0 ${
+        onClick ? "hover:border-blue-300 hover:shadow-xs cursor-pointer" : ""
       }`}
     >
-      <div className="flex justify-between items-start">
-        <span className="text-xs font-medium text-slate-500">{label}</span>
-        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 flex items-center justify-center">
-          <Icon className="w-4 h-4" />
+      <div className="flex justify-between items-start gap-2">
+        <span className="text-[11px] sm:text-xs font-semibold text-slate-500 leading-snug truncate">
+          {label}
+        </span>
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-50 border border-slate-200/80 text-[#0056D2] flex items-center justify-center shrink-0">
+          <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
         </div>
       </div>
-      <div className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2.5 tracking-tight font-display">
+      <div className="text-xl sm:text-3xl font-extrabold text-slate-900 mt-2 tracking-tight font-display">
         {value}
       </div>
-      <p className="text-[11px] text-slate-400 mt-1">{sublabel}</p>
+      <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5 truncate">{sublabel}</p>
     </Wrapper>
   );
 }

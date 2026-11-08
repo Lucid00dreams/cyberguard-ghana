@@ -72,7 +72,7 @@ export default function MainLayout() {
         isDashboardRoute
           ? "h-screen h-[100dvh] overflow-hidden"
           : "min-h-screen overflow-x-hidden"
-      } flex flex-col w-full max-w-full min-w-0 ${isAdminRoute ? "bg-[#062319]" : "bg-[#F8FAFC]"}`}
+      } flex flex-col w-full max-w-full min-w-0 bg-[#F8FAFC]`}
     >
       <SessionTimeoutModal
         isOpen={sessionTimedOut}
