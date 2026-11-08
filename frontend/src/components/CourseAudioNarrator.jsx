@@ -116,8 +116,8 @@ export default function CourseAudioNarrator({
   title = "Lesson Audio Narration",
   content = "",
   activeSentenceIndex = 0,
-  onSentenceChange,
-  onComplete,
+  onSentenceChange = undefined,
+  onComplete = undefined,
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [voices, setVoices] = useState([]);

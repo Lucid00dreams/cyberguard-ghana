@@ -15,4 +15,4 @@ const r2Client = new S3Client({
 const BUCKET_NAME = process.env.R2_BUCKET_NAME;
 const R2_ENDPOINT = process.env.R2_ENDPOINT;
 
-module.exports = { r2Client, BUCKET_NAME };
+module.exports = { r2Client, BUCKET_NAME, R2_ENDPOINT };

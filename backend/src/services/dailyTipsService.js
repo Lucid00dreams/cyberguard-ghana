@@ -337,6 +337,7 @@ function getZonedTimeParts(date = new Date(), timeZone = DEFAULT_TIMEZONE) {
     hour12: false,
   }).formatToParts(date);
 
+  /** @type {Record<string, string>} */
   const map = {};
   for (const p of parts) {
     if (p.type !== "literal") map[p.type] = p.value;
@@ -401,9 +402,9 @@ function verifyUnsubscribeToken(token) {
   try {
     payload = jwt.verify(token, getUnsubscribeSecret(), { algorithms: ["HS256"] });
   } catch {
-    payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
+    payload = jwt.verify(token, String(process.env.JWT_SECRET), { algorithms: ["HS256"] });
   }
-  if (!payload || payload.purpose !== "unsubscribe_daily_tips" || !payload.id) {
+  if (!payload || typeof payload === "string" || payload.purpose !== "unsubscribe_daily_tips" || !payload.id) {
     throw new Error("Invalid unsubscribe token.");
   }
   return payload;
@@ -423,6 +424,7 @@ function buildUnsubscribeUrl(user) {
 }
 
 let isDispatching = false;
+/** @type {any} */
 let schedulerInterval = null;
 
 /**
@@ -439,6 +441,7 @@ async function getDailyTipsScheduleConfig() {
       },
     });
 
+    /** @type {Record<string, string>} */
     const map = {};
     for (const s of settings) {
       map[s.key] = s.value;
@@ -478,8 +481,8 @@ async function getDailyTipsScheduleConfig() {
  * Admin: Update the daily notification dispatch time and status.
  */
 async function setDailyTipsScheduleConfig({ hour, minute = 0, enabled = true }) {
-  const cleanHour = Math.max(0, Math.min(23, parseInt(hour, 10) || 0));
-  const cleanMinute = Math.max(0, Math.min(59, parseInt(minute, 10) || 0));
+  const cleanHour = Math.max(0, Math.min(23, parseInt(String(hour), 10) || 0));
+  const cleanMinute = Math.max(0, Math.min(59, parseInt(String(minute), 10) || 0));
   const cleanEnabled = Boolean(enabled);
 
   await prisma.$transaction([
@@ -505,9 +508,6 @@ async function setDailyTipsScheduleConfig({ hour, minute = 0, enabled = true }) 
 
 /**
  * Dispatch the daily cyber safety tip to all opted-in users and log every email sent.
- * @param {Object} [options]
- * @param {"SCHEDULED_DAILY" | "SCHEDULED_7AM" | "MANUAL_ADMIN"} [options.triggerType]
- * @param {boolean} [options.force] - When true, allows manual admin re-dispatch even if today's scheduled run already completed.
  */
 async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_DAILY", force = false } = {}) {
   if (isDispatching) {

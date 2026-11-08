@@ -38,7 +38,8 @@ function openKeyDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = (e) => {
-      const db = e.target.result;
+      const target = /** @type {any} */ (e.target);
+      const db = target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
       }
@@ -619,7 +620,7 @@ export async function importEncryptedKeyBackup(userId, backupJsonString, passphr
 
   const keyPairs = {
     ecdhPair: { privateKey: ecdhPrivKey, publicKey: ecdhPubKey },
-    ecdsaPair: { privateKey: ecdsaPrivKey, publicKey: ecdsaPublicKey },
+    ecdsaPair: { privateKey: ecdsaPrivKey, publicKey: ecdsaPubKey },
   };
 
   await storeKeyPairs(userId, keyPairs);

@@ -43,7 +43,7 @@ const ROLE_LABELS = {
   STUDENT: "Learner",
 };
 
-export default function AccountSettingsView({ isModal = false, onClose }) {
+export default function AccountSettingsView({ isModal = false, onClose = undefined } = {}) {
   const { user, updateUser } = useAuth();
   const prefersReducedMotion = useReducedMotion();
 

@@ -28,6 +28,9 @@ async function handleUnsubscribe(req, res) {
 
   try {
     const payload = verifyUnsubscribeToken(token);
+    if (!payload || typeof payload === "string") {
+      return res.status(400).send("Invalid or expired unsubscribe link.");
+    }
     await prisma.user.updateMany({
       where: { id: payload.id },
       data: { receiveDailyTips: false },

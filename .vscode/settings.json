@@ -1,4 +1,3 @@
 {
-  "css.lint.unknownAtRules": "ignore",
-  "js/ts.implicitProjectConfig.checkJs": false
+  "css.lint.unknownAtRules": "ignore"
 }

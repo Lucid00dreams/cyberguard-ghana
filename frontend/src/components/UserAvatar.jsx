@@ -63,9 +63,9 @@ function getInitials(name = "") {
  * - Seamlessly integrates into any size or container
  */
 export default function UserAvatar({
-  user,
-  src,
-  name,
+  user = null,
+  src = undefined,
+  name = "",
   className = "",
   size = "md", // xs (24), sm (28), md (36), lg (44), xl (112)
   rounded = "rounded-lg",

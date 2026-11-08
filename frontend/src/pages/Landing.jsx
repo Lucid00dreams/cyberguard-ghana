@@ -398,7 +398,7 @@ export default function Landing() {
   );
 }
 
-function PillarCard({ icon, title, desc, to, cta, accent, index = 0, reducedMotion = false }) {
+function PillarCard({ icon, title, desc, to, cta, accent = false, index = 0, reducedMotion = false }) {
   return (
     <motion.div
       initial={reducedMotion ? false : { opacity: 0, y: 16 }}

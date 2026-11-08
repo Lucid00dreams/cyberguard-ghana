@@ -166,9 +166,8 @@ async function sendViaHttpsRelay({ relayOrigin, to, subject, html, text, headers
 
 /**
  * Send a raw email with anti-spam delivery headers and automatic HTTPS relay fallback
- * @param {Object} options - { to, subject, html, text, headers, clientOrigin }
  */
-async function sendEmail({ to, subject, html, text, headers = {}, clientOrigin }) {
+async function sendEmail({ to, subject, html, text = "", headers = {}, clientOrigin = undefined }) {
   const fromAddress = process.env.FROM_EMAIL || `"CyberGuard Ghana" <${smtpUser}>`;
   const replyToAddress = process.env.REPLY_TO_EMAIL || smtpUser;
 
@@ -241,10 +240,6 @@ async function sendEmail({ to, subject, html, text, headers = {}, clientOrigin }
 
 /**
  * Send Password Reset Email with responsive Ghanaian COP branding
- * @param {string} toEmail - Recipient email
- * @param {string} resetToken - JWT or secure reset token
- * @param {string} displayName - Recipient name
- * @param {Object} [options] - { clientOrigin }
  */
 async function sendPasswordResetEmail(
   toEmail,
@@ -252,7 +247,8 @@ async function sendPasswordResetEmail(
   displayName = "CyberGuard Member",
   options = {}
 ) {
-  const clientOrigin = resolveClientOrigin(options.clientOrigin);
+  const opts = /** @type {any} */ (options);
+  const clientOrigin = resolveClientOrigin(opts.clientOrigin);
   const resetLink = `${clientOrigin}/reset-password?token=${encodeURIComponent(resetToken)}`;
   const safeName = escapeHtml(displayName);
   const safeEmail = escapeHtml(toEmail);
@@ -329,17 +325,15 @@ async function sendPasswordResetEmail(
 
 /**
  * Send Welcome Email when a user signs up for the first time
- * @param {string} toEmail - Recipient email
- * @param {string} displayName - Recipient display name
- * @param {Object} [options] - { receiveDailyTips, clientOrigin }
  */
 async function sendWelcomeEmail(
   toEmail,
   displayName = "CyberGuard Member",
   options = {}
 ) {
-  const clientOrigin = resolveClientOrigin(options.clientOrigin);
-  const receiveDailyTips = Boolean(options.receiveDailyTips);
+  const opts = /** @type {any} */ (options);
+  const clientOrigin = resolveClientOrigin(opts.clientOrigin);
+  const receiveDailyTips = Boolean(opts.receiveDailyTips);
   const dashboardLink = `${clientOrigin}/dashboard`;
   const coursesLink = `${clientOrigin}/courses`;
   const settingsLink = `${clientOrigin}/dashboard?tab=settings`;
@@ -472,8 +466,8 @@ async function sendDailySafetyTipEmail({
   displayName = "CyberGuard Member",
   tip,
   dateFormatted,
-  unsubscribeUrl,
-  clientOrigin: explicitOrigin,
+  unsubscribeUrl = "",
+  clientOrigin: explicitOrigin = undefined,
 }) {
   const clientOrigin = resolveClientOrigin(explicitOrigin);
   const courseUrl = tip?.courseSlug
@@ -572,7 +566,8 @@ async function sendDailySafetyTipEmail({
  * Send OTP Verification Email during student registration
  */
 async function sendOtpVerificationEmail(toEmail, otpCode, options = {}) {
-  const clientOrigin = resolveClientOrigin(options.clientOrigin);
+  const opts = /** @type {any} */ (options);
+  const clientOrigin = resolveClientOrigin(opts.clientOrigin);
   const safeOtp = escapeHtml(otpCode);
   const safeEmail = escapeHtml(toEmail);
   const subject = `${otpCode} is your CyberGuard verification code`;

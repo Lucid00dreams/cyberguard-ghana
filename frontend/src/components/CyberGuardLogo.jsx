@@ -8,12 +8,6 @@ import React from "react";
  * - Ghanaian Golden Medallion core
  * - Iconic Ghanaian Black Star of Africa
  * - Emerald Green active protection terminal
- *
- * @param {'full' | 'compact' | 'icon'} variant - Layout style
- * @param {'xs' | 'sm' | 'md' | 'lg' | 'xl'} size - Scale size
- * @param {'light' | 'dark' | 'auto'} theme - Color scheme
- * @param {string} className - Optional container styling
- * @param {string} subtitle - Optional custom subtitle text
  */
 export default function CyberGuardLogo({
   variant = "full",

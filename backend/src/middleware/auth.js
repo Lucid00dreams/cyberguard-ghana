@@ -15,11 +15,11 @@ async function requireAuth(req, res, next) {
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET, {
+    const payload = jwt.verify(token, String(process.env.JWT_SECRET), {
       algorithms: ["HS256"],
     });
 
-    if (!payload || !payload.id) {
+    if (!payload || typeof payload === "string" || !payload.id) {
       return res.status(401).json({ error: "Invalid token payload." });
     }
 

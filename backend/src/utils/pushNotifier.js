@@ -33,7 +33,7 @@ function getVapidPublicKey() {
  *
  * @param {Object} subscription - { endpoint, p256dh, auth } or Prisma record
  * @param {Object} payload - { title, body, icon, badge, data: { url }, vibrate }
- * @returns {Promise<{ success: boolean, expired?: boolean, error?: string }>}
+ * @returns {Promise<{ success: boolean, expired?: boolean, statusCode?: number, error?: string }>}
  */
 async function sendPushNotification(subscription, payload = {}) {
   if (!subscription || !subscription.endpoint) {

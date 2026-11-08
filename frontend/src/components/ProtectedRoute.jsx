@@ -2,7 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import CyberSpinner from "./CyberSpinner";
 
-export default function ProtectedRoute({ children, roles }) {
+export default function ProtectedRoute({ children, roles = undefined }) {
   const { user, loading } = useAuth();
   const location = useLocation();
 

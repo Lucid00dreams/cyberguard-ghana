@@ -72,9 +72,9 @@ function signToken(user) {
       tokenVersion: typeof user.tokenVersion === "number" ? user.tokenVersion : 0,
       purpose: "session",
     },
-    process.env.JWT_SECRET,
+    String(process.env.JWT_SECRET),
     {
-      expiresIn: process.env.JWT_EXPIRES_IN || "15m",
+      expiresIn: /** @type {any} */ (process.env.JWT_EXPIRES_IN || "15m"),
       algorithm: "HS256",
     }
   );
@@ -327,7 +327,7 @@ router.post(
 
       const verificationToken = jwt.sign(
         { email, purpose: "registration_verified" },
-        process.env.JWT_SECRET,
+        String(process.env.JWT_SECRET),
         { expiresIn: "30m" }
       );
 
@@ -377,7 +377,7 @@ router.post(
       // Cryptographically verify completion token
       let decoded;
       try {
-        decoded = jwt.verify(verificationToken, process.env.JWT_SECRET);
+        decoded = jwt.verify(verificationToken, String(process.env.JWT_SECRET));
       } catch (tokenErr) {
         return res.status(401).json({
           error: "Verification session expired. Please verify your email again.",
@@ -386,6 +386,7 @@ router.post(
 
       if (
         !decoded ||
+        typeof decoded === "string" ||
         decoded.purpose !== "registration_verified" ||
         decoded.email?.toLowerCase() !== email.toLowerCase()
       ) {
@@ -496,7 +497,7 @@ router.post(
 
       let decoded;
       try {
-        decoded = jwt.verify(verificationToken, process.env.JWT_SECRET, { algorithms: ["HS256"] });
+        decoded = jwt.verify(verificationToken, String(process.env.JWT_SECRET), { algorithms: ["HS256"] });
       } catch {
         return res.status(401).json({
           error: "Verification session expired. Please verify your email again.",
@@ -505,6 +506,7 @@ router.post(
 
       if (
         !decoded ||
+        typeof decoded === "string" ||
         decoded.purpose !== "registration_verified" ||
         decoded.email?.toLowerCase() !== email.toLowerCase()
       ) {
@@ -689,6 +691,7 @@ router.post("/google", async (req, res, next) => {
         });
       }
     } else {
+      /** @type {Record<string, any>} */
       const googleUpdates = {};
       if (avatarUrl && (!user.avatarUrl || user.avatarUrl.includes("googleusercontent.com") || user.avatarUrl.includes("default-user"))) {
         googleUpdates.avatarUrl = avatarUrl;
@@ -817,6 +820,7 @@ router.patch(
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const { displayName, ageBand, dateOfBirth, avatarUrl, phoneNumber, bio, receiveDailyTips } = req.body;
+      /** @type {Record<string, any>} */
       const dataToUpdate = {};
       if (displayName !== undefined) dataToUpdate.displayName = displayName.trim();
       if (avatarUrl !== undefined) dataToUpdate.avatarUrl = avatarUrl || null;
@@ -1110,7 +1114,7 @@ router.post(
         return res.status(400).json({ error: "Invalid or malformed reset token." });
       }
 
-      if (!decoded || !decoded.id) {
+      if (!decoded || typeof decoded === "string" || !decoded.id) {
         return res.status(400).json({ error: "Invalid reset token." });
       }
 
