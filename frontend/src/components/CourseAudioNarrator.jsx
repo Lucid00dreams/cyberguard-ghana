@@ -16,11 +16,13 @@ import {
   X,
   Loader2,
   Radio,
+  AlertCircle,
 } from "lucide-react";
 import api from "../utils/api";
 
 /**
  * Curated Studio Neural Voices powered by free high-fidelity Edge TTS
+ * Features real human actors with distinct regional accents and personalities.
  */
 export const NEURAL_VOICES = [
   {
@@ -29,7 +31,7 @@ export const NEURAL_VOICES = [
     accent: "West African",
     region: "Ghana / Nigeria",
     gender: "Female",
-    description: "Warm, relatable West African educator",
+    description: "Warm, natural West African educator — relatable regional guide",
     flag: "🇬🇭",
     isNeural: true,
   },
@@ -39,7 +41,7 @@ export const NEURAL_VOICES = [
     accent: "West African",
     region: "Ghana / Nigeria",
     gender: "Male",
-    description: "Confident, engaging tech mentor",
+    description: "Confident, engaging West African tech mentor",
     flag: "🇬🇭",
     isNeural: true,
   },
@@ -49,7 +51,7 @@ export const NEURAL_VOICES = [
     accent: "US English",
     region: "North America",
     gender: "Female",
-    description: "Clear, studio-grade Coursera instructor",
+    description: "Clear, studio-grade Coursera-style instructor",
     flag: "🇺🇸",
     isNeural: true,
   },
@@ -59,7 +61,17 @@ export const NEURAL_VOICES = [
     accent: "US English",
     region: "North America",
     gender: "Male",
-    description: "Conversational, friendly narrator",
+    description: "Casual, friendly conversational mentor",
+    flag: "🇺🇸",
+    isNeural: true,
+  },
+  {
+    id: "en-US-JennyNeural",
+    name: "Jenny",
+    accent: "US English",
+    region: "North America",
+    gender: "Female",
+    description: "Upbeat, expressive & friendly instructor",
     flag: "🇺🇸",
     isNeural: true,
   },
@@ -94,6 +106,11 @@ export const NEURAL_VOICES = [
     isNeural: true,
   },
 ];
+
+/**
+ * In-memory Blob URL cache for zero-latency playback across sentences & voices
+ */
+const audioBlobCache = new Map();
 
 /**
  * Clean markdown symbols from text so Speech engines read smooth natural English
@@ -138,6 +155,27 @@ function buildNeuralStreamUrl(text, voiceId, rate) {
   return `${cleanBase}/tts/stream?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voiceId)}&rate=${rate}`;
 }
 
+/**
+ * Fetch and cache raw audio as local Blob URL for glitch-free playback
+ */
+async function fetchAudioBlobUrl(text, voiceId, rate) {
+  const cacheKey = `${voiceId}:${rate}:${text}`;
+  if (audioBlobCache.has(cacheKey)) {
+    return audioBlobCache.get(cacheKey);
+  }
+
+  const streamUrl = buildNeuralStreamUrl(text, voiceId, rate);
+  const response = await fetch(streamUrl);
+  if (!response.ok) {
+    throw new Error(`TTS server error (${response.status})`);
+  }
+
+  const blob = await response.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  audioBlobCache.set(cacheKey, blobUrl);
+  return blobUrl;
+}
+
 export default function CourseAudioNarrator({
   title = "Lesson Audio Narration",
   content = "",
@@ -148,10 +186,17 @@ export default function CourseAudioNarrator({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [previewingVoiceId, setPreviewingVoiceId] = useState(null);
+  const [audioError, setAudioError] = useState("");
 
-  // Selected voice: either a neural voice ID (e.g. "en-NG-EzinneNeural") or a local voice URI
+  // Selected voice: ensure we always default to real studio voices
   const [selectedVoiceId, setSelectedVoiceId] = useState(() => {
-    return localStorage.getItem("cg_preferred_voice") || "en-NG-EzinneNeural";
+    const saved = localStorage.getItem("cg_preferred_voice");
+    if (saved && NEURAL_VOICES.some((v) => v.id === saved)) {
+      return saved;
+    }
+    // Clean up any legacy robotic browser voice name stored in earlier sessions
+    localStorage.setItem("cg_preferred_voice", "en-NG-EzinneNeural");
+    return "en-NG-EzinneNeural";
   });
 
   const [playbackRate, setPlaybackRate] = useState(() => {
@@ -167,8 +212,7 @@ export default function CourseAudioNarrator({
   const sentences = useMemo(() => extractSentences(content), [content]);
 
   // Audio elements & playback state refs
-  const audioRef = useRef(null);
-  const nextAudioRef = useRef(null);
+  const activeAudioRef = useRef(null);
   const previewAudioRef = useRef(null);
   const currentIndexRef = useRef(activeSentenceIndex);
   const isPlayingRef = useRef(false);
@@ -214,7 +258,7 @@ export default function CourseAudioNarrator({
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Load fallback device voices if Web Speech API is present
+  // Load fallback device voices only as supplementary option
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
@@ -242,14 +286,13 @@ export default function CourseAudioNarrator({
 
   // Stop all playback engines
   const stopAllPlayback = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.removeAttribute("src");
-      audioRef.current.load();
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
     }
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
-      previewAudioRef.current.removeAttribute("src");
+      previewAudioRef.current = null;
     }
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -268,24 +311,18 @@ export default function CourseAudioNarrator({
 
   // Preload upcoming sentence audio for instantaneous transitions
   const preloadUpcoming = useCallback(
-    (nextIdx) => {
-      if (!currentNeuralVoice || nextIdx >= sentences.length) return;
+    (nextIdx, voiceId) => {
+      if (!voiceId || nextIdx >= sentences.length) return;
       const nextText = sentences[nextIdx];
       if (!nextText) return;
-
-      const url = buildNeuralStreamUrl(nextText, currentNeuralVoice.id, playbackRate);
-      if (!nextAudioRef.current) {
-        nextAudioRef.current = new Audio();
-      }
-      nextAudioRef.current.src = url;
-      nextAudioRef.current.preload = "auto";
+      fetchAudioBlobUrl(nextText, voiceId, playbackRate).catch(() => {});
     },
-    [currentNeuralVoice, playbackRate, sentences]
+    [playbackRate, sentences]
   );
 
-  // Play a specific sentence
+  // Play a specific sentence using Real Studio Neural Voices
   const speakSentence = useCallback(
-    (index) => {
+    async (index, voiceToUse = selectedVoiceId) => {
       if (index < 0 || index >= sentences.length) {
         setIsPlaying(false);
         setIsLoadingAudio(false);
@@ -299,54 +336,101 @@ export default function CourseAudioNarrator({
       const text = sentences[index];
       if (!text) return;
 
-      // 1. NEURAL STUDIO TTS PLAYBACK (DEFAULT & PRIMARY)
-      if (currentNeuralVoice) {
-        if (typeof window !== "undefined" && window.speechSynthesis) {
-          window.speechSynthesis.cancel();
-        }
+      // Stop previous audio instance completely
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+        activeAudioRef.current = null;
+      }
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
 
-        if (!audioRef.current) {
-          audioRef.current = new Audio();
-        }
+      const neuralVoice = NEURAL_VOICES.find((v) => v.id === voiceToUse);
 
-        const audio = audioRef.current;
-        audio.pause();
-
-        const streamUrl = buildNeuralStreamUrl(text, currentNeuralVoice.id, playbackRate);
-        audio.src = streamUrl;
-        audio.playbackRate = 1.0;
-        audio.muted = isMuted;
-
+      // 1. PRIMARY ENGINE: REAL NEURAL STUDIO AUDIO
+      if (neuralVoice) {
         setIsLoadingAudio(true);
+        setAudioError("");
 
-        audio.oncanplay = () => {
-          setIsLoadingAudio(false);
-          if (isPlayingRef.current) {
-            audio.play().catch((err) => {
-              console.warn("[CourseAudioNarrator] Audio play rejected:", err);
-            });
+        try {
+          const blobUrl = await fetchAudioBlobUrl(text, neuralVoice.id, playbackRate);
+
+          // If playback was cancelled during fetch
+          if (!isPlayingRef.current) {
+            setIsLoadingAudio(false);
+            return;
           }
-        };
 
-        audio.onplay = () => {
+          const audio = new Audio(blobUrl);
+          activeAudioRef.current = audio;
+          audio.playbackRate = 1.0;
+          audio.muted = isMuted;
+
+          audio.onplay = () => {
+            setIsLoadingAudio(false);
+            setIsPlaying(true);
+            // Preload upcoming sentence in background for zero buffering
+            preloadUpcoming(index + 1, neuralVoice.id);
+          };
+
+          audio.onended = () => {
+            if (isPlayingRef.current) {
+              const nextIdx = index + 1;
+              if (nextIdx < sentences.length) {
+                currentIndexRef.current = nextIdx;
+                if (onSentenceChange) onSentenceChange(nextIdx);
+                // Natural breath pause (90ms) before next sentence
+                setTimeout(() => {
+                  if (isPlayingRef.current) {
+                    speakSentence(nextIdx, voiceToUse);
+                  }
+                }, 90);
+              } else {
+                setIsPlaying(false);
+                if (onComplete) onComplete();
+              }
+            }
+          };
+
+          audio.onerror = (e) => {
+            console.error("[CourseAudioNarrator] Audio decode error:", e);
+            setIsLoadingAudio(false);
+            setAudioError("Audio stream interrupted. Tap play to retry.");
+          };
+
+          await audio.play();
+        } catch (err) {
+          console.error("[CourseAudioNarrator] Failed to fetch neural speech:", err);
+          setIsLoadingAudio(false);
+          setAudioError("Connection to speech service delayed. Tap play to retry.");
+        }
+        return;
+      }
+
+      // 2. DEVICE SYSTEM VOICE (Only if user explicitly chose it)
+      const deviceVoice = deviceVoices.find((v) => v.voiceURI === voiceToUse);
+      if (deviceVoice && typeof window !== "undefined" && window.speechSynthesis) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.voice = deviceVoice;
+        utterance.rate = playbackRate * 0.95;
+        utterance.volume = isMuted ? 0 : 1;
+
+        utterance.onstart = () => {
           setIsPlaying(true);
           setIsLoadingAudio(false);
-          // Preload upcoming sentence while current one is playing
-          preloadUpcoming(index + 1);
         };
 
-        audio.onended = () => {
+        utterance.onend = () => {
           if (isPlayingRef.current) {
             const nextIdx = index + 1;
             if (nextIdx < sentences.length) {
               currentIndexRef.current = nextIdx;
               if (onSentenceChange) onSentenceChange(nextIdx);
-              // Smooth natural breathing pause (100ms) between sentences
               setTimeout(() => {
                 if (isPlayingRef.current) {
-                  speakSentence(nextIdx);
+                  speakSentence(nextIdx, voiceToUse);
                 }
-              }, 100);
+              }, 120);
             } else {
               setIsPlaying(false);
               if (onComplete) onComplete();
@@ -354,76 +438,18 @@ export default function CourseAudioNarrator({
           }
         };
 
-        audio.onerror = (e) => {
-          console.warn("[CourseAudioNarrator] Neural stream error, falling back to Web Speech:", e);
+        utterance.onerror = (e) => {
+          if (e.error === "canceled" || e.error === "interrupted") return;
+          console.warn("[CourseAudioNarrator] SpeechSynthesis error:", e.error);
+          setIsPlaying(false);
           setIsLoadingAudio(false);
-          // Fallback seamlessly to local browser synthesis so audio never fails
-          fallbackWebSpeech(text, index);
         };
 
-        audio.load();
-        audio.play().catch(() => {
-          // Will play on `oncanplay`
-        });
-        return;
+        window.speechSynthesis.speak(utterance);
       }
-
-      // 2. FALLBACK DEVICE WEB SPEECH SYNTHESIS
-      fallbackWebSpeech(text, index);
     },
-    [sentences, currentNeuralVoice, playbackRate, isMuted, onSentenceChange, preloadUpcoming, onComplete]
+    [sentences, selectedVoiceId, playbackRate, isMuted, onSentenceChange, preloadUpcoming, onComplete, deviceVoices]
   );
-
-  // Fallback to client-side window.speechSynthesis
-  const fallbackWebSpeech = (text, index) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      setIsPlaying(false);
-      setIsLoadingAudio(false);
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    if (currentDeviceVoice) {
-      utterance.voice = currentDeviceVoice;
-    }
-    utterance.rate = playbackRate * 0.95;
-    utterance.pitch = 1.0;
-    utterance.volume = isMuted ? 0 : 1;
-
-    utterance.onstart = () => {
-      setIsPlaying(true);
-      setIsLoadingAudio(false);
-    };
-
-    utterance.onend = () => {
-      if (isPlayingRef.current) {
-        const nextIdx = index + 1;
-        if (nextIdx < sentences.length) {
-          currentIndexRef.current = nextIdx;
-          if (onSentenceChange) onSentenceChange(nextIdx);
-          setTimeout(() => {
-            if (isPlayingRef.current) {
-              speakSentence(nextIdx);
-            }
-          }, 120);
-        } else {
-          setIsPlaying(false);
-          if (onComplete) onComplete();
-        }
-      }
-    };
-
-    utterance.onerror = (e) => {
-      if (e.error === "canceled" || e.error === "interrupted") return;
-      console.warn("[CourseAudioNarrator] Web Speech error:", e.error);
-      setIsPlaying(false);
-      setIsLoadingAudio(false);
-    };
-
-    window.speechSynthesis.speak(utterance);
-  };
 
   // Toggle Play / Pause
   const handleTogglePlay = () => {
@@ -433,7 +459,7 @@ export default function CourseAudioNarrator({
       stopAllPlayback();
     } else {
       setIsPlaying(true);
-      speakSentence(activeSentenceIndex);
+      speakSentence(activeSentenceIndex, selectedVoiceId);
     }
   };
 
@@ -443,7 +469,7 @@ export default function CourseAudioNarrator({
     currentIndexRef.current = 0;
     if (onSentenceChange) onSentenceChange(0);
     setIsPlaying(true);
-    speakSentence(0);
+    speakSentence(0, selectedVoiceId);
   };
 
   // Skip Forward
@@ -453,7 +479,7 @@ export default function CourseAudioNarrator({
       currentIndexRef.current = nextIdx;
       if (onSentenceChange) onSentenceChange(nextIdx);
       if (isPlaying) {
-        speakSentence(nextIdx);
+        speakSentence(nextIdx, selectedVoiceId);
       }
     }
   };
@@ -465,7 +491,7 @@ export default function CourseAudioNarrator({
       currentIndexRef.current = prevIdx;
       if (onSentenceChange) onSentenceChange(prevIdx);
       if (isPlaying) {
-        speakSentence(prevIdx);
+        speakSentence(prevIdx, selectedVoiceId);
       }
     }
   };
@@ -479,11 +505,11 @@ export default function CourseAudioNarrator({
     localStorage.setItem("cg_preferred_rate", String(nextRate));
 
     if (isPlaying) {
-      setTimeout(() => speakSentence(activeSentenceIndex), 50);
+      setTimeout(() => speakSentence(activeSentenceIndex, selectedVoiceId), 50);
     }
   };
 
-  // Select voice from dropdown
+  // Select voice from dropdown: updates state & immediately speaks with the new voice
   const handleSelectVoice = (voiceId) => {
     setSelectedVoiceId(voiceId);
     localStorage.setItem("cg_preferred_voice", voiceId);
@@ -491,51 +517,55 @@ export default function CourseAudioNarrator({
 
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
+      previewAudioRef.current = null;
     }
     setPreviewingVoiceId(null);
 
     if (isPlaying) {
-      setTimeout(() => speakSentence(activeSentenceIndex), 50);
+      speakSentence(activeSentenceIndex, voiceId);
     }
   };
 
-  // Preview a voice sample
-  const handlePreviewVoice = (e, voice) => {
+  // Preview an actual voice sample directly in the dropdown
+  const handlePreviewVoice = async (e, voice) => {
     e.stopPropagation();
 
-    // If currently previewing this voice, stop it
+    // If currently playing preview for this voice, toggle off
     if (previewingVoiceId === voice.id) {
       if (previewAudioRef.current) {
         previewAudioRef.current.pause();
+        previewAudioRef.current = null;
       }
       setPreviewingVoiceId(null);
       return;
     }
 
-    if (!previewAudioRef.current) {
-      previewAudioRef.current = new Audio();
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current = null;
     }
 
-    const preview = previewAudioRef.current;
-    preview.pause();
-
-    const sampleText = `Hello! I am ${voice.name}, your CyberGuard cybersecurity course narrator.`;
-    const previewUrl = buildNeuralStreamUrl(sampleText, voice.id, 1);
-
-    preview.src = previewUrl;
     setPreviewingVoiceId(voice.id);
 
-    preview.onended = () => {
-      setPreviewingVoiceId(null);
-    };
+    try {
+      const sampleText = `Hello! I am ${voice.name}, your CyberGuard cybersecurity instructor.`;
+      const blobUrl = await fetchAudioBlobUrl(sampleText, voice.id, 1);
+      const audio = new Audio(blobUrl);
+      previewAudioRef.current = audio;
 
-    preview.onerror = () => {
-      setPreviewingVoiceId(null);
-    };
+      audio.onended = () => {
+        setPreviewingVoiceId(null);
+      };
 
-    preview.play().catch(() => {
+      audio.onerror = () => {
+        setPreviewingVoiceId(null);
+      };
+
+      await audio.play();
+    } catch (err) {
+      console.warn("[CourseAudioNarrator] Preview failed:", err);
       setPreviewingVoiceId(null);
-    });
+    }
   };
 
   const progressPercent =
@@ -545,17 +575,6 @@ export default function CourseAudioNarrator({
 
   const currentSentence = sentences[activeSentenceIndex] || "";
   const estMinutes = Math.max(1, Math.round(sentences.length * 0.15));
-
-  // Voice name display
-  const voiceDisplay = useMemo(() => {
-    if (currentNeuralVoice) {
-      return `${currentNeuralVoice.flag} ${currentNeuralVoice.name} (${currentNeuralVoice.accent})`;
-    }
-    if (currentDeviceVoice) {
-      return `💻 ${currentDeviceVoice.name.slice(0, 18)}`;
-    }
-    return "🇬🇭 Ezinne (West Africa)";
-  }, [currentNeuralVoice, currentDeviceVoice]);
 
   return (
     <>
@@ -606,7 +625,11 @@ export default function CourseAudioNarrator({
               <p className="text-[11px] text-slate-500 truncate mt-0.5">
                 {isPlaying
                   ? `Sentence ${activeSentenceIndex + 1} of ${sentences.length} (${progressPercent}%)`
-                  : "Click play or tap any sentence in the lesson to listen"}
+                  : audioError ? (
+                    <span className="text-rose-600 font-semibold">{audioError}</span>
+                  ) : (
+                    "Click play or tap any sentence in the lesson to listen"
+                  )}
               </p>
             </div>
           </div>
@@ -741,7 +764,7 @@ export default function CourseAudioNarrator({
                               </button>
 
                               {isSelected && (
-                                <Check className="w-4 h-4 text-[#0056D2] shrink-0" />
+                                <Check className="w-4 h-4 text-[#0056D2]" />
                               )}
                             </div>
                           </div>

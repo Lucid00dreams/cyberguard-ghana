@@ -46,6 +46,15 @@ const CURATED_VOICES = [
     isDefault: false,
   },
   {
+    id: "en-US-JennyNeural",
+    name: "Jenny",
+    accent: "US English",
+    gender: "Female",
+    description: "Upbeat, expressive & friendly instructor",
+    flag: "🇺🇸",
+    isDefault: false,
+  },
+  {
     id: "en-GB-SoniaNeural",
     name: "Sonia",
     accent: "British English",
