@@ -3,21 +3,36 @@ const prisma = require("../config/prisma");
 
 /**
  * Verifies the Bearer JWT on the request and attaches the decoded
- * payload to req.user. Validates tokenVersion against the database
- * to enforce instantaneous session revocation upon password changes or logouts.
+ * payload to req.user. Enforces token purpose separation and validates
+ * tokenVersion against the database for immediate session revocation.
  */
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : null;
 
   if (!token) {
     return res.status(401).json({ error: "Missing or malformed Authorization header." });
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Check if tokenVersion matches database record
+    const payload = jwt.verify(token, process.env.JWT_SECRET, {
+      algorithms: ["HS256"],
+    });
+
+    if (!payload || !payload.id) {
+      return res.status(401).json({ error: "Invalid token payload." });
+    }
+
+    // Reject single-purpose tokens (e.g. unsubscribe_daily_tips, registration_verified, password_reset)
+    if (payload.purpose && payload.purpose !== "session") {
+      return res.status(401).json({ error: "Invalid token type for session authentication." });
+    }
+
+    if (typeof payload.tokenVersion !== "number") {
+      return res.status(401).json({ error: "Invalid or legacy token format. Please log in again." });
+    }
+
+    // Check if user exists and tokenVersion matches database record
     const user = await prisma.user.findUnique({
       where: { id: payload.id },
       select: { id: true, role: true, email: true, tokenVersion: true },
@@ -27,8 +42,10 @@ async function requireAuth(req, res, next) {
       return res.status(401).json({ error: "User account no longer exists." });
     }
 
-    if (typeof payload.tokenVersion === "number" && user.tokenVersion !== payload.tokenVersion) {
-      return res.status(401).json({ error: "Session has been revoked or password was changed. Please log in again." });
+    if (user.tokenVersion !== payload.tokenVersion) {
+      return res.status(401).json({
+        error: "Session has been revoked or password was changed. Please log in again.",
+      });
     }
 
     // Attach latest role and user info from database

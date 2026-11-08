@@ -24,34 +24,58 @@ const submitLimiter = rateLimit({
   message: { error: "Too many reports submitted from this network. Please try again later." },
 });
 
+const ALLOWED_EVIDENCE_MIMES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+];
+
 /**
  * Step 1 — client requests a pre-signed PUT URL so evidence is uploaded
  * directly from the browser to Cloudflare R2. The server never touches
  * the raw file, and no server-side EXIF data is ever generated because
  * the file was already scrubbed client-side before this call.
  */
-router.post("/evidence/presign", submitLimiter, async (req, res, next) => {
-  try {
-    const { mimeType, sha256Hash } = req.body;
-    if (!mimeType || !sha256Hash) {
-      return res.status(400).json({ error: "mimeType and sha256Hash are required." });
+router.post(
+  "/evidence/presign",
+  submitLimiter,
+  [
+    body("mimeType").isIn(ALLOWED_EVIDENCE_MIMES).withMessage("Unsupported evidence file type."),
+    body("sha256Hash")
+      .isHexadecimal()
+      .isLength({ min: 64, max: 64 })
+      .withMessage("Invalid SHA-256 hash."),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ error: errors.array()[0]?.msg, errors: errors.array() });
+      }
+
+      const { mimeType, sha256Hash } = req.body;
+      const cleanHash = String(sha256Hash).toLowerCase();
+
+      const objectKey = `evidence/${cleanHash}-${crypto.randomBytes(4).toString("hex")}`;
+
+      const command = new PutObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: objectKey,
+        ContentType: mimeType,
+      });
+
+      const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 });
+
+      res.json({ uploadUrl, objectKey });
+    } catch (err) {
+      next(err);
     }
-
-    const objectKey = `evidence/${sha256Hash}-${crypto.randomBytes(4).toString("hex")}`;
-
-    const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
-      Key: objectKey,
-      ContentType: mimeType,
-    });
-
-    const uploadUrl = await getSignedUrl(r2Client, command, { expiresIn: 300 });
-
-    res.json({ uploadUrl, objectKey });
-  } catch (err) {
-    next(err);
   }
-});
+);
 
 /**
  * Step 2 — client submits the report metadata + the already-uploaded
@@ -64,11 +88,14 @@ router.post(
   [
     body("category").isIn(["SEXTORTION", "GROOMING", "SCAM", "BULLYING", "IMPERSONATION", "OTHER"]),
     body("narrative").trim().isLength({ min: 20, max: 5000 }),
-    body("evidence").isArray({ min: 0 }),
-    body("evidence.*.sha256Hash").optional().isHexadecimal().isLength({ min: 64, max: 64 }),
-    body("evidence.*.objectKey").optional().isString(),
-    body("evidence.*.mimeType").optional().isString(),
-    body("evidence.*.byteSize").optional().isInt({ min: 1 }),
+    body("evidence").isArray({ min: 0, max: 10 }),
+    body("evidence.*.sha256Hash").isHexadecimal().isLength({ min: 64, max: 64 }),
+    body("evidence.*.objectKey")
+      .isString()
+      .matches(/^evidence\/[a-fA-F0-9]{64}-[a-f0-9]{8}$/)
+      .withMessage("Invalid evidence storage key."),
+    body("evidence.*.mimeType").isIn(ALLOWED_EVIDENCE_MIMES),
+    body("evidence.*.byteSize").isInt({ min: 1, max: 50 * 1024 * 1024 }),
   ],
   async (req, res, next) => {
     try {

@@ -1,6 +1,15 @@
+import crypto from "crypto";
 import nodemailer from "nodemailer";
 
 const DEFAULT_ALLOWED_SENDER = "cyberguardgh@gmail.com";
+
+function safeCompareSecret(a, b) {
+  if (!a || !b || typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -9,10 +18,10 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (
-      process.env.MAIL_RELAY_SECRET &&
-      req.headers["x-mail-relay-secret"] !== process.env.MAIL_RELAY_SECRET
-    ) {
+    const relaySecret = process.env.MAIL_RELAY_SECRET;
+    const providedSecret = req.headers["x-mail-relay-secret"];
+
+    if (relaySecret && !safeCompareSecret(String(providedSecret || ""), relaySecret)) {
       return res.status(401).json({ error: "Invalid mail relay secret." });
     }
 
@@ -23,15 +32,17 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Recipient (to) and subject are required." });
     }
 
+    // Prevent CRLF header injection in recipient or subject
+    if (/[\r\n]/.test(to) || /[\r\n]/.test(subject)) {
+      return res.status(400).json({ error: "Invalid characters in email header fields." });
+    }
+
     const providedPass = (smtp?.pass || "").trim();
     const envPass = (process.env.SMTP_PASS || "").trim();
 
     // If caller does not supply the Gmail App Password directly, require MAIL_RELAY_SECRET
     if (!providedPass) {
-      if (
-        !process.env.MAIL_RELAY_SECRET ||
-        req.headers["x-mail-relay-secret"] !== process.env.MAIL_RELAY_SECRET
-      ) {
+      if (!relaySecret || !safeCompareSecret(String(providedSecret || ""), relaySecret)) {
         return res.status(401).json({
           error: "Missing SMTP credentials on backend server (set SMTP_USER and SMTP_PASS).",
         });
@@ -92,7 +103,7 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("[Vercel Mail Relay] Delivery error:", err.message);
     return res.status(502).json({
-      error: err.message || "SMTP delivery failed.",
+      error: "SMTP delivery failed.",
     });
   }
 }

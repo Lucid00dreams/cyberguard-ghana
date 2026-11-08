@@ -2,13 +2,66 @@ const nodemailer = require("nodemailer");
 
 let lastKnownClientOrigin = null;
 
+const ALLOWED_VERCEL_ORIGIN_REGEX = /^https:\/\/cyberguard-ghana(-[a-z0-9-]+)?\.vercel\.app$/i;
+
+function getConfiguredOrigins() {
+  return (process.env.CLIENT_ORIGIN || "http://localhost:5173")
+    .split(",")
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
+
 /**
- * Record a trusted live frontend origin (e.g. https://<app>.vercel.app)
+ * Validates whether an origin string is an explicitly trusted CyberGuard frontend origin.
+ * Prevents Host/Origin header poisoning and SSRF/credential exfiltration via untrusted origins.
+ */
+function isTrustedClientOrigin(origin) {
+  if (!origin || typeof origin !== "string") return false;
+  const cleaned = origin.trim().replace(/\/$/, "");
+  let parsed;
+  try {
+    parsed = new URL(cleaned);
+  } catch {
+    return false;
+  }
+
+  if (parsed.origin !== cleaned) return false;
+
+  const configured = getConfiguredOrigins();
+  if (configured.includes(cleaned)) return true;
+
+  if (ALLOWED_VERCEL_ORIGIN_REGEX.test(cleaned)) return true;
+
+  if (
+    process.env.NODE_ENV !== "production" &&
+    (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Escapes user-supplied strings before interpolating into HTML email bodies.
+ */
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Record a trusted live frontend origin (e.g. https://cyberguard-ghana.vercel.app)
  * so email links and the HTTPS mail relay resolve accurately even when
  * CLIENT_ORIGIN falls back to localhost.
  */
 function setClientOriginHint(origin) {
-  if (!origin || typeof origin !== "string") return;
+  if (!isTrustedClientOrigin(origin)) return;
   const cleaned = origin.trim().replace(/\/$/, "");
   if (
     cleaned.startsWith("https://") &&
@@ -20,30 +73,25 @@ function setClientOriginHint(origin) {
 }
 
 function resolveClientOrigin(explicitOrigin) {
-  if (explicitOrigin && typeof explicitOrigin === "string") {
+  if (explicitOrigin && isTrustedClientOrigin(explicitOrigin)) {
     const cleaned = explicitOrigin.trim().replace(/\/$/, "");
-    if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) {
-      setClientOriginHint(cleaned);
-      if (!cleaned.includes("localhost") || process.env.NODE_ENV !== "production") {
-        return cleaned;
-      }
+    setClientOriginHint(cleaned);
+    if (!cleaned.includes("localhost") || process.env.NODE_ENV !== "production") {
+      return cleaned;
     }
   }
 
-  const envOrigin = (process.env.CLIENT_ORIGIN || "")
-    .split(",")[0]
-    .trim()
-    .replace(/\/$/, "");
+  const envOrigin = getConfiguredOrigins()[0] || "";
 
   if (envOrigin && !envOrigin.includes("localhost") && !envOrigin.includes("127.0.0.1")) {
     return envOrigin;
   }
 
-  if (lastKnownClientOrigin) {
+  if (lastKnownClientOrigin && isTrustedClientOrigin(lastKnownClientOrigin)) {
     return lastKnownClientOrigin;
   }
 
-  return envOrigin || "http://localhost:5173";
+  return envOrigin || "https://cyberguard-ghana.vercel.app";
 }
 
 // Create reusable SMTP transporter using Gmail / custom SMTP
@@ -68,8 +116,13 @@ const transporter = nodemailer.createTransport({
 /**
  * Dispatch an email via the Vercel HTTPS Serverless Mail Relay (/api/mail-relay)
  * over port 443 — avoids Render Free Tier outbound blocks on SMTP ports 25/465/587.
+ * Strictly validates that relayOrigin is a trusted CyberGuard origin before dispatching.
  */
 async function sendViaHttpsRelay({ relayOrigin, to, subject, html, text, headers, fromAddress, replyToAddress }) {
+  if (!isTrustedClientOrigin(relayOrigin)) {
+    throw new Error("Refusing to dispatch mail relay request to untrusted origin.");
+  }
+
   const relayUrl = `${relayOrigin.replace(/\/$/, "")}/api/mail-relay`;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 14000);
@@ -140,7 +193,9 @@ async function sendEmail({ to, subject, html, text, headers = {}, clientOrigin }
 
   const resolvedOrigin = resolveClientOrigin(clientOrigin);
   const canUseHttpsRelay =
-    resolvedOrigin.startsWith("https://") && !resolvedOrigin.includes("onrender.com");
+    isTrustedClientOrigin(resolvedOrigin) &&
+    resolvedOrigin.startsWith("https://") &&
+    !resolvedOrigin.includes("onrender.com");
   const preferHttpsRelay =
     canUseHttpsRelay &&
     (Boolean(process.env.RENDER) || process.env.NODE_ENV === "production");
@@ -199,6 +254,8 @@ async function sendPasswordResetEmail(
 ) {
   const clientOrigin = resolveClientOrigin(options.clientOrigin);
   const resetLink = `${clientOrigin}/reset-password?token=${encodeURIComponent(resetToken)}`;
+  const safeName = escapeHtml(displayName);
+  const safeEmail = escapeHtml(toEmail);
 
   const subject = "Reset Your Password — CyberGuard Ghana";
 
@@ -234,7 +291,7 @@ async function sendPasswordResetEmail(
         </div>
 
         <div class="content">
-          <div class="greeting">Hello ${displayName},</div>
+          <div class="greeting">Hello ${safeName},</div>
           <p class="text">
             We received a request to reset your password for your <strong>CyberGuard Ghana</strong> student portal account. Click the secure button below to choose a new password:
           </p>
@@ -258,7 +315,7 @@ async function sendPasswordResetEmail(
         <div class="footer">
           <p><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
           <p>Governed in accordance with the Ghana Cybersecurity Act, 2020 (Act 1038)</p>
-          <p style="margin-top: 10px; font-size: 10px;">This automated notification was sent to ${toEmail}. Please do not reply directly to this message.</p>
+          <p style="margin-top: 10px; font-size: 10px;">This automated notification was sent to ${safeEmail}. Please do not reply directly to this message.</p>
         </div>
       </div>
     </body>
@@ -286,6 +343,8 @@ async function sendWelcomeEmail(
   const dashboardLink = `${clientOrigin}/dashboard`;
   const coursesLink = `${clientOrigin}/courses`;
   const settingsLink = `${clientOrigin}/dashboard?tab=settings`;
+  const safeName = escapeHtml(displayName);
+  const safeEmail = escapeHtml(toEmail);
 
   const subject = `Welcome to CyberGuard Ghana, ${displayName}!`;
 
@@ -348,7 +407,7 @@ async function sendWelcomeEmail(
         </div>
 
         <div class="content">
-          <div class="greeting">Akwaaba, ${displayName}!</div>
+          <div class="greeting">Akwaaba, ${safeName}!</div>
           <p class="lead-text">
             Welcome to <strong>CyberGuard Ghana</strong>! Thank you for signing up—your account is now active and ready.
           </p>
@@ -389,7 +448,7 @@ async function sendWelcomeEmail(
         <div class="footer">
           <p><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
           <p>Operated in alignment with the Cyber Security Authority (CSA), Ghana</p>
-          <p style="margin-top: 10px; font-size: 10px;">This one-time welcome email was sent to ${toEmail} because you created an account on CyberGuard Ghana.</p>
+          <p style="margin-top: 10px; font-size: 10px;">This one-time welcome email was sent to ${safeEmail} because you created an account on CyberGuard Ghana.</p>
         </div>
       </div>
     </body>
@@ -407,13 +466,6 @@ async function sendWelcomeEmail(
 
 /**
  * Send Daily 7:00 AM Cyber Safety Tip Email to opted-in users
- * @param {Object} params
- * @param {string} params.toEmail - Recipient email
- * @param {string} params.displayName - Recipient display name
- * @param {Object} params.tip - { index, category, title, summary, actionStep, courseSlug }
- * @param {string} params.dateFormatted - Readable date string (e.g. "Wednesday, 4 November 2026")
- * @param {string} params.unsubscribeUrl - Signed one-click unsubscribe URL
- * @param {string} [params.clientOrigin] - Optional explicit frontend origin
  */
 async function sendDailySafetyTipEmail({
   toEmail,
@@ -425,9 +477,11 @@ async function sendDailySafetyTipEmail({
 }) {
   const clientOrigin = resolveClientOrigin(explicitOrigin);
   const courseUrl = tip?.courseSlug
-    ? `${clientOrigin}/courses/${tip.courseSlug}`
+    ? `${clientOrigin}/courses/${encodeURIComponent(tip.courseSlug)}`
     : `${clientOrigin}/courses`;
   const settingsUrl = `${clientOrigin}/dashboard?tab=settings`;
+  const safeName = escapeHtml(displayName);
+  const safeUnsubscribeUrl = unsubscribeUrl ? escapeHtml(unsubscribeUrl) : "";
 
   const subject = `Daily Cyber Safety Tip: ${tip.title} — CyberGuard Ghana`;
 
@@ -437,7 +491,7 @@ async function sendDailySafetyTipEmail({
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${subject}</title>
+      <title>${escapeHtml(subject)}</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 0; }
         .wrapper { max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); }
@@ -465,19 +519,19 @@ async function sendDailySafetyTipEmail({
         <div class="header">
           <p class="header-meta">CyberGuard Ghana • Morning Safety Briefing</p>
           <h1>7:00 AM Daily Cyber Safety Tip</h1>
-          <p class="header-date">${dateFormatted}</p>
+          <p class="header-date">${escapeHtml(dateFormatted)}</p>
         </div>
 
         <div class="content">
-          <div class="greeting">Good morning, ${displayName},</div>
+          <div class="greeting">Good morning, ${safeName},</div>
 
-          <span class="category-pill">Tip #${tip.index} • ${tip.category}</span>
-          <h2 class="tip-title">${tip.title}</h2>
-          <p class="tip-body">${tip.summary}</p>
+          <span class="category-pill">Tip #${escapeHtml(tip.index)} • ${escapeHtml(tip.category)}</span>
+          <h2 class="tip-title">${escapeHtml(tip.title)}</h2>
+          <p class="tip-body">${escapeHtml(tip.summary)}</p>
 
           <div class="action-box">
             <p class="action-label">Today's 60-Second Safety Action</p>
-            <p class="action-text">${tip.actionStep}</p>
+            <p class="action-text">${escapeHtml(tip.actionStep)}</p>
           </div>
 
           <div class="btn-container">
@@ -494,7 +548,7 @@ async function sendDailySafetyTipEmail({
           <p>You are receiving this 7:00 AM briefing because you opted in to Daily Cyber Safety Tips.</p>
           <p style="margin-top: 8px;">
             <a href="${settingsUrl}" target="_blank">Manage email preferences</a>
-            ${unsubscribeUrl ? ` &bull; <a href="${unsubscribeUrl}" target="_blank">Unsubscribe from daily tips</a>` : ""}
+            ${safeUnsubscribeUrl ? ` &bull; <a href="${safeUnsubscribeUrl}" target="_blank">Unsubscribe from daily tips</a>` : ""}
           </p>
         </div>
       </div>
@@ -516,12 +570,11 @@ async function sendDailySafetyTipEmail({
 
 /**
  * Send OTP Verification Email during student registration
- * @param {string} toEmail - Recipient email
- * @param {string} otpCode - 6-digit verification code
- * @param {Object} [options] - { clientOrigin }
  */
 async function sendOtpVerificationEmail(toEmail, otpCode, options = {}) {
   const clientOrigin = resolveClientOrigin(options.clientOrigin);
+  const safeOtp = escapeHtml(otpCode);
+  const safeEmail = escapeHtml(toEmail);
   const subject = `${otpCode} is your CyberGuard verification code`;
 
   const html = `
@@ -530,7 +583,7 @@ async function sendOtpVerificationEmail(toEmail, otpCode, options = {}) {
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${otpCode} — Verify Your Email</title>
+      <title>${safeOtp} — Verify Your Email</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 0; }
         .wrapper { max-width: 580px; margin: 30px auto; background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04); }
@@ -561,7 +614,7 @@ async function sendOtpVerificationEmail(toEmail, otpCode, options = {}) {
           </p>
 
           <div class="code-box">
-            <div class="code-value">${otpCode}</div>
+            <div class="code-value">${safeOtp}</div>
           </div>
 
           <div class="alert-box">
@@ -580,7 +633,7 @@ async function sendOtpVerificationEmail(toEmail, otpCode, options = {}) {
         <div class="footer">
           <p><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
           <p>Governed in accordance with the Ghana Cybersecurity Act, 2020 (Act 1038)</p>
-          <p style="margin-top: 10px; font-size: 10px;">Sent to ${toEmail}. This is an automated security dispatch.</p>
+          <p style="margin-top: 10px; font-size: 10px;">Sent to ${safeEmail}. This is an automated security dispatch.</p>
         </div>
       </div>
     </body>
@@ -594,6 +647,8 @@ async function sendOtpVerificationEmail(toEmail, otpCode, options = {}) {
 
 module.exports = {
   transporter,
+  escapeHtml,
+  isTrustedClientOrigin,
   setClientOriginHint,
   resolveClientOrigin,
   sendEmail,

@@ -376,19 +376,33 @@ function getTipForDate(date = new Date()) {
   return DAILY_CYBER_TIPS[idx];
 }
 
+const crypto = require("crypto");
+
+function getUnsubscribeSecret() {
+  return crypto
+    .createHmac("sha256", String(process.env.JWT_SECRET || "cyberguard_default"))
+    .update("cyberguard_unsubscribe_daily_tips_v1")
+    .digest("hex");
+}
+
 /**
- * Signed token for one-click email unsubscribe
+ * Signed token for one-click email unsubscribe (uses a domain-separated signing key)
  */
 function createUnsubscribeToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, purpose: "unsubscribe_daily_tips" },
-    process.env.JWT_SECRET,
-    { expiresIn: "90d" }
+    getUnsubscribeSecret(),
+    { expiresIn: "90d", algorithm: "HS256" }
   );
 }
 
 function verifyUnsubscribeToken(token) {
-  const payload = jwt.verify(token, process.env.JWT_SECRET);
+  let payload;
+  try {
+    payload = jwt.verify(token, getUnsubscribeSecret(), { algorithms: ["HS256"] });
+  } catch {
+    payload = jwt.verify(token, process.env.JWT_SECRET, { algorithms: ["HS256"] });
+  }
   if (!payload || payload.purpose !== "unsubscribe_daily_tips" || !payload.id) {
     throw new Error("Invalid unsubscribe token.");
   }

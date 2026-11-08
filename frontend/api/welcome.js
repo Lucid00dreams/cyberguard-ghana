@@ -3,6 +3,18 @@ import nodemailer from "nodemailer";
 const BACKEND_ORIGIN =
   process.env.BACKEND_ORIGIN || "https://cyberguard-ghana.onrender.com";
 
+const ALLOWED_VERCEL_HOST_REGEX = /^cyberguard-ghana(-[a-z0-9-]+)?\.vercel\.app$/i;
+
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -36,11 +48,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, skipped: "Not a newly created account." });
     }
 
-    const proto = req.headers["x-forwarded-proto"] || "https";
-    const host = req.headers["x-forwarded-host"] || req.headers.host || "";
-    const clientOrigin = host ? `${proto}://${host}` : "https://cyberguard-ghana.vercel.app";
+    const rawHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").trim();
+    const clientOrigin = ALLOWED_VERCEL_HOST_REGEX.test(rawHost)
+      ? `https://${rawHost}`
+      : "https://cyberguard-ghana.vercel.app";
 
     const displayName = me.displayName || "CyberGuard Member";
+    const safeName = escapeHtml(displayName);
+    const safeEmail = escapeHtml(me.email);
     const receiveDailyTips = Boolean(me.receiveDailyTips);
     const dashboardLink = `${clientOrigin}/dashboard`;
     const coursesLink = `${clientOrigin}/courses`;
@@ -85,7 +100,7 @@ export default async function handler(req, res) {
             <p style="color: #93c5fd; margin: 6px 0 0 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">National Cyber Safety &amp; Digital Defense Academy</p>
           </div>
           <div style="padding: 36px; text-align: left;">
-            <div style="font-size: 19px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">Akwaaba, ${displayName}!</div>
+            <div style="font-size: 19px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">Akwaaba, ${safeName}!</div>
             <p style="font-size: 14px; line-height: 1.65; color: #334155; margin-bottom: 16px;">
               Welcome to <strong>CyberGuard Ghana</strong>! Thank you for signing up—your account is now active and ready.
             </p>
@@ -115,7 +130,7 @@ export default async function handler(req, res) {
           </div>
           <div style="background-color: #f1f5f9; padding: 20px 36px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
             <p style="margin: 0;"><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
-            <p style="margin: 6px 0 0 0; font-size: 10px;">This one-time welcome email was sent to ${me.email} because you created an account on CyberGuard Ghana.</p>
+            <p style="margin: 6px 0 0 0; font-size: 10px;">This one-time welcome email was sent to ${safeEmail} because you created an account on CyberGuard Ghana.</p>
           </div>
         </div>
       </body>
@@ -146,7 +161,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, messageId: info.messageId });
   } catch (err) {
     console.error("[Vercel Welcome Email] Error:", err.message);
-    return res.status(502).json({ error: err.message });
+    return res.status(502).json({ error: "Welcome email delivery failed." });
   }
 }
-

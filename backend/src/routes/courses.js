@@ -155,6 +155,11 @@ router.post("/:courseId/lessons", requireAuth, requireRole("ADMIN", "TUTOR"), as
     if (validation) return res.status(validation.status).json({ error: validation.error });
 
     const { moduleId, title, type, order, videoUrl, textContent, transcript, transcriptSegments } = req.body;
+    const targetModule = await prisma.module.findUnique({ where: { id: moduleId } });
+    if (!targetModule || targetModule.courseId !== course.id) {
+      return res.status(400).json({ error: "Specified module does not belong to this course." });
+    }
+
     const lesson = await prisma.lesson.create({
       data: {
         moduleId,
@@ -173,7 +178,7 @@ router.post("/:courseId/lessons", requireAuth, requireRole("ADMIN", "TUTOR"), as
   }
 });
 
-// Admin/Tutor or Student: Trigger on-demand Coursera AI transcription for a lesson
+// Trigger on-demand Coursera AI transcription for a lesson (students can only generate if missing; only course author/admin can overwrite)
 router.post("/lessons/:lessonId/transcribe", requireAuth, async (req, res, next) => {
   try {
     const lesson = await prisma.lesson.findUnique({
@@ -182,16 +187,25 @@ router.post("/lessons/:lessonId/transcribe", requireAuth, async (req, res, next)
     });
     if (!lesson) return res.status(404).json({ error: "Lesson not found." });
 
+    const isAuthorOrAdmin = !ensureCourseAuthor(lesson.module?.course, req.user);
+    if (!isAuthorOrAdmin && lesson.transcript) {
+      return res.json(lesson);
+    }
+
     const { transcribeVideoFile, generateFallbackTranscript } = require("../services/transcriptionService");
     let result = null;
 
     if (lesson.videoUrl && lesson.videoUrl.includes("/uploads/videos/")) {
-      const filename = lesson.videoUrl.split("/uploads/videos/")[1];
-      const path = require("path");
-      const localPath = path.join(__dirname, "../../public/uploads/videos", filename);
-      const fs = require("fs");
-      if (fs.existsSync(localPath)) {
-        result = await transcribeVideoFile(localPath, "video/mp4", { title: lesson.title });
+      const rawFilename = lesson.videoUrl.split("/uploads/videos/")[1];
+      if (rawFilename && !rawFilename.includes("..") && !rawFilename.includes("/") && !rawFilename.includes("\\")) {
+        const path = require("path");
+        const fs = require("fs");
+        const videosDir = path.resolve(__dirname, "../../public/uploads/videos");
+        const cleanFilename = path.basename(rawFilename);
+        const localPath = path.resolve(videosDir, cleanFilename);
+        if (localPath.startsWith(videosDir) && fs.existsSync(localPath)) {
+          result = await transcribeVideoFile(localPath, "video/mp4", { title: lesson.title });
+        }
       }
     }
 

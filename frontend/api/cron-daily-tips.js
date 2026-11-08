@@ -1,23 +1,26 @@
 const BACKEND_ORIGIN =
   process.env.BACKEND_ORIGIN || "https://cyberguard-ghana.onrender.com";
 
+const ALLOWED_VERCEL_HOST_REGEX = /^cyberguard-ghana(-[a-z0-9-]+)?\.vercel\.app$/i;
+
 export default async function handler(req, res) {
-  const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers["x-forwarded-host"] || req.headers.host || "";
-  const clientOrigin = host ? `${proto}://${host}` : "";
+  const rawHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").trim();
+  const clientOrigin = ALLOWED_VERCEL_HOST_REGEX.test(rawHost)
+    ? `https://${rawHost}`
+    : "https://cyberguard-ghana.vercel.app";
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8500);
 
   try {
-    const targetUrl = `${BACKEND_ORIGIN.replace(/\/$/, "")}/api/health${
-      clientOrigin ? `?clientOrigin=${encodeURIComponent(clientOrigin)}` : ""
-    }`;
+    const targetUrl = `${BACKEND_ORIGIN.replace(/\/$/, "")}/api/health?clientOrigin=${encodeURIComponent(
+      clientOrigin
+    )}`;
 
     const resp = await fetch(targetUrl, {
       method: "GET",
       headers: {
-        ...(clientOrigin ? { Origin: clientOrigin } : {}),
+        Origin: clientOrigin,
         "User-Agent": "cyberguard-vercel-cron/1.0",
       },
       signal: controller.signal,
@@ -32,7 +35,6 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     clearTimeout(timeoutId);
-    // Even if Render cold-start exceeds 8.5s, the wake-up TCP request has already been initiated
     return res.status(202).json({
       ok: true,
       waking: true,
@@ -41,4 +43,3 @@ export default async function handler(req, res) {
     });
   }
 }
-

@@ -1,7 +1,8 @@
 const express = require("express");
+const crypto = require("crypto");
 const prisma = require("../config/prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
-const { resolveClientOrigin } = require("../utils/mailer");
+const { resolveClientOrigin, escapeHtml } = require("../utils/mailer");
 const {
   DEFAULT_TIMEZONE,
   getZonedTimeParts,
@@ -36,6 +37,9 @@ async function handleUnsubscribe(req, res) {
       return res.json({ success: true, message: "You have been unsubscribed from Daily Cyber Safety Tips." });
     }
 
+    const safeEmail = escapeHtml(payload.email || "your email");
+    const safeOrigin = escapeHtml(clientOrigin);
+
     return res.status(200).send(`
       <!DOCTYPE html>
       <html lang="en">
@@ -54,8 +58,8 @@ async function handleUnsubscribe(req, res) {
       <body>
         <div class="card">
           <h1>Daily Tips Paused</h1>
-          <p>We have unsubscribed <strong>${payload.email || "your email"}</strong> from the 7:00 AM Daily Cyber Safety Tips. You can re-enable them anytime in your Dashboard settings.</p>
-          <a href="${clientOrigin}/dashboard?tab=settings">Return to Dashboard</a>
+          <p>We have unsubscribed <strong>${safeEmail}</strong> from the 7:00 AM Daily Cyber Safety Tips. You can re-enable them anytime in your Dashboard settings.</p>
+          <a href="${safeOrigin}/dashboard?tab=settings">Return to Dashboard</a>
         </div>
       </body>
       </html>
@@ -80,7 +84,9 @@ router.post("/cron", async (req, res, next) => {
     }
     const authHeader = req.headers.authorization || "";
     const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-    if (!provided || provided !== cronSecret) {
+    const bufA = Buffer.from(provided);
+    const bufB = Buffer.from(String(cronSecret));
+    if (!provided || bufA.length !== bufB.length || !crypto.timingSafeEqual(bufA, bufB)) {
       return res.status(401).json({ error: "Unauthorized cron invocation." });
     }
 

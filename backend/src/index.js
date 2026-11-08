@@ -3,11 +3,12 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const path = require("path");
+const rateLimit = require("express-rate-limit");
 
 const authRoutes = require("./routes/auth");
 const courseRoutes = require("./routes/courses");
 const incidentRoutes = require("./routes/incidents");
-const path = require("path");
 const tutorRoutes = require("./routes/tutors");
 const uploadRoutes = require("./routes/uploads");
 const cybergodRoutes = require("./routes/cybergod");
@@ -15,12 +16,22 @@ const cyberchatRoutes = require("./routes/cyberchat");
 const dailyTipsRoutes = require("./routes/dailyTips");
 const pushNotificationsRoutes = require("./routes/pushNotifications");
 const { startDailyTipsScheduler } = require("./services/dailyTipsService");
-const { setClientOriginHint } = require("./utils/mailer");
+const { isTrustedClientOrigin, setClientOriginHint } = require("./utils/mailer");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
-const rateLimit = require("express-rate-limit");
+// Trust first reverse proxy (Render / Cloudflare / Vercel) so rate limiters see real client IPs
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+const globalApiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 180, // max 180 API requests per minute per IP
+  message: { error: "Too many requests from this IP. Please slow down." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -38,6 +49,14 @@ const resetLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 25, // max 25 media upload operations per 15 minutes
+  message: { error: "Upload rate limit reached. Please wait before uploading more files." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 30, // max 30 chat messages per minute
@@ -49,7 +68,15 @@ const aiLimiter = rateLimit({
 // Production-ready HTTP Security Headers via Helmet
 app.use(
   helmet({
-    contentSecurityPolicy: false, // Managed per frontend or reverse-proxy
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
     crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
     xContentTypeOptions: true,
@@ -63,20 +90,12 @@ app.use(
   })
 );
 
-const allowedOrigins = (process.env.CLIENT_ORIGIN || "http://localhost:5173")
-  .split(",")
-  .map((s) => s.trim().replace(/\/$/, ""));
-
 app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      const cleanOrigin = origin.replace(/\/$/, "");
-      if (
-        allowedOrigins.includes(cleanOrigin) ||
-        cleanOrigin.endsWith(".vercel.app") ||
-        process.env.NODE_ENV !== "production"
-      ) {
+      const cleanOrigin = origin.trim().replace(/\/$/, "");
+      if (isTrustedClientOrigin(cleanOrigin)) {
         setClientOriginHint(cleanOrigin);
         return callback(null, true);
       }
@@ -86,17 +105,18 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+app.use(express.json({ limit: "8mb" }));
+app.use(express.urlencoded({ limit: "8mb", extended: true }));
 app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
-// Secure Static Uploads with Content-Type Sniffing Protection
+// Secure Static Uploads with Content-Type Sniffing & Script Execution Protection
 app.use(
   "/uploads",
   express.static(path.join(__dirname, "../public/uploads"), {
     setHeaders: (res, filePath) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
-      const safeExtensions = [".jpg", ".jpeg", ".png", ".webp", ".mp4", ".webm", ".mov"];
+      res.setHeader("Content-Security-Policy", "default-src 'none'; media-src 'self'; img-src 'self'; style-src 'none'; script-src 'none'; sandbox");
+      const safeExtensions = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4", ".webm", ".mov", ".m4v"];
       const ext = path.extname(filePath).toLowerCase();
       if (!safeExtensions.includes(ext)) {
         res.setHeader("Content-Disposition", "attachment");
@@ -108,11 +128,13 @@ app.use(
 app.get("/health", (req, res) => res.json({ status: "ok", service: "cyberguard-ghana-backend" }));
 app.get("/api/health", (req, res) => {
   const hint = typeof req.query.clientOrigin === "string" ? req.query.clientOrigin.trim().replace(/\/$/, "") : "";
-  if (hint && (allowedOrigins.includes(hint) || hint.endsWith(".vercel.app"))) {
+  if (hint && isTrustedClientOrigin(hint)) {
     setClientOriginHint(hint);
   }
   res.json({ status: "ok", service: "cyberguard-ghana-backend" });
 });
+
+app.use("/api", globalApiLimiter);
 
 // Rate-limited authentication & recovery endpoints
 app.use("/api/auth/login", authLimiter);
@@ -129,7 +151,7 @@ app.use("/api/courses", courseRoutes);
 // Incident reporting endpoints contain internal submitLimiter; do not block CSA officer reviews
 app.use("/api/incidents", incidentRoutes);
 app.use("/api/tutors", tutorRoutes);
-app.use("/api/uploads", uploadRoutes);
+app.use("/api/uploads", uploadLimiter, uploadRoutes);
 app.use("/api/cybergod/chat", aiLimiter);
 app.use("/api/cybergod", cybergodRoutes);
 app.use("/api/cyberchat", cyberchatRoutes);

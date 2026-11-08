@@ -6,10 +6,14 @@ const { body, validationResult } = require("express-validator");
 const prisma = require("../config/prisma");
 const { requireAuth, requireRole } = require("../middleware/auth");
 const {
+  isTrustedClientOrigin,
   sendPasswordResetEmail,
   sendWelcomeEmail,
   sendOtpVerificationEmail,
 } = require("../utils/mailer");
+
+// Precomputed 12-round bcrypt hash used to equalize timing when login email does not exist
+const DUMMY_BCRYPT_HASH = "$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";
 
 const router = express.Router();
 
@@ -66,19 +70,25 @@ function signToken(user) {
       role: user.role,
       email: user.email,
       tokenVersion: typeof user.tokenVersion === "number" ? user.tokenVersion : 0,
+      purpose: "session",
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || "15m" }
+    {
+      expiresIn: process.env.JWT_EXPIRES_IN || "15m",
+      algorithm: "HS256",
+    }
   );
 }
 
 function getRequestOrigin(req) {
   if (req.headers.origin && typeof req.headers.origin === "string") {
-    return req.headers.origin.trim().replace(/\/$/, "");
+    const cleaned = req.headers.origin.trim().replace(/\/$/, "");
+    if (isTrustedClientOrigin(cleaned)) return cleaned;
   }
   if (req.headers.referer && typeof req.headers.referer === "string") {
     try {
-      return new URL(req.headers.referer).origin;
+      const origin = new URL(req.headers.referer).origin;
+      if (isTrustedClientOrigin(origin)) return origin;
     } catch {
       return undefined;
     }
@@ -467,6 +477,7 @@ router.post(
 router.post(
   "/register",
   [
+    body("verificationToken").notEmpty().withMessage("Email verification is required before creating an account."),
     body("email").isEmail().normalizeEmail(),
     body("password").isLength({ min: 8 }).withMessage("Password must be at least 8 characters."),
     body("displayName").trim().isLength({ min: 2 }),
@@ -478,10 +489,29 @@ router.post(
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({ error: errors.array()[0]?.msg, errors: errors.array() });
       }
 
-      const { email, password, displayName, avatarUrl, receiveDailyTips, dateOfBirth } = req.body;
+      const { verificationToken, email, password, displayName, avatarUrl, receiveDailyTips, dateOfBirth } = req.body;
+
+      let decoded;
+      try {
+        decoded = jwt.verify(verificationToken, process.env.JWT_SECRET, { algorithms: ["HS256"] });
+      } catch {
+        return res.status(401).json({
+          error: "Verification session expired. Please verify your email again.",
+        });
+      }
+
+      if (
+        !decoded ||
+        decoded.purpose !== "registration_verified" ||
+        decoded.email?.toLowerCase() !== email.toLowerCase()
+      ) {
+        return res.status(401).json({
+          error: "Invalid verification session. Please verify your email again.",
+        });
+      }
 
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
@@ -516,6 +546,7 @@ router.post(
         });
 
         allocatedCourses = await allocateCoursesForUser(tx, newUser.id, effectiveAgeBand);
+        await tx.emailVerification.deleteMany({ where: { email } });
         return newUser;
       });
 
@@ -583,12 +614,21 @@ router.post("/google", async (req, res, next) => {
       return res.status(401).json({ error: "Invalid or expired Google OAuth credential." });
     }
 
+    // Verify issuer
+    if (
+      tokenData.iss &&
+      tokenData.iss !== "accounts.google.com" &&
+      tokenData.iss !== "https://accounts.google.com"
+    ) {
+      return res.status(401).json({ error: "Invalid Google OAuth token issuer." });
+    }
+
     // Verify email address is verified by Google
     if (tokenData.email_verified === "false" || tokenData.email_verified === false) {
       return res.status(401).json({ error: "Unverified Google email address." });
     }
 
-    // Verify audience if GOOGLE_CLIENT_ID is configured
+    // Verify audience against GOOGLE_CLIENT_ID
     const configuredClientId = process.env.GOOGLE_CLIENT_ID
       ? process.env.GOOGLE_CLIENT_ID.trim().replace(/^["']|["']$/g, "")
       : "";
@@ -704,6 +744,7 @@ router.post(
       const { email, password } = req.body;
       const user = await prisma.user.findUnique({ where: { email } });
       if (!user) {
+        await bcrypt.compare(password, DUMMY_BCRYPT_HASH);
         return res.status(401).json({ error: "Invalid email or password." });
       }
 
@@ -1009,9 +1050,9 @@ router.post(
         // Secret includes user's current passwordHash so token invalidates if password changes
         const resetSecret = user.passwordHash + process.env.JWT_SECRET;
         const resetToken = jwt.sign(
-          { id: user.id, email: user.email },
+          { id: user.id, email: user.email, purpose: "password_reset" },
           resetSecret,
-          { expiresIn: "15m" }
+          { expiresIn: "15m", algorithm: "HS256" }
         );
 
         try {
@@ -1024,6 +1065,9 @@ router.post(
             error: "Unable to dispatch password reset email. Please try again later or contact support.",
           });
         }
+      } else {
+        // Equalize timing slightly when account does not exist
+        await bcrypt.compare(email, DUMMY_BCRYPT_HASH);
       }
 
       // Always return success message to prevent account enumeration
@@ -1070,6 +1114,10 @@ router.post(
         return res.status(400).json({ error: "Invalid reset token." });
       }
 
+      if (decoded.purpose && decoded.purpose !== "password_reset") {
+        return res.status(400).json({ error: "Invalid token purpose." });
+      }
+
       const user = await prisma.user.findUnique({ where: { id: decoded.id } });
       if (!user) {
         return res.status(404).json({ error: "User account no longer exists." });
@@ -1077,7 +1125,7 @@ router.post(
 
       const resetSecret = user.passwordHash + process.env.JWT_SECRET;
       try {
-        jwt.verify(token, resetSecret);
+        jwt.verify(token, resetSecret, { algorithms: ["HS256"] });
       } catch (err) {
         return res.status(400).json({
           error: "Password reset link has expired or has already been used. Please request a new link.",

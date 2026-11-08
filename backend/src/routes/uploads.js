@@ -6,12 +6,33 @@ const { PutObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 const { body, validationResult } = require("express-validator");
 const { r2Client, BUCKET_NAME, R2_ENDPOINT } = require("../config/storage");
-const { requireAuth } = require("../middleware/auth");
+const { requireAuth, requireRole } = require("../middleware/auth");
 
 const router = express.Router();
 
 const UPLOADS_DIR = path.join(__dirname, "../../public/uploads");
 const VIDEOS_DIR = path.join(UPLOADS_DIR, "videos");
+
+const ALLOWED_VIDEO_EXTS = new Set([".mp4", ".webm", ".mov", ".m4v"]);
+const ALLOWED_VIDEO_MIMES = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-m4v",
+  "audio/mp4",
+  "audio/webm",
+]);
+
+const ALLOWED_PRESIGN_FOLDERS = new Set(["uploads", "avatars", "courses"]);
+const ALLOWED_PRESIGN_MIME_MAP = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+};
 
 function resolveBaseUrl(req) {
   if (process.env.BACKEND_URL) return process.env.BACKEND_URL.replace(/\/$/, "");
@@ -20,8 +41,11 @@ function resolveBaseUrl(req) {
     const proto = req.headers["x-forwarded-proto"] || req.protocol || "https";
     return `${proto}://${host}`;
   }
-  return process.env.NODE_ENV === "production" ? "https://cyberguard-ghana.onrender.com" : "http://localhost:4000";
+  return process.env.NODE_ENV === "production"
+    ? "https://cyberguard-ghana.onrender.com"
+    : "http://localhost:4000";
 }
+
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
@@ -38,8 +62,9 @@ const videoStorage = multer.diskStorage({
     cb(null, VIDEOS_DIR);
   },
   filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase() || ".mp4";
-    const uniqueName = `lecture-${crypto.randomBytes(8).toString("hex")}-${Date.now()}${ext}`;
+    const rawExt = path.extname(file.originalname || "").toLowerCase();
+    const safeExt = ALLOWED_VIDEO_EXTS.has(rawExt) ? rawExt : ".mp4";
+    const uniqueName = `lecture-${crypto.randomBytes(8).toString("hex")}-${Date.now()}${safeExt}`;
     cb(null, uniqueName);
   },
 });
@@ -48,13 +73,14 @@ const videoUpload = multer({
   storage: videoStorage,
   limits: { fileSize: 250 * 1024 * 1024 }, // 250 MB
   fileFilter: (req, file, cb) => {
-    const allowed = /mp4|webm|quicktime|mov|mkv|ogg|m4v/i;
-    const isMimeValid = allowed.test(file.mimetype) || file.mimetype.startsWith("video/") || file.mimetype.startsWith("audio/");
-    const isExtValid = allowed.test(path.extname(file.originalname).toLowerCase());
-    if (isMimeValid || isExtValid) {
+    const rawExt = path.extname(file.originalname || "").toLowerCase();
+    const mime = String(file.mimetype || "").toLowerCase();
+    const isMimeValid = ALLOWED_VIDEO_MIMES.has(mime);
+    const isExtValid = ALLOWED_VIDEO_EXTS.has(rawExt);
+    if (isMimeValid && isExtValid) {
       cb(null, true);
     } else {
-      cb(new Error("Only video files (.mp4, .webm, .mov, .m4v, .mkv) are accepted."));
+      cb(new Error("Only authentic video files (.mp4, .webm, .mov, .m4v) are accepted."));
     }
   },
 });
@@ -64,20 +90,31 @@ function buildObjectUrl(objectKey) {
   return `${endpoint}/${BUCKET_NAME}/${encodeURIComponent(objectKey)}`;
 }
 
-// R2/S3 Presigned URL endpoint
+// R2/S3 Presigned URL endpoint with strict folder & MIME allowlists
 router.post(
   "/presign",
   requireAuth,
-  [body("mimeType").isString().notEmpty(), body("folder").optional().isString()],
+  [
+    body("mimeType").isString().notEmpty(),
+    body("folder").optional().isString(),
+  ],
   async (req, res, next) => {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
       const { mimeType, folder = "uploads" } = req.body;
-      const safeFolder = folder.replace(/^\/|\/$/g, "");
-      const suffix = mimeType.split("/").pop();
-      const objectKey = `${safeFolder}/${crypto.randomBytes(6).toString("hex")}-${Date.now()}.${suffix}`;
+      const cleanFolder = String(folder).trim().replace(/^\/+|\/+$/g, "");
+      if (!ALLOWED_PRESIGN_FOLDERS.has(cleanFolder)) {
+        return res.status(400).json({ error: "Invalid upload destination folder." });
+      }
+
+      const suffix = ALLOWED_PRESIGN_MIME_MAP[String(mimeType).toLowerCase()];
+      if (!suffix) {
+        return res.status(400).json({ error: "Unsupported file MIME type for upload." });
+      }
+
+      const objectKey = `${cleanFolder}/${crypto.randomBytes(8).toString("hex")}-${Date.now()}.${suffix}`;
 
       const command = new PutObjectCommand({
         Bucket: BUCKET_NAME,
@@ -165,65 +202,76 @@ router.post("/image", requireAuth, async (req, res, next) => {
   }
 });
 
-// Video Upload (Direct Multipart Video File)
-router.post("/video", requireAuth, videoUpload.single("video"), async (req, res, next) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No video file was uploaded." });
+// Video Upload (Direct Multipart Video File) — Restricted to ADMIN and TUTOR roles
+router.post(
+  "/video",
+  requireAuth,
+  requireRole("ADMIN", "TUTOR"),
+  videoUpload.single("video"),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No video file was uploaded." });
+      }
+
+      const baseUrl = resolveBaseUrl(req);
+      const videoUrl = `${baseUrl}/uploads/videos/${req.file.filename}`;
+
+      res.json({
+        success: true,
+        url: videoUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+      });
+    } catch (err) {
+      next(err);
     }
-
-    const baseUrl = resolveBaseUrl(req);
-    const videoUrl = `${baseUrl}/uploads/videos/${req.file.filename}`;
-
-    res.json({
-      success: true,
-      url: videoUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
-    });
-  } catch (err) {
-    next(err);
   }
-});
+);
 
-// Video Upload + Automatic Coursera-Style Gemini AI Transcription
-router.post("/video-with-transcription", requireAuth, videoUpload.single("video"), async (req, res, next) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No video file was uploaded." });
+// Video Upload + Automatic Coursera-Style Gemini AI Transcription — Restricted to ADMIN and TUTOR roles
+router.post(
+  "/video-with-transcription",
+  requireAuth,
+  requireRole("ADMIN", "TUTOR"),
+  videoUpload.single("video"),
+  async (req, res, next) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No video file was uploaded." });
+      }
+
+      const baseUrl = resolveBaseUrl(req);
+      const videoUrl = `${baseUrl}/uploads/videos/${req.file.filename}`;
+      const filePath = req.file.path;
+
+      const title = req.body.title || path.parse(req.file.originalname).name;
+      const duration = Number(req.body.duration) || 120;
+
+      console.log(`Triggering automatic lecture transcription for: "${title}"`);
+      const transcription = await transcribeVideoFile(filePath, req.file.mimetype, { title, duration });
+
+      res.json({
+        success: true,
+        url: videoUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        size: req.file.size,
+        transcript: transcription.fullTranscript,
+        transcriptSegments: transcription.segments,
+      });
+    } catch (err) {
+      console.error("Video upload & transcribe error:", err);
+      next(err);
     }
-
-    const baseUrl = resolveBaseUrl(req);
-    const videoUrl = `${baseUrl}/uploads/videos/${req.file.filename}`;
-    const filePath = req.file.path;
-
-    const title = req.body.title || path.parse(req.file.originalname).name;
-    const duration = Number(req.body.duration) || 120;
-
-    // Transcribe video audio using Gemini Multimodal AI
-    console.log(`🎙️ Triggering Coursera-style automatic transcription for: "${title}"`);
-    const transcription = await transcribeVideoFile(filePath, req.file.mimetype, { title, duration });
-
-    res.json({
-      success: true,
-      url: videoUrl,
-      filename: req.file.filename,
-      originalName: req.file.originalname,
-      mimeType: req.file.mimetype,
-      size: req.file.size,
-      transcript: transcription.fullTranscript,
-      transcriptSegments: transcription.segments,
-    });
-  } catch (err) {
-    console.error("Video upload & transcribe error:", err);
-    next(err);
   }
-});
+);
 
-// On-demand transcription endpoint for existing video lessons
-router.post("/transcribe", requireAuth, async (req, res, next) => {
+// On-demand transcription endpoint for existing video lessons — Restricted to ADMIN and TUTOR roles
+router.post("/transcribe", requireAuth, requireRole("ADMIN", "TUTOR"), async (req, res, next) => {
   try {
     const { videoUrl, title = "Interactive Lecture", duration = 120 } = req.body;
     if (!videoUrl || typeof videoUrl !== "string") {
@@ -234,7 +282,6 @@ router.post("/transcribe", requireAuth, async (req, res, next) => {
     if (videoUrl.includes("/uploads/videos/")) {
       const rawFilename = videoUrl.split("/uploads/videos/")[1];
       if (rawFilename) {
-        // Defend against path traversal: immediately reject traversal sequences
         if (rawFilename.includes("..") || rawFilename.includes("/") || rawFilename.includes("\\")) {
           return res.status(400).json({ error: "Invalid video filename or directory traversal attempt detected." });
         }
@@ -258,4 +305,3 @@ router.post("/transcribe", requireAuth, async (req, res, next) => {
 });
 
 module.exports = router;
-
