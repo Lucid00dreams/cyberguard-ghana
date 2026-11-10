@@ -6,10 +6,14 @@ import { AuthProvider } from "./context/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
 import { warmupBackend } from "./utils/api.js";
+import { initTabMonitor } from "./utils/tabMonitor.js";
 import "./index.css";
 
 // Initiate early backend wake-up to eliminate cold starts
 warmupBackend();
+
+// Initialize real inter-tab communication & health monitoring
+initTabMonitor();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

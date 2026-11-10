@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -14,18 +14,24 @@ import {
   Eye,
   FileSearch,
   Smartphone,
-  Sparkles,
   ExternalLink,
-  Copy,
-  Check,
   Search,
   ArrowRight,
   Radio,
   HardDrive,
   Globe,
-  HelpCircle,
+  Layers,
+  Cpu,
+  Activity,
+  Battery,
+  BatteryCharging,
+  Zap,
+  Clock,
   XCircle,
 } from "lucide-react";
+
+import { scanAllTabs, pruneAllTabsMemory } from "../utils/tabMonitor";
+import { getStorageHealthReport, cleanBrowserStorage, formatBytes } from "../utils/storageCleaner";
 
 const EASE_OUT = [0.22, 1, 0.36, 1];
 
@@ -35,7 +41,6 @@ const TRUSTED_GH_DOMAINS = [
   "telecel.com.gh",
   "at.com.gh",
   "csa.gov.gh",
-  "csa-portal.csa.gov.gh",
   "bog.gov.gh",
   "ecobank.com",
   "gcb.com.gh",
@@ -43,9 +48,9 @@ const TRUSTED_GH_DOMAINS = [
   "calbank.net",
   "ghipss.net",
   "cyberguard.gh",
+  "cyberguard-ghana.vercel.app",
 ];
 
-// Suspicious TLDs or phishing patterns commonly targeting Ghana MoMo users
 const SUSPICIOUS_PATTERNS = [
   /momo.*claim/i,
   /mtn.*bonus/i,
@@ -62,260 +67,226 @@ export default function SecurityAudit() {
   const autoStart = searchParams.get("auto") === "true";
   const prefersReducedMotion = useReducedMotion();
 
+  // Scan state
   const [scanning, setScanning] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentStepText, setCurrentStepText] = useState("Ready to scan");
-  const [scanStepIndex, setScanStepIndex] = useState(0);
 
-  // Scan Results
-  const [connectionAudit, setConnectionAudit] = useState(null);
-  const [ipAudit, setIpAudit] = useState(null);
-  const [permissionsAudit, setPermissionsAudit] = useState([]);
-  const [storageAudit, setStorageAudit] = useState(null);
-  const [ghThreatAdvisory, setGhThreatAdvisory] = useState([]);
+  // Real Telemetry Data
+  const [openTabs, setOpenTabs] = useState([]);
+  const [storageData, setStorageData] = useState(null);
+  const [networkData, setNetworkData] = useState(null);
+  const [hardwareData, setHardwareData] = useState(null);
+  const [permissionsData, setPermissionsData] = useState([]);
+  const [ipAuditData, setIpAuditData] = useState(null);
 
-  // Clean Up state
+  // Cleanup state
   const [cleaning, setCleaning] = useState(false);
-  const [cleaned, setCleaned] = useState(false);
-  const [cleanedStats, setCleanedStats] = useState({ bytes: 0, items: 0 });
+  const [cleanedResult, setCleanedResult] = useState(null);
 
-  // Interactive Tools state
+  // MoMo Link Scanner
   const [momoInput, setMomoInput] = useState("");
   const [momoAnalysis, setMomoAnalysis] = useState(null);
 
+  // File Inspector
   const [fileAnalysis, setFileAnalysis] = useState(null);
   const [fileHashing, setFileHashing] = useState(false);
 
-  // Trigger automatic scan if requested via PWA icon shortcut
-  useEffect(() => {
-    if (autoStart) {
-      runSecurityScan();
-    }
-  }, [autoStart]);
-
-  // Overall Safety Score calculation (0 - 100)
-  const safetyScore = useMemo(() => {
-    if (!hasScanned) return null;
-    let score = 100;
-
-    if (connectionAudit && !connectionAudit.isHttps) score -= 30;
-    if (ipAudit && ipAudit.leaked) score -= 20;
-
-    // Permissions check
-    const highRiskPerms = permissionsAudit.filter(
-      (p) => p.status === "granted" && (p.name === "geolocation" || p.name === "camera" || p.name === "microphone")
-    );
-    score -= highRiskPerms.length * 5;
-
-    // Storage check
-    if (storageAudit && storageAudit.itemCount > 20) score -= 5;
-
-    return Math.max(score, 45);
-  }, [hasScanned, connectionAudit, ipAudit, permissionsAudit, storageAudit]);
-
-  async function runSecurityScan() {
+  // Run full realistic scan
+  const executeScan = useCallback(async () => {
     setScanning(true);
-    setProgress(5);
-    setCleaned(false);
+    setProgress(10);
+    setCleanedResult(null);
 
-    // Step 1: Network & Protocol
-    setScanStepIndex(1);
-    setCurrentStepText("Auditing network protocol & SSL/TLS certificate...");
-    await new Promise((r) => setTimeout(r, 400));
-    const isHttps = window.location.protocol === "https:";
-    const connectionInfo = {
-      isHttps,
-      protocol: window.location.protocol.replace(":", "").toUpperCase(),
-      hstsReady: isHttps,
-      grade: isHttps ? "A+" : "C (Unencrypted)",
-    };
-    setConnectionAudit(connectionInfo);
+    // 1. Scan All Open Tabs via BroadcastChannel
+    setCurrentStepText("Probing all open application tabs and worker processes...");
+    const tabs = await scanAllTabs(300);
+    setOpenTabs(tabs);
     setProgress(30);
 
-    // Step 2: WebRTC IP Leak Detection
-    setScanStepIndex(2);
-    setCurrentStepText("Testing WebRTC candidate IP leak protection...");
-    let webrtcLeakDetected = false;
-    let localCandidate = "Protected (No leak)";
+    // 2. Real Storage & Cache Inspection
+    setCurrentStepText("Measuring exact CacheStorage, LocalStorage, and IndexedDB byte allocation...");
+    const storage = await getStorageHealthReport();
+    setStorageData(storage);
+    setProgress(55);
+
+    // 3. Real Network Latency & Profile
+    setCurrentStepText("Pinging edge server and testing WebRTC candidate leak isolation...");
+    const pingStart = performance.now();
+    let latencyMs = 0;
+    try {
+      await fetch("/manifest.webmanifest?ping=" + Date.now(), { cache: "no-store" });
+      latencyMs = Math.round(performance.now() - pingStart);
+    } catch {
+      latencyMs = 0;
+    }
+
+    let webrtcLeak = false;
     try {
       const rtc = new RTCPeerConnection({ iceServers: [] });
       rtc.createDataChannel("");
       const offer = await rtc.createOffer();
       await rtc.setLocalDescription(offer);
-
-      const candidateStr = offer.sdp || "";
-      if (candidateStr.includes("c=IN IP4 192.168.") || candidateStr.includes("c=IN IP4 10.")) {
-        webrtcLeakDetected = true;
-        localCandidate = "Private LAN candidate exposed";
+      const sdp = offer.sdp || "";
+      if (sdp.includes("c=IN IP4 192.168.") || sdp.includes("c=IN IP4 10.")) {
+        webrtcLeak = true;
       }
       rtc.close();
     } catch {
-      // Browsers blocking RTC peer connection or in restricted mode
-      webrtcLeakDetected = false;
+      webrtcLeak = false;
     }
-    setIpAudit({
-      leaked: webrtcLeakDetected,
-      status: webrtcLeakDetected ? "Warning: IP exposed to scripts" : "Shielded: No private IP leak",
-      detail: localCandidate,
+
+    setNetworkData({
+      online: navigator.onLine,
+      latencyMs,
+      effectiveType: navigator.connection?.effectiveType || "High-Speed",
+      downlink: navigator.connection?.downlink ? `${navigator.connection.downlink} Mbps` : null,
+      rtt: navigator.connection?.rtt ? `${navigator.connection.rtt} ms` : null,
+      saveData: Boolean(navigator.connection?.saveData),
+      isHttps: window.location.protocol === "https:",
     });
-    setProgress(55);
 
-    // Step 3: Permissions Hygiene
-    setScanStepIndex(3);
-    setCurrentStepText("Auditing device hardware permissions (Camera, Mic, GPS)...");
-    await new Promise((r) => setTimeout(r, 350));
-    const permsToCheck = ["geolocation", "notifications", "camera", "microphone"];
-    const permResults = [];
-
-    for (const name of permsToCheck) {
-      try {
-        if (navigator.permissions && navigator.permissions.query) {
-          const status = await navigator.permissions.query({ name });
-          permResults.push({ name, status: status.state });
-        } else {
-          permResults.push({ name, status: "prompt" });
-        }
-      } catch {
-        permResults.push({ name, status: "restricted" });
-      }
-    }
-    setPermissionsAudit(permResults);
+    setIpAuditData({
+      leaked: webrtcLeak,
+      status: webrtcLeak ? "Warning: Private LAN IP leaked to WebRTC" : "Shielded: WebRTC private candidates masked",
+    });
     setProgress(75);
 
-    // Step 4: Storage & Tracking footprint
-    setScanStepIndex(4);
-    setCurrentStepText("Measuring local tracker footprint & cache storage...");
-    await new Promise((r) => setTimeout(r, 350));
-    let totalItems = 0;
-    try {
-      totalItems += localStorage.length;
-      totalItems += sessionStorage.length;
-    } catch {}
-
-    let storageEstimate = { quota: "Unknown", usage: "~1.2 MB" };
-    if (navigator.storage && navigator.storage.estimate) {
+    // 4. Hardware & Power Telemetry
+    setCurrentStepText("Collecting system hardware threads, heap memory, and power telemetry...");
+    let batteryInfo = null;
+    if ("getBattery" in navigator) {
       try {
-        const est = await navigator.storage.estimate();
-        const usageMb = ((est.usage || 0) / (1024 * 1024)).toFixed(1);
-        storageEstimate = { usage: `${usageMb} MB` };
+        const b = await navigator.getBattery();
+        batteryInfo = {
+          level: Math.round(b.level * 100),
+          charging: b.charging,
+        };
       } catch {}
     }
-    setStorageAudit({
-      itemCount: totalItems,
-      usage: storageEstimate.usage,
-      cleanable: totalItems > 5,
+
+    let memoryInfo = null;
+    if (window.performance && window.performance.memory) {
+      memoryInfo = {
+        usedHeapMb: parseFloat((window.performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1)),
+        totalHeapMb: parseFloat((window.performance.memory.totalJSHeapSize / (1024 * 1024)).toFixed(1)),
+        limitHeapMb: parseFloat((window.performance.memory.jsHeapSizeLimit / (1024 * 1024)).toFixed(1)),
+      };
+    }
+
+    setHardwareData({
+      cores: navigator.hardwareConcurrency || "Unknown",
+      deviceMemoryGb: navigator.deviceMemory ? `${navigator.deviceMemory} GB` : null,
+      battery: batteryInfo,
+      memory: memoryInfo,
+      isPwa: window.matchMedia("(display-mode: standalone)").matches || Boolean(window.navigator.standalone),
     });
     setProgress(90);
 
-    // Step 5: Ghana National Cybersecurity Threat Vectors
-    setScanStepIndex(5);
-    setCurrentStepText("Cross-referencing National Child Online Protection & CSA Ghana advisories...");
-    await new Promise((r) => setTimeout(r, 400));
-    setGhThreatAdvisory([
-      {
-        title: "Unauthorized MoMo Cashout Prompts",
-        status: "Active Alert",
-        desc: "Fraudsters generate remote MoMo merchant requests. Never approve prompt requests without initiating the transaction yourself.",
-        level: "warning",
-      },
-      {
-        title: "Malicious Unlicensed Lending Apps",
-        status: "Bank of Ghana Advisory",
-        desc: "Over 50 unapproved loan apps scrape phone contacts to harass borrowers. Only install BoG-licensed financial apps from Google Play.",
-        level: "safe",
-      },
-      {
-        title: "National Helpline 292 Integration",
-        status: "Available",
-        desc: "Toll-free emergency dispatch ready for sextortion, account takeover, or illegal wire fraud under Act 1038.",
-        level: "safe",
-      },
-    ]);
+    // 5. Hardware Permissions Hygiene
+    setCurrentStepText("Auditing camera, microphone, and location hardware access...");
+    const perms = ["geolocation", "notifications", "camera", "microphone"];
+    const permsAudit = [];
+    for (const pName of perms) {
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const res = await navigator.permissions.query({ name: pName });
+          permsAudit.push({ name: pName, state: res.state });
+        } else {
+          permsAudit.push({ name: pName, state: "prompt" });
+        }
+      } catch {
+        permsAudit.push({ name: pName, state: "restricted" });
+      }
+    }
+    setPermissionsData(permsAudit);
 
     setProgress(100);
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 180));
     setScanning(false);
     setHasScanned(true);
-    setCurrentStepText("Audit complete. Your device and connection profile is analyzed.");
-  }
+    setCurrentStepText("Scan complete. Live device telemetry verified.");
+  }, []);
 
-  // 1-Tap Device Privacy & Cache Cleanup
-  async function handleCleanUp() {
+  useEffect(() => {
+    if (autoStart) {
+      executeScan();
+    }
+  }, [autoStart, executeScan]);
+
+  // Overall Health Score (0 - 100) computed from verifiable metrics
+  const healthScore = useMemo(() => {
+    if (!hasScanned) return null;
+    let score = 100;
+
+    // Deduct for insecure protocol
+    if (networkData && !networkData.isHttps) score -= 30;
+
+    // Deduct for WebRTC leak
+    if (ipAuditData && ipAuditData.leaked) score -= 15;
+
+    // Deduct for excessive open tabs consuming background RAM
+    if (openTabs.length > 3) score -= 5 * (openTabs.length - 3);
+
+    // Deduct for excessive cleanable cache (> 25 MB)
+    if (storageData && storageData.cleanableBytes > 25 * 1024 * 1024) score -= 10;
+
+    // Deduct for unmonitored sensitive hardware permissions granted
+    const grantedHighRisk = permissionsData.filter(
+      (p) => p.state === "granted" && (p.name === "camera" || p.name === "microphone" || p.name === "geolocation")
+    );
+    score -= grantedHighRisk.length * 5;
+
+    return Math.max(score, 30);
+  }, [hasScanned, networkData, ipAuditData, openTabs, storageData, permissionsData]);
+
+  // Execute REAL physical cache & storage deletion
+  async function handleRealClean() {
     setCleaning(true);
-    let purgedItems = 0;
-
-    // 1. Clear session storage
     try {
-      purgedItems += sessionStorage.length;
-      sessionStorage.clear();
-    } catch {}
+      // 1. Tell all other background tabs to purge in-memory caches
+      pruneAllTabsMemory();
 
-    // 2. Clear non-essential localStorage items (keep auth tokens so user doesn't get logged out!)
-    try {
-      const keysToRemove = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && !key.startsWith("cg_token") && !key.startsWith("cg_user") && !key.startsWith("cg_push")) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((k) => {
-        localStorage.removeItem(k);
-        purgedItems++;
-      });
-    } catch {}
+      // 2. Perform physical storage and CacheStorage purge
+      const result = await cleanBrowserStorage();
+      setCleanedResult(result);
 
-    // 3. Clear CacheStorage temporary blobs if supported
-    try {
-      if ("caches" in window) {
-        const keys = await caches.keys();
-        for (const k of keys) {
-          if (k.includes("temp") || k.includes("media")) {
-            await caches.delete(k);
-            purgedItems += 5;
-          }
-        }
-      }
-    } catch {}
+      // 3. Update storage report with verified after-state
+      setStorageData(result.afterReport);
 
-    await new Promise((r) => setTimeout(r, 600));
-    setCleaning(false);
-    setCleaned(true);
-    setCleanedStats({
-      bytes: Math.round(purgedItems * 85 + 2400),
-      items: purgedItems || 8,
-    });
-
-    // Re-evaluate storage audit
-    setStorageAudit((prev) => (prev ? { ...prev, itemCount: 2, cleanable: false } : null));
+      // 4. Refresh open tabs telemetry
+      const updatedTabs = await scanAllTabs(250);
+      setOpenTabs(updatedTabs);
+    } catch (err) {
+      console.error("[Clean] Physical cleanup error:", err);
+    } finally {
+      setCleaning(false);
+    }
   }
 
-  // MoMo / SMS Link Analyzer
+  // MoMo Link / SMS Inspector
   function handleAnalyzeMomo() {
     const raw = momoInput.trim();
     if (!raw) return;
 
     let isPhishing = false;
-    let reasons = [];
+    const reasons = [];
 
-    // Check suspicious regex patterns
-    for (const pattern of SUSPICIOUS_PATTERNS) {
-      if (pattern.test(raw)) {
+    for (const pat of SUSPICIOUS_PATTERNS) {
+      if (pat.test(raw)) {
         isPhishing = true;
-        reasons.push("Message contains known high-risk urgency or reward keywords used in Ghana MoMo scams.");
+        reasons.push("Message contains deceptive urgency, cashout, or bonus claims common in Ghanaian MoMo scams.");
         break;
       }
     }
 
-    // Check URL if present
     const urlMatch = raw.match(/https?:\/\/[^\s]+/i) || raw.match(/([a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/i);
     if (urlMatch) {
       const foundUrl = urlMatch[0];
       try {
         const parsed = new URL(foundUrl.startsWith("http") ? foundUrl : `https://${foundUrl}`);
         const hostname = parsed.hostname.toLowerCase();
-
         const isTrusted = TRUSTED_GH_DOMAINS.some((td) => hostname === td || hostname.endsWith(`.${td}`));
 
         if (!isTrusted) {
@@ -327,31 +298,31 @@ export default function SecurityAudit() {
           ) {
             isPhishing = true;
             reasons.push(
-              `Domain "${hostname}" impersonates a telecom service but is NOT an official MTN, Telecel, or Bank domain!`
+              `Domain "${hostname}" spoofs telecom branding. Official MTN, Telecel, and Banks NEVER use third-party domains.`
             );
           } else if (parsed.protocol === "http:") {
             isPhishing = true;
-            reasons.push("Link is unencrypted (HTTP), exposing credentials or PIN entries in transit.");
+            reasons.push("Insecure HTTP protocol detected. Entering your 4-digit PIN over this connection leaks it.");
           } else {
-            reasons.push(`Domain "${hostname}" is unrecognized. Exercise extreme caution before entering your PIN.`);
+            reasons.push(`Domain "${hostname}" is unrecognized. Do not authenticate or approve cashout prompts.`);
           }
         } else {
           reasons.push(`Verified official domain: ${hostname}`);
         }
       } catch {
-        reasons.push("Malformed link structure detected.");
+        reasons.push("Malformed link syntax detected.");
       }
     }
 
     setMomoAnalysis({
       input: raw,
-      verdict: isPhishing ? "DANGER · LIKELY PHISHING SCAM" : reasons.length > 0 ? "CAUTION · UNVERIFIED" : "NO KNOWN THREATS DETECTED",
       isPhishing,
+      verdict: isPhishing ? "HIGH RISK · PHISHING ATTEMPT" : reasons.length > 0 ? "CAUTION · UNVERIFIED SENDER" : "NO KNOWN THREATS DETECTED",
       reasons,
     });
   }
 
-  // File / APK Integrity Hash Analyzer
+  // File / APK Integrity Hash Inspector
   async function handleFileSelected(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -361,9 +332,8 @@ export default function SecurityAudit() {
 
     const ext = file.name.split(".").pop().toLowerCase();
     const isApk = ext === "apk";
-    const isExecutable = ["exe", "bat", "vbs", "dex", "scr"].includes(ext);
+    const isExecutable = ["exe", "bat", "vbs", "dex", "scr", "sh"].includes(ext);
 
-    // Compute real SHA-256 hash in browser
     try {
       const buffer = await file.arrayBuffer();
       const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
@@ -377,21 +347,16 @@ export default function SecurityAudit() {
         hash: hashHex,
         isApk,
         isExecutable,
-        verdict: isExecutable
-          ? "High Risk Executable File"
-          : isApk
-          ? "Android Package (Sideloaded APK)"
-          : "Standard Document / Media",
         recommendation: isApk
-          ? "Do NOT install APK files downloaded from WhatsApp, Telegram, or SMS. Legitimate Ghanaian financial apps are only distributed via Google Play."
+          ? "Sideloaded Android APK. Do NOT install apps sent via WhatsApp or Telegram. Sideloaded APKs bypass Google Play Protect verification."
           : isExecutable
-          ? "Executable files can compromise your device. Do not run or open without scanning in an isolated sandbox."
-          : "File hash generated. No immediate dangerous executable header found.",
+          ? "Executable file detected. Can execute arbitrary machine code on your device."
+          : "Standard media/document file. Cryptographic SHA-256 signature calculated.",
       });
     } catch {
       setFileAnalysis({
         name: file.name,
-        error: "Failed to read file for cryptographic hashing.",
+        error: "Could not read file for hashing.",
       });
     } finally {
       setFileHashing(false);
@@ -401,279 +366,377 @@ export default function SecurityAudit() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      {/* Top Banner with PWA Context */}
+      {/* HEADER SECTION */}
       <section className="bg-slate-950 text-white relative overflow-hidden py-10 sm:py-14 px-4 sm:px-6 border-b border-slate-800">
-        <div className="max-w-5xl mx-auto relative z-10">
+        <div className="max-w-6xl mx-auto relative z-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3 max-w-2xl">
               <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-400/20 px-3 py-1 rounded-full text-xs text-blue-400 font-semibold tracking-wide uppercase">
                 <Radio className="w-3.5 h-3.5 animate-pulse text-blue-400" />
-                <span>PWA Quick Action · Device &amp; Connection Shield</span>
+                <span>PWA Quick Action · Multi-Tab &amp; System Health</span>
               </div>
               <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-                Device Security &amp; Privacy Scan
+                Device Security &amp; Storage Health
               </h1>
               <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-                Triggered directly from your home screen long-press shortcut. Run a real-time audit of connection encryption, WebRTC privacy leaks, permission hygiene, and Ghana MoMo threat vectors.
+                Audits all open application tabs, measures exact disk and cache consumption down to the byte, tests network latency, and executes physical cache cleanup.
               </p>
             </div>
 
-            {/* Quick Action Button */}
             <div className="shrink-0 flex items-center gap-3">
               <button
                 type="button"
-                onClick={runSecurityScan}
+                onClick={executeScan}
                 disabled={scanning}
                 className="bg-[#0056D2] hover:bg-[#00419E] active:scale-95 text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-xl transition shadow-lg shadow-blue-900/30 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />
-                <span>{scanning ? "Scanning System..." : hasScanned ? "Run Scan Again" : "Start Live Audit"}</span>
+                <span>{scanning ? "Inspecting System..." : hasScanned ? "Re-Run Complete Audit" : "Run Live System Scan"}</span>
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 space-y-8 relative z-20">
-        {/* RADAR & SCAN PROGRESS CARD */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-8 shadow-xs">
-          {scanning ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center space-y-6">
-              {/* Radar Simulation */}
-              <div className="relative w-36 h-36 flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border-2 border-blue-100 animate-ping opacity-60" />
-                <div className="absolute inset-2 rounded-full border border-blue-200" />
-                <div className="absolute inset-8 rounded-full border border-blue-300/80" />
-                <div className="absolute inset-14 rounded-full border border-blue-400/90" />
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
-                  className="absolute inset-0 rounded-full border-t-2 border-blue-600"
-                />
-                <Shield className="w-10 h-10 text-[#0056D2] relative z-10 animate-pulse" />
-              </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 -mt-6 space-y-6 relative z-20">
+        {/* SCANNING RADAR CARD */}
+        {scanning && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-8 shadow-xs flex flex-col items-center justify-center text-center space-y-6">
+            <div className="relative w-32 h-32 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full border-2 border-blue-100 animate-ping opacity-60" />
+              <div className="absolute inset-2 rounded-full border border-blue-200" />
+              <div className="absolute inset-6 rounded-full border border-blue-300/80" />
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1.8, ease: "linear" }}
+                className="absolute inset-0 rounded-full border-t-2 border-blue-600"
+              />
+              <Shield className="w-9 h-9 text-[#0056D2] relative z-10 animate-pulse" />
+            </div>
 
-              <div className="space-y-2 max-w-md">
-                <p className="text-xs font-mono uppercase tracking-wider text-[#0056D2] font-bold">
-                  Step {scanStepIndex} of 5 · Scanning
-                </p>
-                <h3 className="text-base font-bold text-slate-900">{currentStepText}</h3>
-                <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                  <motion.div
-                    className="bg-[#0056D2] h-full rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+            <div className="space-y-2 max-w-md w-full">
+              <p className="text-xs font-mono uppercase tracking-wider text-[#0056D2] font-bold">
+                Live Browser Telemetry Check
+              </p>
+              <h3 className="text-sm font-bold text-slate-900">{currentStepText}</h3>
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                <motion.div
+                  className="bg-[#0056D2] h-full rounded-full transition-all duration-300"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
             </div>
-          ) : hasScanned ? (
-            /* SCORE & CLEANUP HERO */
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-100">
-                <div className="flex items-center gap-5">
-                  <div
-                    className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center font-black text-2xl shrink-0 ${
-                      safetyScore >= 85
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : safetyScore >= 70
-                        ? "bg-amber-50 text-amber-700 border border-amber-200"
-                        : "bg-rose-50 text-rose-700 border border-rose-200"
-                    }`}
-                  >
-                    <span>{safetyScore}</span>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">Score</span>
-                  </div>
+          </div>
+        )}
 
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                        {safetyScore >= 85
-                          ? "Device & Connection Protected"
-                          : safetyScore >= 70
-                          ? "Moderate Protection · Action Suggested"
-                          : "High Exposure Detected"}
-                      </h2>
-                      <span
-                        className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                          safetyScore >= 85
-                            ? "bg-emerald-100 text-emerald-800"
-                            : safetyScore >= 70
-                            ? "bg-amber-100 text-amber-800"
-                            : "bg-rose-100 text-rose-800"
-                        }`}
-                      >
-                        {safetyScore >= 85 ? "Optimal" : safetyScore >= 70 ? "Review Needed" : "Vulnerable"}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                      Audit completed on {new Date().toLocaleTimeString()} · Verified against Ghanaian national threats
-                    </p>
-                  </div>
+        {/* HEALTH REPORT & CLEAN ACTION CARD */}
+        {hasScanned && !scanning && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-8 shadow-xs space-y-6">
+            {/* Top Summary Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+              <div className="flex items-center gap-5">
+                <div
+                  className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center font-black text-2xl shrink-0 ${
+                    healthScore >= 85
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : healthScore >= 70
+                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                      : "bg-rose-50 text-rose-700 border border-rose-200"
+                  }`}
+                >
+                  <span>{healthScore}</span>
+                  <span className="text-[10px] font-semibold uppercase tracking-wider">Health</span>
                 </div>
 
-                {/* 1-Tap Clean Up Button */}
-                <div className="shrink-0 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleCleanUp}
-                    disabled={cleaning || cleaned}
-                    className={`text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 cursor-pointer shadow-2xs ${
-                      cleaned
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
-                        : "bg-slate-900 hover:bg-slate-800 text-white active:scale-95"
-                    }`}
-                  >
-                    {cleaned ? (
-                      <>
-                        <Check className="w-4 h-4 text-emerald-600" />
-                        <span>Cleaned ({cleanedStats.bytes} B freed)</span>
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="w-4 h-4 text-slate-300" />
-                        <span>{cleaning ? "Purging traces..." : "1-Tap Privacy Cleanup"}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* AUDIT DETAILS GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* 1. Connection Encryption */}
-                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Lock className="w-4 h-4 text-[#0056D2]" /> Connection &amp; SSL/TLS
-                    </span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg sm:text-xl font-bold text-slate-900">
+                      {healthScore >= 85
+                        ? "Optimal System & Storage Health"
+                        : healthScore >= 70
+                        ? "Moderate Cache & Tab Load"
+                        : "High Resource Consumption"}
+                    </h2>
                     <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                        connectionAudit?.isHttps ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                        healthScore >= 85
+                          ? "bg-emerald-100 text-emerald-800"
+                          : healthScore >= 70
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-rose-100 text-rose-800"
                       }`}
                     >
-                      {connectionAudit?.grade}
+                      {openTabs.length} {openTabs.length === 1 ? "Tab Active" : "Tabs Active"}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {connectionAudit?.isHttps
-                      ? "All traffic between your phone and CyberGuard is encrypted with high-grade TLS 1.3 to prevent Wi-Fi sniffing."
-                      : "Unencrypted HTTP session. Credentials could be intercepted by operators on public Wi-Fi."}
-                  </p>
-                </div>
-
-                {/* 2. WebRTC IP Leak */}
-                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Wifi className="w-4 h-4 text-[#0056D2]" /> WebRTC IP Privacy
-                    </span>
-                    <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                        ipAudit?.leaked ? "bg-rose-100 text-rose-800" : "bg-emerald-100 text-emerald-800"
-                      }`}
-                    >
-                      {ipAudit?.leaked ? "Exposed" : "Shielded"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {ipAudit?.status}. WebRTC candidates do not leak your private home or school network subnet to scripts.
-                  </p>
-                </div>
-
-                {/* 3. Permissions Hygiene */}
-                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <Eye className="w-4 h-4 text-[#0056D2]" /> Device Permissions
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      {permissionsAudit.filter((p) => p.status === "granted").length} active
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {permissionsAudit.map((p) => (
-                      <span
-                        key={p.name}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded capitalize ${
-                          p.status === "granted"
-                            ? "bg-amber-100 text-amber-800"
-                            : p.status === "denied"
-                            ? "bg-slate-200 text-slate-600 line-through"
-                            : "bg-slate-100 text-slate-500"
-                        }`}
-                      >
-                        {p.name}: {p.status}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4. Storage & Cache Footprint */}
-                <div className="p-4 rounded-xl border border-slate-100 bg-slate-50/70 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                      <HardDrive className="w-4 h-4 text-[#0056D2]" /> Cache &amp; Storage Footprint
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-500">
-                      {storageAudit?.usage || "Clean"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">
-                    {storageAudit?.itemCount || 0} local storage entries found.
-                    {cleaned
-                      ? " Temporary trackers and caches have been purged."
-                      : " Use the 1-Tap Cleanup button above to purge inactive session leftovers."}
+                  <p className="text-xs text-slate-500">
+                    Real metrics verified from StorageManager, CacheStorage, and BroadcastChannel
                   </p>
                 </div>
               </div>
 
-              {/* GHANA NATIONAL THREAT ADVISORIES */}
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4 text-amber-600" /> Active Ghanaian Threat Mitigations
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {ghThreatAdvisory.map((item, idx) => (
+              {/* Physical Cleanup Button with Exact Byte Metrics */}
+              <div className="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleRealClean}
+                  disabled={cleaning || storageData?.cleanableBytes === 0}
+                  className={`text-xs font-bold px-5 py-3 rounded-xl transition flex items-center gap-2.5 cursor-pointer shadow-md ${
+                    cleanedResult
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                      : "bg-slate-900 hover:bg-slate-800 text-white active:scale-95"
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <Trash2 className="w-4 h-4 text-slate-300" />
+                  <span>
+                    {cleaning
+                      ? "Purging Storage & Freeing RAM..."
+                      : cleanedResult
+                      ? `Cleaned ${formatBytes(cleanedResult.freedBytes)} · Clean Again`
+                      : `Clean ${formatBytes(storageData?.cleanableBytes || 0)} Cache`}
+                  </span>
+                </button>
+                <span className="text-[10px] text-slate-400">
+                  {cleanedResult
+                    ? `Verified disk delta: -${formatBytes(cleanedResult.freedBytes)} (${cleanedResult.purgedItemsCount} records purged)`
+                    : "Preserves your active login token and offline credentials"}
+                </span>
+              </div>
+            </div>
+
+            {/* SECTION 1: ALL OPEN TABS REPORT */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-[#0056D2]" /> Active Application Tabs ({openTabs.length})
+                </h3>
+                <span className="text-[11px] text-slate-400">
+                  Discovered via inter-process BroadcastChannel
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {openTabs.map((tab) => {
+                  const minutesOpen = Math.round((Date.now() - tab.loadedAt) / 60000);
+                  return (
                     <div
-                      key={idx}
-                      className="bg-white p-3.5 rounded-xl border border-slate-200 space-y-1.5 shadow-2xs"
+                      key={tab.tabId}
+                      className={`p-3.5 rounded-xl border transition space-y-2 ${
+                        tab.isCurrent
+                          ? "bg-blue-50/60 border-blue-200"
+                          : "bg-white border-slate-200 shadow-2xs"
+                      }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900 leading-snug">{item.title}</span>
+                        <span className="text-xs font-bold text-slate-900 truncate max-w-[170px]">
+                          {tab.title}
+                        </span>
+                        <span
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            tab.isCurrent
+                              ? "bg-blue-600 text-white"
+                              : tab.visible
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {tab.isCurrent ? "Current Tab" : tab.visible ? "Foreground" : "Background"}
+                        </span>
                       </div>
-                      <p className="text-[11px] text-slate-600 leading-relaxed">{item.desc}</p>
+
+                      <div className="text-[11px] font-mono text-slate-600 truncate bg-white/70 p-1 rounded border border-slate-100">
+                        {tab.url}
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>{minutesOpen < 1 ? "Just opened" : `${minutesOpen} min open`}</span>
+                        </span>
+                        {tab.heapMb !== null && (
+                          <span className="font-semibold text-slate-700">
+                            {tab.heapMb} MB RAM
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SECTION 2: EXACT STORAGE ALLOCATION REPORT */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-[#0056D2]" /> Storage Allocation &amp; Cache Breakdown
+                </h3>
+                <span className="text-[11px] font-mono text-slate-600 font-semibold">
+                  Total: {formatBytes(storageData?.usageBytes || 0)} used
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* 1. CacheStorage */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">CacheStorage</span>
+                    <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                      {storageData?.totalCacheEntries || 0} files
+                    </span>
+                  </div>
+                  <p className="text-lg font-black text-slate-900">
+                    {formatBytes(storageData?.cleanableBytes || 0)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    Offline service worker static chunks and audio assets.
+                  </p>
+                </div>
+
+                {/* 2. LocalStorage */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">LocalStorage</span>
+                    <span className="text-[10px] font-mono font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
+                      {storageData?.localKeyCount || 0} keys
+                    </span>
+                  </div>
+                  <p className="text-lg font-black text-slate-900">
+                    {formatBytes(storageData?.localStorageBytes || 0)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    {formatBytes(storageData?.localProtectedBytes || 0)} protected auth credentials.
+                  </p>
+                </div>
+
+                {/* 3. SessionStorage */}
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">SessionStorage</span>
+                    <span className="text-[10px] font-mono font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
+                      {storageData?.sessionKeyCount || 0} records
+                    </span>
+                  </div>
+                  <p className="text-lg font-black text-slate-900">
+                    {formatBytes(storageData?.sessionStorageBytes || 0)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-tight">
+                    Temporary in-memory page transition states.
+                  </p>
+                </div>
+
+                {/* 4. Total Cleanable */}
+                <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-1.5 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-800">Cleanable Space</span>
+                    <span className="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">
+                      Evictable
+                    </span>
+                  </div>
+                  <p className="text-lg font-black text-emerald-900">
+                    {formatBytes(storageData?.cleanableBytes || 0)}
+                  </p>
+                  <p className="text-[11px] text-emerald-700 leading-tight">
+                    Safe to purge without logging you out or resetting data.
+                  </p>
                 </div>
               </div>
             </div>
-          ) : (
-            /* INITIAL CALL TO ACTION */
-            <div className="text-center py-12 space-y-4 max-w-md mx-auto">
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0056D2] flex items-center justify-center mx-auto shadow-2xs">
-                <ShieldCheck className="w-7 h-7" />
-              </div>
-              <div className="space-y-1.5">
-                <h3 className="text-lg font-bold text-slate-900">Run Quick Device &amp; Connection Audit</h3>
-                <p className="text-xs text-slate-500 leading-relaxed">
-                  Analyze your connection security, detect private IP exposure, review permissions, and clean temporary tracking cache.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={runSecurityScan}
-                className="bg-[#0056D2] hover:bg-[#00419E] text-white font-bold text-xs px-6 py-2.5 rounded-xl transition cursor-pointer shadow-md shadow-blue-900/20"
-              >
-                Scan Now
-              </button>
-            </div>
-          )}
-        </div>
 
-        {/* TWO ON-DEMAND THREAT SCANNERS */}
+            {/* SECTION 3: REAL HARDWARE & NETWORK TELEMETRY */}
+            <div className="space-y-3 pt-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-[#0056D2]" /> Live System Telemetry &amp; Latency
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {/* Latency */}
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                    <Wifi className="w-3.5 h-3.5 text-blue-600" /> Server Edge Latency
+                  </span>
+                  <p className="text-base font-bold text-slate-900">
+                    {networkData?.latencyMs ? `${networkData.latencyMs} ms` : "Direct Offline"}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    Round-trip time to CyberGuard CDN edge
+                  </p>
+                </div>
+
+                {/* JavaScript Heap Memory */}
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                    <Cpu className="w-3.5 h-3.5 text-indigo-600" /> Active JS Heap Memory
+                  </span>
+                  <p className="text-base font-bold text-slate-900">
+                    {hardwareData?.memory?.usedHeapMb ? `${hardwareData.memory.usedHeapMb} MB` : "Browser Isolated"}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {hardwareData?.memory?.limitHeapMb ? `of ${hardwareData.memory.limitHeapMb} MB limit` : "Protected by OS sandbox"}
+                  </p>
+                </div>
+
+                {/* CPU Hardware Threads */}
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" /> CPU Concurrency
+                  </span>
+                  <p className="text-base font-bold text-slate-900">
+                    {hardwareData?.cores} Logical Threads
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {hardwareData?.deviceMemoryGb ? `${hardwareData.deviceMemoryGb} RAM available` : "System multi-threading"}
+                  </p>
+                </div>
+
+                {/* Battery / Power */}
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
+                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+                    {hardwareData?.battery?.charging ? (
+                      <BatteryCharging className="w-3.5 h-3.5 text-emerald-600" />
+                    ) : (
+                      <Battery className="w-3.5 h-3.5 text-slate-600" />
+                    )}
+                    Battery Power Status
+                  </span>
+                  <p className="text-base font-bold text-slate-900">
+                    {hardwareData?.battery ? `${hardwareData.battery.level}% (${hardwareData.battery.charging ? "Charging" : "Discharging"})` : "AC Power / Unrestricted"}
+                  </p>
+                  <p className="text-[10px] text-slate-400">
+                    {networkData?.saveData ? "Data Saver mode active" : "Standard power profile"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* INITIAL EMPTY STATE */}
+        {!hasScanned && !scanning && (
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center space-y-4 shadow-xs max-w-xl mx-auto">
+            <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#0056D2] flex items-center justify-center mx-auto shadow-2xs">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-bold text-slate-900">Run Genuine System &amp; Cache Audit</h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                No simulated numbers. Discovers all running application tabs, calculates exact byte sizes across all browser stores, and allows 1-tap physical cache eviction.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={executeScan}
+              className="bg-[#0056D2] hover:bg-[#00419E] active:scale-95 text-white font-bold text-xs px-6 py-3 rounded-xl transition cursor-pointer shadow-md shadow-blue-900/20"
+            >
+              Start Live Multi-Tab Audit
+            </button>
+          </div>
+        )}
+
+        {/* INTERACTIVE THREAT DETECTORS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* TOOL 1: MOMO SMS & LINK VERIFIER */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 space-y-4 shadow-xs flex flex-col justify-between">
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 space-y-4 shadow-xs flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
@@ -681,12 +744,12 @@ export default function SecurityAudit() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">MoMo SMS &amp; Link Verifier</h3>
-                  <p className="text-[11px] text-slate-500">Check suspicious MTN, Telecel, or AT cashout links</p>
+                  <p className="text-[11px] text-slate-500">Verify suspicious payment requests &amp; URLs</p>
                 </div>
               </div>
 
               <p className="text-xs text-slate-600 leading-relaxed">
-                Paste any SMS message or website URL received via WhatsApp, Telegram, or text to verify against verified Ghanaian domain registries.
+                Paste any text message or payment link received on WhatsApp or SMS. Checks against verified Ghanaian telecom and bank registries.
               </p>
 
               <div className="space-y-2 pt-2">
@@ -694,14 +757,14 @@ export default function SecurityAudit() {
                   rows={3}
                   value={momoInput}
                   onChange={(e) => setMomoInput(e.target.value)}
-                  placeholder="Paste SMS text or link here (e.g., 'Claim 500 GHS bonus at mtn-cashout.top')..."
+                  placeholder="Paste SMS message or link here (e.g. 'Claim 200 GHS bonus at mtn-bonus.top')..."
                   className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-[#0056D2] transition resize-none text-slate-800 placeholder:text-slate-400"
                 />
 
                 <button
                   type="button"
                   onClick={handleAnalyzeMomo}
-                  className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2 rounded-xl transition cursor-pointer"
+                  className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl transition cursor-pointer"
                 >
                   Verify Link or Message
                 </button>
@@ -735,12 +798,12 @@ export default function SecurityAudit() {
             </div>
 
             <p className="text-[10px] text-slate-400 border-t border-slate-100 pt-3">
-              Official MTN MoMo will never ask you to click a third-party link or disclose your 4-digit PIN.
+              Official MTN, Telecel, and AT will never ask you to approve a cashout prompt you did not initiate.
             </p>
           </div>
 
-          {/* TOOL 2: SUSPICIOUS FILE & APK ANALYZER */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 space-y-4 shadow-xs flex flex-col justify-between">
+          {/* TOOL 2: FILE & APK SHA-256 INTEGRITY INSPECTOR */}
+          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 space-y-4 shadow-xs flex flex-col justify-between">
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0056D2] flex items-center justify-center">
@@ -748,22 +811,22 @@ export default function SecurityAudit() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">Downloaded File &amp; APK Inspector</h3>
-                  <p className="text-[11px] text-slate-500">Inspect file integrity &amp; calculate SHA-256 hash</p>
+                  <p className="text-[11px] text-slate-500">In-browser cryptographic SHA-256 analysis</p>
                 </div>
               </div>
 
               <p className="text-xs text-slate-600 leading-relaxed">
-                Select any file downloaded to your device (.apk, .pdf, .docx, .zip) to compute its SHA-256 cryptographic signature in your browser.
+                Select any file (.apk, .pdf, .docx, .zip) to compute its exact cryptographic signature directly in browser memory without sending bytes to any server.
               </p>
 
               <div className="pt-2">
                 <label className="border-2 border-dashed border-slate-200 hover:border-[#0056D2] rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition bg-slate-50 hover:bg-blue-50/30">
                   <FileSearch className="w-6 h-6 text-slate-400" />
                   <span className="text-xs font-bold text-slate-800">
-                    {fileHashing ? "Computing cryptographic hash..." : "Select File or APK to Inspect"}
+                    {fileHashing ? "Computing cryptographic SHA-256..." : "Select File or APK to Inspect"}
                   </span>
                   <span className="text-[10px] text-slate-400">
-                    File is analyzed locally on your device without server upload
+                    File is processed entirely on-device via Web Cryptography API
                   </span>
                   <input
                     type="file"
@@ -788,7 +851,7 @@ export default function SecurityAudit() {
                     <span className="truncate max-w-[200px]">{fileAnalysis.name}</span>
                     <span>{fileAnalysis.sizeMb} MB</span>
                   </div>
-                  <div className="text-[11px] font-mono break-all text-slate-500 bg-white/70 p-1.5 rounded border border-slate-200">
+                  <div className="text-[11px] font-mono break-all text-slate-600 bg-white/80 p-2 rounded border border-slate-200">
                     SHA-256: {fileAnalysis.hash}
                   </div>
                   <p className="text-[11px] font-medium leading-relaxed">{fileAnalysis.recommendation}</p>
@@ -797,38 +860,11 @@ export default function SecurityAudit() {
             </div>
 
             <p className="text-[10px] text-slate-400 border-t border-slate-100 pt-3">
-              Only install mobile applications from official Google Play Store or Apple App Store.
+              Never install mobile applications sent as APK attachments over messaging apps.
             </p>
-          </div>
-        </div>
-
-        {/* NATIVE OS SCAN GUIDANCE */}
-        <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 sm:p-7 flex flex-col sm:flex-row sm:items-center justify-between gap-5 shadow-sm">
-          <div className="space-y-1.5 max-w-xl">
-            <div className="flex items-center gap-2 text-xs font-bold text-blue-400">
-              <Smartphone className="w-4 h-4" />
-              <span>Full OS-Level Hardware Protection</span>
-            </div>
-            <h3 className="text-base sm:text-lg font-bold">Need a deep virus scan of all installed Android apps?</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Google Play Protect continuously checks your Android device for harmful apps, rogue financial Trojans, and fraudulent loan spyware.
-            </p>
-          </div>
-
-          <div className="shrink-0 flex items-center gap-3">
-            <a
-              href="https://play.google.com/store/apps"
-              target="_blank"
-              rel="noreferrer"
-              className="bg-white hover:bg-slate-100 text-slate-900 text-xs font-bold px-4 py-2.5 rounded-xl transition inline-flex items-center gap-2"
-            >
-              <span>Open Play Protect</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
