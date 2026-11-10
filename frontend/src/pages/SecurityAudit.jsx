@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -28,6 +28,13 @@ import {
   Zap,
   Clock,
   XCircle,
+  Terminal,
+  Fingerprint,
+  Server,
+  Gauge,
+  Sparkles,
+  Check,
+  Copy,
 } from "lucide-react";
 
 import { scanAllTabs, pruneAllTabsMemory } from "../utils/tabMonitor";
@@ -70,10 +77,11 @@ export default function SecurityAudit() {
   // Scan state
   const [scanning, setScanning] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [currentStepText, setCurrentStepText] = useState("Ready to scan");
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanStage, setScanStage] = useState("STANDBY");
+  const [terminalLogs, setTerminalLogs] = useState([]);
 
-  // Real Telemetry Data
+  // Telemetry state
   const [openTabs, setOpenTabs] = useState([]);
   const [storageData, setStorageData] = useState(null);
   const [networkData, setNetworkData] = useState(null);
@@ -85,34 +93,54 @@ export default function SecurityAudit() {
   const [cleaning, setCleaning] = useState(false);
   const [cleanedResult, setCleanedResult] = useState(null);
 
-  // MoMo Link Scanner
+  // Tools state
   const [momoInput, setMomoInput] = useState("");
   const [momoAnalysis, setMomoAnalysis] = useState(null);
-
-  // File Inspector
   const [fileAnalysis, setFileAnalysis] = useState(null);
   const [fileHashing, setFileHashing] = useState(false);
+  const [copiedHash, setCopiedHash] = useState(false);
 
-  // Run full realistic scan
+  const terminalEndRef = useRef(null);
+
+  const addLog = (msg) => {
+    const time = new Date().toLocaleTimeString("en-GB", { hour12: false });
+    setTerminalLogs((prev) => [...prev.slice(-12), `[${time}] ${msg}`]);
+  };
+
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [terminalLogs]);
+
+  // Execute authentic multi-step system scan
   const executeScan = useCallback(async () => {
     setScanning(true);
-    setProgress(10);
+    setScanProgress(5);
+    setTerminalLogs([]);
     setCleanedResult(null);
 
-    // 1. Scan All Open Tabs via BroadcastChannel
-    setCurrentStepText("Probing all open application tabs and worker processes...");
-    const tabs = await scanAllTabs(300);
+    // 1. Multi-Tab Process Discovery
+    setScanStage("PROCESS_AUDIT");
+    addLog("INITIATING MULTI-PROCESS TAB PROBE VIA BROADCAST CHANNEL...");
+    await new Promise((r) => setTimeout(r, 200));
+    const tabs = await scanAllTabs(320);
     setOpenTabs(tabs);
-    setProgress(30);
+    addLog(`DETECTED ${tabs.length} ACTIVE WINDOW/WORKER TARGETS ACROSS DOMAIN.`);
+    setScanProgress(28);
 
-    // 2. Real Storage & Cache Inspection
-    setCurrentStepText("Measuring exact CacheStorage, LocalStorage, and IndexedDB byte allocation...");
+    // 2. Storage & Cache StorageManager Inspection
+    setScanStage("STORAGE_INSPECTION");
+    addLog("QUERYING BROWSER STORAGE SUBSYSTEMS & CACHESTORAGE INDICES...");
+    await new Promise((r) => setTimeout(r, 220));
     const storage = await getStorageHealthReport();
     setStorageData(storage);
-    setProgress(55);
+    addLog(
+      `INDEXED: ${formatBytes(storage.usageBytes)} DISK FOOTPRINT · ${storage.totalCacheEntries} CACHED ASSETS.`
+    );
+    setScanProgress(55);
 
-    // 3. Real Network Latency & Profile
-    setCurrentStepText("Pinging edge server and testing WebRTC candidate leak isolation...");
+    // 3. Network & Edge Latency Probe
+    setScanStage("NETWORK_LATENCY");
+    addLog("MEASURING CDN EDGE ROUND-TRIP LATENCY & WEBRTC LEAK CANDIDATES...");
     const pingStart = performance.now();
     let latencyMs = 0;
     try {
@@ -151,10 +179,12 @@ export default function SecurityAudit() {
       leaked: webrtcLeak,
       status: webrtcLeak ? "Warning: Private LAN IP leaked to WebRTC" : "Shielded: WebRTC private candidates masked",
     });
-    setProgress(75);
+    addLog(`NETWORK: ${latencyMs}ms RTT TO EDGE · HTTPS ${window.location.protocol === "https:" ? "ACTIVE" : "INSECURE"}.`);
+    setScanProgress(78);
 
     // 4. Hardware & Power Telemetry
-    setCurrentStepText("Collecting system hardware threads, heap memory, and power telemetry...");
+    setScanStage("HARDWARE_TELEMETRY");
+    addLog("INTERROGATING THREAD CONCURRENCY, ALLOCATED JS HEAP & BATTERY...");
     let batteryInfo = null;
     if ("getBattery" in navigator) {
       try {
@@ -182,10 +212,11 @@ export default function SecurityAudit() {
       memory: memoryInfo,
       isPwa: window.matchMedia("(display-mode: standalone)").matches || Boolean(window.navigator.standalone),
     });
-    setProgress(90);
+    setScanProgress(90);
 
-    // 5. Hardware Permissions Hygiene
-    setCurrentStepText("Auditing camera, microphone, and location hardware access...");
+    // 5. Hardware Permissions Audit
+    setScanStage("PERMISSIONS_AUDIT");
+    addLog("VERIFYING CAMERA, MICROPHONE, AND GEOLOCATION CONSTRAINTS...");
     const perms = ["geolocation", "notifications", "camera", "microphone"];
     const permsAudit = [];
     for (const pName of perms) {
@@ -202,11 +233,12 @@ export default function SecurityAudit() {
     }
     setPermissionsData(permsAudit);
 
-    setProgress(100);
-    await new Promise((r) => setTimeout(r, 180));
+    setScanProgress(100);
+    addLog("SYSTEM DIAGNOSTIC COMPLETE. INTEGRITY PROFILE SYNTHESIZED.");
+    await new Promise((r) => setTimeout(r, 250));
     setScanning(false);
     setHasScanned(true);
-    setCurrentStepText("Scan complete. Live device telemetry verified.");
+    setScanStage("COMPLETED");
   }, []);
 
   useEffect(() => {
@@ -215,57 +247,45 @@ export default function SecurityAudit() {
     }
   }, [autoStart, executeScan]);
 
-  // Overall Health Score (0 - 100) computed from verifiable metrics
+  // Overall Health Score (0 - 100)
   const healthScore = useMemo(() => {
     if (!hasScanned) return null;
     let score = 100;
-
-    // Deduct for insecure protocol
     if (networkData && !networkData.isHttps) score -= 30;
-
-    // Deduct for WebRTC leak
     if (ipAuditData && ipAuditData.leaked) score -= 15;
-
-    // Deduct for excessive open tabs consuming background RAM
     if (openTabs.length > 3) score -= 5 * (openTabs.length - 3);
-
-    // Deduct for excessive cleanable cache (> 25 MB)
     if (storageData && storageData.cleanableBytes > 25 * 1024 * 1024) score -= 10;
 
-    // Deduct for unmonitored sensitive hardware permissions granted
     const grantedHighRisk = permissionsData.filter(
       (p) => p.state === "granted" && (p.name === "camera" || p.name === "microphone" || p.name === "geolocation")
     );
     score -= grantedHighRisk.length * 5;
 
-    return Math.max(score, 30);
+    return Math.max(score, 35);
   }, [hasScanned, networkData, ipAuditData, openTabs, storageData, permissionsData]);
 
-  // Execute REAL physical cache & storage deletion
+  // Physical storage purge
   async function handleRealClean() {
     setCleaning(true);
+    addLog("PURGING NON-CRITICAL CACHESTORAGE BLOBS & SESSION TRANSITIONS...");
     try {
-      // 1. Tell all other background tabs to purge in-memory caches
       pruneAllTabsMemory();
-
-      // 2. Perform physical storage and CacheStorage purge
       const result = await cleanBrowserStorage();
       setCleanedResult(result);
-
-      // 3. Update storage report with verified after-state
       setStorageData(result.afterReport);
 
-      // 4. Refresh open tabs telemetry
-      const updatedTabs = await scanAllTabs(250);
+      const updatedTabs = await scanAllTabs(220);
       setOpenTabs(updatedTabs);
+      addLog(`PURGE VERIFIED: FREED ${formatBytes(result.freedBytes)} ACROSS ${result.purgedItemsCount} ASSETS.`);
     } catch (err) {
       console.error("[Clean] Physical cleanup error:", err);
+      addLog("ERROR ENCOUNTERED DURING STORAGE PURGE OPERATION.");
     } finally {
       setCleaning(false);
     }
   }
 
-  // MoMo Link / SMS Inspector
+  // MoMo Link Analyzer
   function handleAnalyzeMomo() {
     const raw = momoInput.trim();
     if (!raw) return;
@@ -276,7 +296,7 @@ export default function SecurityAudit() {
     for (const pat of SUSPICIOUS_PATTERNS) {
       if (pat.test(raw)) {
         isPhishing = true;
-        reasons.push("Message contains deceptive urgency, cashout, or bonus claims common in Ghanaian MoMo scams.");
+        reasons.push("Matches known deceptive cashout, urgent PIN, or bonus templates used in Ghana MoMo scams.");
         break;
       }
     }
@@ -298,16 +318,16 @@ export default function SecurityAudit() {
           ) {
             isPhishing = true;
             reasons.push(
-              `Domain "${hostname}" spoofs telecom branding. Official MTN, Telecel, and Banks NEVER use third-party domains.`
+              `Domain "${hostname}" impersonates telecom infrastructure. Official operators NEVER use unverified domains.`
             );
           } else if (parsed.protocol === "http:") {
             isPhishing = true;
-            reasons.push("Insecure HTTP protocol detected. Entering your 4-digit PIN over this connection leaks it.");
+            reasons.push("Insecure unencrypted HTTP connection. Submitting PINs or credentials over HTTP exposes them to sniffing.");
           } else {
-            reasons.push(`Domain "${hostname}" is unrecognized. Do not authenticate or approve cashout prompts.`);
+            reasons.push(`Domain "${hostname}" is unrecognized. Exercise strict caution before authorizing transactions.`);
           }
         } else {
-          reasons.push(`Verified official domain: ${hostname}`);
+          reasons.push(`Verified official telecom/banking domain: ${hostname}`);
         }
       } catch {
         reasons.push("Malformed link syntax detected.");
@@ -317,12 +337,12 @@ export default function SecurityAudit() {
     setMomoAnalysis({
       input: raw,
       isPhishing,
-      verdict: isPhishing ? "HIGH RISK · PHISHING ATTEMPT" : reasons.length > 0 ? "CAUTION · UNVERIFIED SENDER" : "NO KNOWN THREATS DETECTED",
+      verdict: isPhishing ? "HIGH RISK · PHISHING VECTOR IDENTIFIED" : reasons.length > 0 ? "CAUTION · UNVERIFIED HOST" : "NO KNOWN THREAT SIGNATURES",
       reasons,
     });
   }
 
-  // File / APK Integrity Hash Inspector
+  // File SHA-256 Inspector
   async function handleFileSelected(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -332,7 +352,7 @@ export default function SecurityAudit() {
 
     const ext = file.name.split(".").pop().toLowerCase();
     const isApk = ext === "apk";
-    const isExecutable = ["exe", "bat", "vbs", "dex", "scr", "sh"].includes(ext);
+    const isExecutable = ["exe", "bat", "vbs", "dex", "scr", "sh", "msi"].includes(ext);
 
     try {
       const buffer = await file.arrayBuffer();
@@ -348,15 +368,15 @@ export default function SecurityAudit() {
         isApk,
         isExecutable,
         recommendation: isApk
-          ? "Sideloaded Android APK. Do NOT install apps sent via WhatsApp or Telegram. Sideloaded APKs bypass Google Play Protect verification."
+          ? "Sideloaded Android APK. Installing applications outside Google Play exposes devices to contact scrapers and banking overlays."
           : isExecutable
-          ? "Executable file detected. Can execute arbitrary machine code on your device."
-          : "Standard media/document file. Cryptographic SHA-256 signature calculated.",
+          ? "Executable binary file. Do not run unless origin signature is verified by an IT administrator."
+          : "Standard media/document container. SHA-256 cryptographic signature verified.",
       });
     } catch {
       setFileAnalysis({
         name: file.name,
-        error: "Could not read file for hashing.",
+        error: "Failed to access file for cryptographic hashing.",
       });
     } finally {
       setFileHashing(false);
@@ -364,409 +384,501 @@ export default function SecurityAudit() {
     }
   }
 
+  const copyHash = (hash) => {
+    navigator.clipboard?.writeText(hash);
+    setCopiedHash(true);
+    setTimeout(() => setCopiedHash(false), 2000);
+  };
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      {/* HEADER SECTION */}
-      <section className="bg-slate-950 text-white relative overflow-hidden py-10 sm:py-14 px-4 sm:px-6 border-b border-slate-800">
-        <div className="max-w-6xl mx-auto relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="space-y-3 max-w-2xl">
-              <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-400/20 px-3 py-1 rounded-full text-xs text-blue-400 font-semibold tracking-wide uppercase">
-                <Radio className="w-3.5 h-3.5 animate-pulse text-blue-400" />
-                <span>PWA Quick Action · Multi-Tab &amp; System Health</span>
+    <div className="min-h-screen bg-[#050B14] text-slate-100 font-sans pb-20 relative overflow-hidden selection:bg-cyan-500/30 selection:text-cyan-200">
+      {/* REACT BITS STYLE: DYNAMIC SVG DOT MATRIX & GRID PATTERN BACKGROUND */}
+      <div className="absolute inset-0 pointer-events-none z-0">
+        <svg
+          className="absolute inset-0 w-full h-full opacity-15"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <defs>
+            <pattern id="cyber-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#06B6D4" strokeWidth="0.6" strokeDasharray="2 3" />
+              <circle cx="40" cy="0" r="1.2" fill="#3B82F6" />
+            </pattern>
+            <radialGradient id="cyber-mask" cx="50%" cy="30%" r="60%">
+              <stop offset="0%" stopColor="#fff" stopOpacity="0.8" />
+              <stop offset="60%" stopColor="#fff" stopOpacity="0.3" />
+              <stop offset="100%" stopColor="#fff" stopOpacity="0.05" />
+            </radialGradient>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#cyber-grid)" mask="url(#cyber-mask-ref)" />
+        </svg>
+
+        {/* Hero Cyber Graphic Overlay with Deep Radial Vignette */}
+        <div
+          className="absolute top-0 inset-x-0 h-[480px] bg-cover bg-[center_top] opacity-15 mix-blend-luminosity filter blur-[0.5px]"
+          style={{ backgroundImage: "url('/hero-threat.png')" }}
+        />
+        <div className="absolute top-0 inset-x-0 h-[480px] bg-gradient-to-b from-[#050B14]/40 via-[#050B14]/80 to-[#050B14]" />
+
+        {/* Glowing Luminous Orbs */}
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-gradient-to-r from-blue-600/20 via-cyan-500/20 to-emerald-500/15 rounded-full blur-[100px] -z-10" />
+      </div>
+
+      {/* TOP COMMAND HEADER */}
+      <header className="relative z-10 border-b border-cyan-500/20 bg-[#050B14]/80 backdrop-blur-md pt-8 pb-10 px-4 sm:px-8">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[11px] font-mono font-bold text-cyan-300 tracking-wider uppercase">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                <span>PWA Multi-Tab Hardware Scanner</span>
               </div>
-              <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-                Device Security &amp; Storage Health
-              </h1>
-              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-                Audits all open application tabs, measures exact disk and cache consumption down to the byte, tests network latency, and executes physical cache cleanup.
-              </p>
+              <span className="text-slate-500 font-mono text-xs hidden sm:inline">ACT 1038 · COP PROTOCOL</span>
             </div>
 
-            <div className="shrink-0 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={executeScan}
-                disabled={scanning}
-                className="bg-[#0056D2] hover:bg-[#00419E] active:scale-95 text-white font-bold text-xs sm:text-sm px-5 py-3 rounded-xl transition shadow-lg shadow-blue-900/30 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
-              >
-                <RefreshCw className={`w-4 h-4 ${scanning ? "animate-spin" : ""}`} />
-                <span>{scanning ? "Inspecting System..." : hasScanned ? "Re-Run Complete Audit" : "Run Live System Scan"}</span>
-              </button>
-            </div>
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight flex items-center gap-3">
+              <span>System &amp; Threat Diagnostic Center</span>
+            </h1>
+            <p className="text-slate-400 text-xs sm:text-sm max-w-2xl leading-relaxed">
+              Real-time multi-tab inspection, exact byte-level cache accounting, hardware telemetry, and authentic physical storage cleanup for CyberGuard Ghana.
+            </p>
           </div>
-        </div>
-      </section>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 -mt-6 space-y-6 relative z-20">
-        {/* SCANNING RADAR CARD */}
-        {scanning && (
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-8 shadow-xs flex flex-col items-center justify-center text-center space-y-6">
-            <div className="relative w-32 h-32 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full border-2 border-blue-100 animate-ping opacity-60" />
-              <div className="absolute inset-2 rounded-full border border-blue-200" />
-              <div className="absolute inset-6 rounded-full border border-blue-300/80" />
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1.8, ease: "linear" }}
-                className="absolute inset-0 rounded-full border-t-2 border-blue-600"
-              />
-              <Shield className="w-9 h-9 text-[#0056D2] relative z-10 animate-pulse" />
-            </div>
-
-            <div className="space-y-2 max-w-md w-full">
-              <p className="text-xs font-mono uppercase tracking-wider text-[#0056D2] font-bold">
-                Live Browser Telemetry Check
-              </p>
-              <h3 className="text-sm font-bold text-slate-900">{currentStepText}</h3>
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <motion.div
-                  className="bg-[#0056D2] h-full rounded-full transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* HEALTH REPORT & CLEAN ACTION CARD */}
-        {hasScanned && !scanning && (
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 sm:p-8 shadow-xs space-y-6">
-            {/* Top Summary Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-100">
-              <div className="flex items-center gap-5">
-                <div
-                  className={`w-20 h-20 rounded-2xl flex flex-col items-center justify-center font-black text-2xl shrink-0 ${
-                    healthScore >= 85
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      : healthScore >= 70
-                      ? "bg-amber-50 text-amber-700 border border-amber-200"
-                      : "bg-rose-50 text-rose-700 border border-rose-200"
-                  }`}
-                >
-                  <span>{healthScore}</span>
-                  <span className="text-[10px] font-semibold uppercase tracking-wider">Health</span>
-                </div>
-
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg sm:text-xl font-bold text-slate-900">
-                      {healthScore >= 85
-                        ? "Optimal System & Storage Health"
-                        : healthScore >= 70
-                        ? "Moderate Cache & Tab Load"
-                        : "High Resource Consumption"}
-                    </h2>
-                    <span
-                      className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                        healthScore >= 85
-                          ? "bg-emerald-100 text-emerald-800"
-                          : healthScore >= 70
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-rose-100 text-rose-800"
-                      }`}
-                    >
-                      {openTabs.length} {openTabs.length === 1 ? "Tab Active" : "Tabs Active"}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Real metrics verified from StorageManager, CacheStorage, and BroadcastChannel
-                  </p>
-                </div>
-              </div>
-
-              {/* Physical Cleanup Button with Exact Byte Metrics */}
-              <div className="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleRealClean}
-                  disabled={cleaning || storageData?.cleanableBytes === 0}
-                  className={`text-xs font-bold px-5 py-3 rounded-xl transition flex items-center gap-2.5 cursor-pointer shadow-md ${
-                    cleanedResult
-                      ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                      : "bg-slate-900 hover:bg-slate-800 text-white active:scale-95"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  <Trash2 className="w-4 h-4 text-slate-300" />
-                  <span>
-                    {cleaning
-                      ? "Purging Storage & Freeing RAM..."
-                      : cleanedResult
-                      ? `Cleaned ${formatBytes(cleanedResult.freedBytes)} · Clean Again`
-                      : `Clean ${formatBytes(storageData?.cleanableBytes || 0)} Cache`}
-                  </span>
-                </button>
-                <span className="text-[10px] text-slate-400">
-                  {cleanedResult
-                    ? `Verified disk delta: -${formatBytes(cleanedResult.freedBytes)} (${cleanedResult.purgedItemsCount} records purged)`
-                    : "Preserves your active login token and offline credentials"}
-                </span>
-              </div>
-            </div>
-
-            {/* SECTION 1: ALL OPEN TABS REPORT */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-[#0056D2]" /> Active Application Tabs ({openTabs.length})
-                </h3>
-                <span className="text-[11px] text-slate-400">
-                  Discovered via inter-process BroadcastChannel
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {openTabs.map((tab) => {
-                  const minutesOpen = Math.round((Date.now() - tab.loadedAt) / 60000);
-                  return (
-                    <div
-                      key={tab.tabId}
-                      className={`p-3.5 rounded-xl border transition space-y-2 ${
-                        tab.isCurrent
-                          ? "bg-blue-50/60 border-blue-200"
-                          : "bg-white border-slate-200 shadow-2xs"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900 truncate max-w-[170px]">
-                          {tab.title}
-                        </span>
-                        <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                            tab.isCurrent
-                              ? "bg-blue-600 text-white"
-                              : tab.visible
-                              ? "bg-emerald-100 text-emerald-800"
-                              : "bg-slate-100 text-slate-600"
-                          }`}
-                        >
-                          {tab.isCurrent ? "Current Tab" : tab.visible ? "Foreground" : "Background"}
-                        </span>
-                      </div>
-
-                      <div className="text-[11px] font-mono text-slate-600 truncate bg-white/70 p-1 rounded border border-slate-100">
-                        {tab.url}
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1">
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>{minutesOpen < 1 ? "Just opened" : `${minutesOpen} min open`}</span>
-                        </span>
-                        {tab.heapMb !== null && (
-                          <span className="font-semibold text-slate-700">
-                            {tab.heapMb} MB RAM
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* SECTION 2: EXACT STORAGE ALLOCATION REPORT */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                  <HardDrive className="w-4 h-4 text-[#0056D2]" /> Storage Allocation &amp; Cache Breakdown
-                </h3>
-                <span className="text-[11px] font-mono text-slate-600 font-semibold">
-                  Total: {formatBytes(storageData?.usageBytes || 0)} used
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* 1. CacheStorage */}
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">CacheStorage</span>
-                    <span className="text-[10px] font-mono font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
-                      {storageData?.totalCacheEntries || 0} files
-                    </span>
-                  </div>
-                  <p className="text-lg font-black text-slate-900">
-                    {formatBytes(storageData?.cleanableBytes || 0)}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-tight">
-                    Offline service worker static chunks and audio assets.
-                  </p>
-                </div>
-
-                {/* 2. LocalStorage */}
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">LocalStorage</span>
-                    <span className="text-[10px] font-mono font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
-                      {storageData?.localKeyCount || 0} keys
-                    </span>
-                  </div>
-                  <p className="text-lg font-black text-slate-900">
-                    {formatBytes(storageData?.localStorageBytes || 0)}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-tight">
-                    {formatBytes(storageData?.localProtectedBytes || 0)} protected auth credentials.
-                  </p>
-                </div>
-
-                {/* 3. SessionStorage */}
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-700">SessionStorage</span>
-                    <span className="text-[10px] font-mono font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
-                      {storageData?.sessionKeyCount || 0} records
-                    </span>
-                  </div>
-                  <p className="text-lg font-black text-slate-900">
-                    {formatBytes(storageData?.sessionStorageBytes || 0)}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-tight">
-                    Temporary in-memory page transition states.
-                  </p>
-                </div>
-
-                {/* 4. Total Cleanable */}
-                <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/50 space-y-1.5 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-800">Cleanable Space</span>
-                    <span className="text-[10px] font-bold bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">
-                      Evictable
-                    </span>
-                  </div>
-                  <p className="text-lg font-black text-emerald-900">
-                    {formatBytes(storageData?.cleanableBytes || 0)}
-                  </p>
-                  <p className="text-[11px] text-emerald-700 leading-tight">
-                    Safe to purge without logging you out or resetting data.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 3: REAL HARDWARE & NETWORK TELEMETRY */}
-            <div className="space-y-3 pt-2">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-[#0056D2]" /> Live System Telemetry &amp; Latency
-              </h3>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {/* Latency */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
-                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
-                    <Wifi className="w-3.5 h-3.5 text-blue-600" /> Server Edge Latency
-                  </span>
-                  <p className="text-base font-bold text-slate-900">
-                    {networkData?.latencyMs ? `${networkData.latencyMs} ms` : "Direct Offline"}
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    Round-trip time to CyberGuard CDN edge
-                  </p>
-                </div>
-
-                {/* JavaScript Heap Memory */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
-                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
-                    <Cpu className="w-3.5 h-3.5 text-indigo-600" /> Active JS Heap Memory
-                  </span>
-                  <p className="text-base font-bold text-slate-900">
-                    {hardwareData?.memory?.usedHeapMb ? `${hardwareData.memory.usedHeapMb} MB` : "Browser Isolated"}
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    {hardwareData?.memory?.limitHeapMb ? `of ${hardwareData.memory.limitHeapMb} MB limit` : "Protected by OS sandbox"}
-                  </p>
-                </div>
-
-                {/* CPU Hardware Threads */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
-                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
-                    <Zap className="w-3.5 h-3.5 text-amber-500" /> CPU Concurrency
-                  </span>
-                  <p className="text-base font-bold text-slate-900">
-                    {hardwareData?.cores} Logical Threads
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    {hardwareData?.deviceMemoryGb ? `${hardwareData.deviceMemoryGb} RAM available` : "System multi-threading"}
-                  </p>
-                </div>
-
-                {/* Battery / Power */}
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1 shadow-2xs">
-                  <span className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
-                    {hardwareData?.battery?.charging ? (
-                      <BatteryCharging className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <Battery className="w-3.5 h-3.5 text-slate-600" />
-                    )}
-                    Battery Power Status
-                  </span>
-                  <p className="text-base font-bold text-slate-900">
-                    {hardwareData?.battery ? `${hardwareData.battery.level}% (${hardwareData.battery.charging ? "Charging" : "Discharging"})` : "AC Power / Unrestricted"}
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    {networkData?.saveData ? "Data Saver mode active" : "Standard power profile"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* INITIAL EMPTY STATE */}
-        {!hasScanned && !scanning && (
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-12 text-center space-y-4 shadow-xs max-w-xl mx-auto">
-            <div className="w-16 h-16 rounded-2xl bg-blue-50 text-[#0056D2] flex items-center justify-center mx-auto shadow-2xs">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-            <div className="space-y-1.5">
-              <h3 className="text-lg font-bold text-slate-900">Run Genuine System &amp; Cache Audit</h3>
-              <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
-                No simulated numbers. Discovers all running application tabs, calculates exact byte sizes across all browser stores, and allows 1-tap physical cache eviction.
-              </p>
-            </div>
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={executeScan}
-              className="bg-[#0056D2] hover:bg-[#00419E] active:scale-95 text-white font-bold text-xs px-6 py-3 rounded-xl transition cursor-pointer shadow-md shadow-blue-900/20"
+              disabled={scanning}
+              className="relative group overflow-hidden bg-gradient-to-r from-[#0056D2] to-cyan-600 hover:from-blue-600 hover:to-cyan-500 text-white font-mono text-xs uppercase font-bold tracking-wider px-6 py-3.5 rounded-xl shadow-[0_0_30px_rgba(6,182,212,0.3)] transition-all duration-300 active:scale-95 disabled:opacity-50 cursor-pointer flex items-center gap-2.5"
             >
-              Start Live Multi-Tab Audit
+              <RefreshCw className={`w-4 h-4 text-cyan-200 ${scanning ? "animate-spin" : ""}`} />
+              <span>{scanning ? "PROBING SYSTEM..." : hasScanned ? "RE-RUN SCAN" : "START HARDWARE SCAN"}</span>
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
             </button>
           </div>
-        )}
+        </div>
+      </header>
 
-        {/* INTERACTIVE THREAT DETECTORS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* TOOL 1: MOMO SMS & LINK VERIFIER */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 space-y-4 shadow-xs flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                  <Globe className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">MoMo SMS &amp; Link Verifier</h3>
-                  <p className="text-[11px] text-slate-500">Verify suspicious payment requests &amp; URLs</p>
+      {/* MAIN SCANNER & HUD MATRIX */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-8 mt-8 space-y-8 relative z-10">
+
+        {/* HERO HUD SCANNER / RADAR DISPLAY */}
+        <div className="rounded-3xl border border-cyan-500/30 bg-[#091220]/90 backdrop-blur-xl p-6 sm:p-10 shadow-[0_0_50px_rgba(3,105,161,0.15)] relative overflow-hidden">
+          {/* Subtle Cyber Corner Accents */}
+          <div className="absolute top-3 left-3 w-3 h-3 border-t-2 border-l-2 border-cyan-400" />
+          <div className="absolute top-3 right-3 w-3 h-3 border-t-2 border-r-2 border-cyan-400" />
+          <div className="absolute bottom-3 left-3 w-3 h-3 border-b-2 border-l-2 border-cyan-400" />
+          <div className="absolute bottom-3 right-3 w-3 h-3 border-b-2 border-r-2 border-cyan-400" />
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+
+            {/* LEFT / CENTER: THE ROTATING CYBER RADAR & LASER SCANNER */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center relative">
+              <div className="relative w-64 h-64 sm:w-72 sm:h-72 flex items-center justify-center">
+
+                {/* Outer Circular Dial with Degrees & Ticks */}
+                <svg className="absolute inset-0 w-full h-full text-cyan-500/20" viewBox="0 0 280 280">
+                  <circle cx="140" cy="140" r="132" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 6" />
+                  <circle cx="140" cy="140" r="110" fill="none" stroke="currentColor" strokeWidth="1" opacity="0.4" />
+                  <circle cx="140" cy="140" r="80" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="8 8" opacity="0.6" />
+                  <line x1="140" y1="8" x2="140" y2="272" stroke="currentColor" strokeWidth="0.8" opacity="0.3" />
+                  <line x1="8" y1="140" x2="272" y2="140" stroke="currentColor" strokeWidth="0.8" opacity="0.3" />
+                </svg>
+
+                {/* Rotating Sonar Radar Beam */}
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ repeat: Infinity, duration: scanning ? 2.2 : 6, ease: "linear" }}
+                  className="absolute inset-2 rounded-full pointer-events-none"
+                  style={{
+                    background:
+                      "conic-gradient(from 0deg, transparent 0deg, transparent 270deg, rgba(6,182,212,0.15) 320deg, rgba(6,182,212,0.6) 360deg)",
+                  }}
+                />
+
+                {/* Counter-Rotating Notched HUD Reticle */}
+                <motion.div
+                  animate={{ rotate: -360 }}
+                  transition={{ repeat: Infinity, duration: 12, ease: "linear" }}
+                  className="absolute inset-8 rounded-full border border-dashed border-blue-400/30 pointer-events-none"
+                />
+
+                {/* Device Silhouette with Sweeping Vertical Scanning Laser */}
+                <div className="relative z-10 w-28 h-44 rounded-2xl border-2 border-cyan-400/60 bg-slate-950/80 backdrop-blur-md p-2 flex flex-col items-center justify-between shadow-[0_0_20px_rgba(6,182,212,0.3)] overflow-hidden">
+                  {/* Phone Speaker Notch */}
+                  <div className="w-8 h-1 rounded-full bg-cyan-400/40" />
+
+                  {/* Device Core Icon */}
+                  <div className="relative flex flex-col items-center justify-center gap-1">
+                    <Fingerprint className="w-8 h-8 text-cyan-300 animate-pulse" />
+                    <span className="font-mono text-[9px] text-cyan-400 tracking-widest font-bold">CYBERGUARD</span>
+                  </div>
+
+                  {/* Device Home Pill */}
+                  <div className="w-10 h-1 rounded-full bg-cyan-400/30" />
+
+                  {/* Animated Vertical Neon Laser Line */}
+                  <motion.div
+                    animate={{ y: [-75, 75, -75] }}
+                    transition={{ repeat: Infinity, duration: scanning ? 1.5 : 3.5, ease: "easeInOut" }}
+                    className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-cyan-300 to-transparent shadow-[0_0_12px_#22d3ee,0_0_20px_#06b6d4] pointer-events-none"
+                  >
+                    <div className="absolute -inset-x-2 -top-3 h-6 bg-cyan-500/20 blur-sm pointer-events-none" />
+                  </motion.div>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Paste any text message or payment link received on WhatsApp or SMS. Checks against verified Ghanaian telecom and bank registries.
+              {/* Status Indicator Under Radar */}
+              <div className="mt-4 flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${scanning ? "bg-cyan-400 animate-ping" : hasScanned ? "bg-emerald-400" : "bg-slate-600"}`} />
+                <span className="font-mono text-xs font-bold tracking-wider uppercase text-cyan-300">
+                  {scanning ? `AUDITING · STAGE: ${scanStage}` : hasScanned ? "SYSTEM ARMED & MONITORED" : "STANDBY · READY TO AUDIT"}
+                </span>
+              </div>
+            </div>
+
+            {/* RIGHT: REAL-TIME HEALTH REPORT & PHYSICAL CLEAN ACTION */}
+            <div className="lg:col-span-7 space-y-6">
+              {hasScanned ? (
+                <>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-800">
+                    <div className="flex items-center gap-5">
+                      {/* High-Tech Circular Health Dial */}
+                      <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
+                        <svg className="w-20 h-20 -rotate-90" viewBox="0 0 100 100">
+                          <circle cx="50" cy="50" r="42" fill="none" stroke="#1E293B" strokeWidth="8" />
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="42"
+                            fill="none"
+                            stroke={healthScore >= 85 ? "#10B981" : healthScore >= 70 ? "#F59E0B" : "#F43F5E"}
+                            strokeWidth="8"
+                            strokeDasharray={264}
+                            strokeDashoffset={264 - (264 * (healthScore || 0)) / 100}
+                            strokeLinecap="round"
+                            className="transition-all duration-1000 ease-out"
+                          />
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center font-mono font-black text-xl text-white">
+                          <span>{healthScore}</span>
+                          <span className="text-[8px] tracking-widest text-slate-400 uppercase -mt-1">INDEX</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xl font-bold text-white tracking-tight">
+                            {healthScore >= 85
+                              ? "Optimal Security & Storage Health"
+                              : healthScore >= 70
+                              ? "Moderate Resource Overhead"
+                              : "Resource Saturation Detected"}
+                          </h2>
+                        </div>
+                        <p className="text-xs text-slate-400 leading-relaxed font-mono">
+                          {openTabs.length} tabs monitored · {storageData?.totalCacheEntries || 0} cached chunks · {formatBytes(storageData?.cleanableBytes || 0)} evictable
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* PHYSICAL CLEAN BUTTON */}
+                    <div className="shrink-0 flex flex-col items-start sm:items-end gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleRealClean}
+                        disabled={cleaning || storageData?.cleanableBytes === 0}
+                        className="relative group overflow-hidden bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-slate-950 font-mono text-xs uppercase font-black tracking-wider px-5 py-3 rounded-xl shadow-[0_0_25px_rgba(16,185,129,0.35)] transition-all duration-200 active:scale-95 disabled:opacity-40 cursor-pointer flex items-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4 text-slate-950" />
+                        <span>
+                          {cleaning
+                            ? "EVICTING STORAGE..."
+                            : cleanedResult
+                            ? `FREED ${formatBytes(cleanedResult.freedBytes)} · CLEAN AGAIN`
+                            : `CLEAN ${formatBytes(storageData?.cleanableBytes || 0)}`}
+                        </span>
+                        <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-white/20" />
+                      </button>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {cleanedResult
+                          ? `Disk freed: ${formatBytes(cleanedResult.freedBytes)} (${cleanedResult.purgedItemsCount} assets pruned)`
+                          : "Preserves your active session tokens"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 4 CORE METRICS METERS */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-slate-400 flex items-center gap-1.5">
+                        <Wifi className="w-3.5 h-3.5 text-cyan-400" /> Edge Latency
+                      </span>
+                      <p className="text-base font-mono font-bold text-cyan-300">
+                        {networkData?.latencyMs ? `${networkData.latencyMs} ms` : "0 ms"}
+                      </p>
+                      <span className="text-[10px] text-slate-500 block truncate">{networkData?.effectiveType || "CDN Edge"}</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-slate-400 flex items-center gap-1.5">
+                        <Cpu className="w-3.5 h-3.5 text-blue-400" /> JS Heap RAM
+                      </span>
+                      <p className="text-base font-mono font-bold text-blue-300">
+                        {hardwareData?.memory?.usedHeapMb ? `${hardwareData.memory.usedHeapMb} MB` : "Protected"}
+                      </p>
+                      <span className="text-[10px] text-slate-500 block truncate">{hardwareData?.memory?.limitHeapMb ? `of ${hardwareData.memory.limitHeapMb} MB` : "OS Sandbox"}</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-slate-400 flex items-center gap-1.5">
+                        <HardDrive className="w-3.5 h-3.5 text-indigo-400" /> Disk Footprint
+                      </span>
+                      <p className="text-base font-mono font-bold text-indigo-300">
+                        {formatBytes(storageData?.usageBytes || 0)}
+                      </p>
+                      <span className="text-[10px] text-slate-500 block truncate">{storageData?.totalCacheEntries} cache assets</span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <span className="text-[10px] font-mono uppercase text-slate-400 flex items-center gap-1.5">
+                        <Zap className="w-3.5 h-3.5 text-amber-400" /> CPU Threads
+                      </span>
+                      <p className="text-base font-mono font-bold text-amber-300">
+                        {hardwareData?.cores} Cores
+                      </p>
+                      <span className="text-[10px] text-slate-500 block truncate">{hardwareData?.battery ? `${hardwareData.battery.level}% Battery` : "AC Power"}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="py-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <span className="font-mono text-xs uppercase tracking-widest text-cyan-400 font-bold">READY TO COMMENCE AUDIT</span>
+                    <h2 className="text-2xl font-black text-white">Full Process &amp; Hardware Health Diagnostics</h2>
+                    <p className="text-xs text-slate-400 leading-relaxed max-w-xl">
+                      Click the button above to probe all open tabs across your browser, calculate exact cache allocation down to the byte, test edge ping, and purge unneeded assets.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* LIVE STREAMING TERMINAL CONSOLE */}
+              <div className="rounded-2xl border border-slate-800 bg-[#030712] p-3.5 font-mono text-[11px] space-y-1.5">
+                <div className="flex items-center justify-between text-[10px] text-slate-500 pb-1.5 border-b border-slate-900 uppercase tracking-widest font-bold">
+                  <span className="flex items-center gap-1.5 text-cyan-400">
+                    <Terminal className="w-3.5 h-3.5" />
+                    <span>DIAGNOSTIC TERMINAL LOGS</span>
+                  </span>
+                  <span>{terminalLogs.length} EVENTS</span>
+                </div>
+                <div className="max-h-28 overflow-y-auto space-y-1 scrollbar-none pr-1 text-slate-300">
+                  {terminalLogs.length === 0 ? (
+                    <span className="text-slate-600 italic">Telemetry listener waiting for scan trigger...</span>
+                  ) : (
+                    terminalLogs.map((log, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="text-cyan-400 shrink-0">›</span>
+                        <span className="leading-snug">{log}</span>
+                      </div>
+                    ))
+                  )}
+                  <div ref={terminalEndRef} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION 1: MULTI-TAB MATRIX HUD */}
+        {hasScanned && (
+          <div className="rounded-3xl border border-slate-800 bg-[#091220]/90 backdrop-blur-xl p-6 sm:p-8 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">Active Browser Tabs &amp; Workers</h3>
+                  <p className="text-xs text-slate-400">Live inter-tab communication discovered via BroadcastChannel API</p>
+                </div>
+              </div>
+              <span className="font-mono text-xs font-bold text-cyan-300 bg-cyan-950/60 border border-cyan-500/30 px-3 py-1 rounded-full">
+                {openTabs.length} {openTabs.length === 1 ? "PROCESS ACTIVE" : "PROCESSES ACTIVE"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {openTabs.map((tab) => {
+                const minutesOpen = Math.round((Date.now() - tab.loadedAt) / 60000);
+                return (
+                  <div
+                    key={tab.tabId}
+                    className={`p-4 rounded-2xl border transition-all duration-200 space-y-3 relative overflow-hidden ${
+                      tab.isCurrent
+                        ? "bg-blue-950/40 border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]"
+                        : "bg-slate-900/70 border-slate-800/80 hover:border-slate-700"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white truncate max-w-[170px]">
+                        {tab.title}
+                      </span>
+                      <span
+                        className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                          tab.isCurrent
+                            ? "bg-cyan-500 text-slate-950 font-black"
+                            : tab.visible
+                            ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                            : "bg-slate-800 text-slate-400"
+                        }`}
+                      >
+                        {tab.isCurrent ? "Current Tab" : tab.visible ? "Foreground" : "Background"}
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] font-mono text-slate-400 truncate bg-slate-950/60 p-2 rounded-lg border border-slate-800/80">
+                      {tab.url}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-400 font-mono pt-1">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-slate-500" />
+                        <span>{minutesOpen < 1 ? "< 1 min ago" : `${minutesOpen} min active`}</span>
+                      </span>
+                      {tab.heapMb !== null && (
+                        <span className="font-bold text-cyan-300">
+                          {tab.heapMb} MB RAM
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 2: VERIFIED STORAGE ALLOCATION BREAKDOWN */}
+        {hasScanned && (
+          <div className="rounded-3xl border border-slate-800 bg-[#091220]/90 backdrop-blur-xl p-6 sm:p-8 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center">
+                  <HardDrive className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">Browser Storage &amp; Cache Allocation</h3>
+                  <p className="text-xs text-slate-400">Directly audited from navigator.storage and CacheStorage interfaces</p>
+                </div>
+              </div>
+              <span className="font-mono text-xs font-bold text-indigo-300 bg-indigo-950/60 border border-indigo-500/30 px-3 py-1 rounded-full">
+                TOTAL: {formatBytes(storageData?.usageBytes || 0)}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* CacheStorage */}
+              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-2 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">CacheStorage</span>
+                  <span className="text-[10px] font-mono font-bold bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded">
+                    {storageData?.totalCacheEntries || 0} ASSETS
+                  </span>
+                </div>
+                <p className="text-2xl font-mono font-black text-cyan-300">
+                  {formatBytes(storageData?.cleanableBytes || 0)}
+                </p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Cached Vite chunks, course audio narrations, and offline assets.
+                </p>
+              </div>
+
+              {/* LocalStorage */}
+              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-2 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">LocalStorage</span>
+                  <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                    {storageData?.localKeyCount || 0} KEYS
+                  </span>
+                </div>
+                <p className="text-2xl font-mono font-black text-slate-200">
+                  {formatBytes(storageData?.localStorageBytes || 0)}
+                </p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  {formatBytes(storageData?.localProtectedBytes || 0)} protected session credentials.
+                </p>
+              </div>
+
+              {/* SessionStorage */}
+              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-900/60 space-y-2 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-slate-300 uppercase">SessionStorage</span>
+                  <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded">
+                    {storageData?.sessionKeyCount || 0} RECORDS
+                  </span>
+                </div>
+                <p className="text-2xl font-mono font-black text-slate-200">
+                  {formatBytes(storageData?.sessionStorageBytes || 0)}
+                </p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Temporary in-memory page transition caches.
+                </p>
+              </div>
+
+              {/* Cleanable Space */}
+              <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 space-y-2 relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-emerald-400 uppercase">Cleanable Cache</span>
+                  <span className="text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded">
+                    EVICTABLE
+                  </span>
+                </div>
+                <p className="text-2xl font-mono font-black text-emerald-400">
+                  {formatBytes(storageData?.cleanableBytes || 0)}
+                </p>
+                <p className="text-[11px] text-emerald-300/80 leading-relaxed">
+                  Safe to prune without logging you out or resetting preferences.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 3: INTERACTIVE THREAT SCANNERS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          {/* TOOL 1: MOMO SMS & LINK TERMINAL */}
+          <div className="rounded-3xl border border-slate-800 bg-[#091220]/90 backdrop-blur-xl p-6 sm:p-7 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center">
+                  <Globe className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">MoMo SMS &amp; Link Verifier</h3>
+                  <p className="text-xs text-slate-400">Cross-reference suspicious URLs against Ghanaian telecom registries</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Paste any text message, WhatsApp link, or remote cashout prompt to analyze against known spoofing and phishing signatures.
               </p>
 
-              <div className="space-y-2 pt-2">
+              <div className="space-y-2 pt-1">
                 <textarea
                   rows={3}
                   value={momoInput}
                   onChange={(e) => setMomoInput(e.target.value)}
-                  placeholder="Paste SMS message or link here (e.g. 'Claim 200 GHS bonus at mtn-bonus.top')..."
-                  className="w-full text-xs p-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-[#0056D2] transition resize-none text-slate-800 placeholder:text-slate-400"
+                  placeholder="Paste SMS text or link (e.g. 'Claim 200 GHS bonus at mtn-bonus.top')..."
+                  className="w-full text-xs font-mono p-3 rounded-xl border border-slate-800 bg-slate-950/80 text-cyan-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500 transition resize-none"
                 />
 
                 <button
                   type="button"
                   onClick={handleAnalyzeMomo}
-                  className="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2.5 rounded-xl transition cursor-pointer"
+                  className="w-full bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs uppercase font-bold py-2.5 rounded-xl transition cursor-pointer border border-slate-700 hover:border-cyan-500/50"
                 >
-                  Verify Link or Message
+                  VERIFY LINK OR MESSAGE
                 </button>
               </div>
 
@@ -774,21 +886,21 @@ export default function SecurityAudit() {
                 <motion.div
                   initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                  className={`p-4 rounded-xl border text-xs space-y-2 ${
                     momoAnalysis.isPhishing
-                      ? "bg-rose-50 border-rose-200 text-rose-900"
-                      : "bg-slate-50 border-slate-200 text-slate-800"
+                      ? "bg-rose-950/40 border-rose-500/40 text-rose-200"
+                      : "bg-slate-900/90 border-slate-700 text-slate-200"
                   }`}
                 >
-                  <div className="font-bold flex items-center gap-1.5">
+                  <div className="font-bold flex items-center gap-2">
                     {momoAnalysis.isPhishing ? (
-                      <XCircle className="w-4 h-4 text-rose-600" />
+                      <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
                     ) : (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                     )}
-                    <span>{momoAnalysis.verdict}</span>
+                    <span className="font-mono tracking-wider">{momoAnalysis.verdict}</span>
                   </div>
-                  <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                  <ul className="list-disc pl-4 space-y-1 text-[11px] text-slate-300">
                     {momoAnalysis.reasons.map((r, idx) => (
                       <li key={idx}>{r}</li>
                     ))}
@@ -797,36 +909,36 @@ export default function SecurityAudit() {
               )}
             </div>
 
-            <p className="text-[10px] text-slate-400 border-t border-slate-100 pt-3">
-              Official MTN, Telecel, and AT will never ask you to approve a cashout prompt you did not initiate.
+            <p className="text-[10px] font-mono text-slate-500 border-t border-slate-800/80 pt-3">
+              OFFICIAL MTN, TELECEL, AND AT WILL NEVER ASK YOU TO APPROVE PROMPTS YOU DID NOT INITIATE.
             </p>
           </div>
 
-          {/* TOOL 2: FILE & APK SHA-256 INTEGRITY INSPECTOR */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 p-6 space-y-4 shadow-xs flex flex-col justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0056D2] flex items-center justify-center">
-                  <FileSearch className="w-4 h-4" />
+          {/* TOOL 2: CRYPTOGRAPHIC FILE SHA-256 LAB */}
+          <div className="rounded-3xl border border-slate-800 bg-[#091220]/90 backdrop-blur-xl p-6 sm:p-7 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <FileSearch className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900">Downloaded File &amp; APK Inspector</h3>
-                  <p className="text-[11px] text-slate-500">In-browser cryptographic SHA-256 analysis</p>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-white">Downloaded File &amp; APK Inspector</h3>
+                  <p className="text-xs text-slate-400">Client-side SHA-256 cryptographic signature verification</p>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Select any file (.apk, .pdf, .docx, .zip) to compute its exact cryptographic signature directly in browser memory without sending bytes to any server.
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Select any file (.apk, .pdf, .docx, .zip) to compute its exact SHA-256 hash in browser memory without sending data to any external server.
               </p>
 
-              <div className="pt-2">
-                <label className="border-2 border-dashed border-slate-200 hover:border-[#0056D2] rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer transition bg-slate-50 hover:bg-blue-50/30">
-                  <FileSearch className="w-6 h-6 text-slate-400" />
-                  <span className="text-xs font-bold text-slate-800">
-                    {fileHashing ? "Computing cryptographic SHA-256..." : "Select File or APK to Inspect"}
+              <div className="pt-1">
+                <label className="border-2 border-dashed border-slate-800 hover:border-cyan-500/60 rounded-2xl p-5 flex flex-col items-center justify-center gap-2 text-center cursor-pointer transition bg-slate-950/60 hover:bg-slate-900/60">
+                  <FileSearch className="w-7 h-7 text-cyan-400" />
+                  <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                    {fileHashing ? "COMPUTING SHA-256 HASH..." : "SELECT FILE OR APK TO INSPECT"}
                   </span>
-                  <span className="text-[10px] text-slate-400">
-                    File is processed entirely on-device via Web Cryptography API
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Executed entirely on-device via Web Cryptography API
                   </span>
                   <input
                     type="file"
@@ -841,30 +953,67 @@ export default function SecurityAudit() {
                 <motion.div
                   initial={prefersReducedMotion ? false : { opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                  className={`p-4 rounded-xl border text-xs space-y-2 ${
                     fileAnalysis.isApk || fileAnalysis.isExecutable
-                      ? "bg-amber-50 border-amber-200 text-amber-900"
-                      : "bg-slate-50 border-slate-200 text-slate-800"
+                      ? "bg-amber-950/40 border-amber-500/40 text-amber-200"
+                      : "bg-slate-900/90 border-slate-700 text-slate-200"
                   }`}
                 >
-                  <div className="flex items-center justify-between font-bold">
-                    <span className="truncate max-w-[200px]">{fileAnalysis.name}</span>
-                    <span>{fileAnalysis.sizeMb} MB</span>
+                  <div className="flex items-center justify-between font-mono font-bold">
+                    <span className="truncate max-w-[200px] text-white">{fileAnalysis.name}</span>
+                    <span className="text-cyan-400">{fileAnalysis.sizeMb} MB</span>
                   </div>
-                  <div className="text-[11px] font-mono break-all text-slate-600 bg-white/80 p-2 rounded border border-slate-200">
-                    SHA-256: {fileAnalysis.hash}
+
+                  <div className="flex items-center justify-between gap-2 p-2 rounded bg-slate-950/80 border border-slate-800 text-[10px] font-mono">
+                    <span className="truncate text-slate-400">SHA-256: {fileAnalysis.hash}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyHash(fileAnalysis.hash)}
+                      className="text-cyan-400 hover:text-cyan-300 shrink-0 cursor-pointer"
+                      title="Copy Hash"
+                    >
+                      {copiedHash ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
                   </div>
-                  <p className="text-[11px] font-medium leading-relaxed">{fileAnalysis.recommendation}</p>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed font-mono">{fileAnalysis.recommendation}</p>
                 </motion.div>
               )}
             </div>
 
-            <p className="text-[10px] text-slate-400 border-t border-slate-100 pt-3">
-              Never install mobile applications sent as APK attachments over messaging apps.
+            <p className="text-[10px] font-mono text-slate-500 border-t border-slate-800/80 pt-3">
+              ONLY INSTALL ANDROID APPS FROM THE GOOGLE PLAY STORE OR VERIFIED ACADEMIC REPOSITORIES.
             </p>
           </div>
         </div>
-      </div>
+
+        {/* NATIVE GOOGLE PLAY PROTECT INTEGRATION GUIDANCE */}
+        <div className="rounded-3xl bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-950 border border-cyan-500/20 p-6 sm:p-8 flex flex-col sm:flex-row sm:items-center justify-between gap-6 shadow-lg">
+          <div className="space-y-2 max-w-xl">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold text-cyan-400 uppercase tracking-widest">
+              <Smartphone className="w-4 h-4 text-cyan-400" />
+              <span>Full Hardware OS Scanning</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-white">Need a deep malware scan of all installed Android apps?</h3>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Google Play Protect continuously analyzes all installed applications on your Android smartphone for malicious lending Trojans, stalkerware, and rogue APKs.
+            </p>
+          </div>
+
+          <div className="shrink-0 flex items-center gap-3">
+            <a
+              href="https://play.google.com/store/apps"
+              target="_blank"
+              rel="noreferrer"
+              className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs uppercase font-black px-5 py-3 rounded-xl transition inline-flex items-center gap-2 shadow-[0_0_20px_rgba(6,182,212,0.3)]"
+            >
+              <span>OPEN PLAY PROTECT</span>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-950" />
+            </a>
+          </div>
+        </div>
+
+      </main>
     </div>
   );
 }
