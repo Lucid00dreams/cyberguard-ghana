@@ -20,7 +20,7 @@ model User {
   avatarUrl         String?
   phoneNumber       String?
   bio               String?
-  receiveDailyTips  Boolean       @default(false)
+  receiveDailyTips  Boolean       @default(true)
   receiveDailyPushTips Boolean    @default(true)
   tokenVersion      Int           @default(0)
   bookingsAsStudent Booking[]     @relation("StudentBookings")

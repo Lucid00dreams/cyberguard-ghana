@@ -87,7 +87,7 @@ self.addEventListener("push", (event) => {
     badge: data.badge || "/pwa-96x96.png",
     vibrate: data.vibrate || [200, 100, 200],
     data: data.data || { url: data.url || "/" },
-    tag: data.tag || "cyberguard-daily-tip",
+    tag: data.tag || `cyberguard-tip-${Date.now()}`,
     renotify: true,
   };
 

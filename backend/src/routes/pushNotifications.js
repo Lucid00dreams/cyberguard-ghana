@@ -2,6 +2,7 @@ const express = require("express");
 const prisma = require("../config/prisma");
 const { requireAuth } = require("../middleware/auth");
 const { getVapidPublicKey, sendPushNotification } = require("../utils/pushNotifier");
+const { getDailyTipsScheduleConfig } = require("../services/dailyTipsService");
 
 const router = express.Router();
 
@@ -144,11 +145,12 @@ router.post("/test", requireAuth, async (req, res, next) => {
       });
     }
 
+    const schedule = await getDailyTipsScheduleConfig();
     const testPayload = {
       title: "🛡️ CyberGuard Ghana · Push Test",
-      body: "Instant Web Push is active on your device! You'll receive your 7:00 AM daily security tips right here.",
-      icon: "/logo-mark.svg",
-      badge: "/favicon.svg",
+      body: `Instant Web Push is active on your device! You'll receive your ${schedule.displayTime || "7:00 AM"} daily security tips right here.`,
+      icon: "/pwa-192x192.png",
+      badge: "/favicon.png",
       url: "/dashboard?tab=settings",
       vibrate: [200, 100, 200, 100, 200],
     };

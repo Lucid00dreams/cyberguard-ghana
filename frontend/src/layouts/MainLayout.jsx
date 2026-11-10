@@ -25,6 +25,7 @@ import UserAvatar from "../components/UserAvatar";
 import SessionTimeoutModal from "../components/SessionTimeoutModal";
 import CyberGodChatbot from "../components/CyberGodChatbot";
 import CyberGuardLogo from "../components/CyberGuardLogo";
+import PushNotificationBanner from "../components/PushNotificationBanner";
 
 const navLinkClass = ({ isActive }) =>
   `relative text-xs font-semibold whitespace-nowrap transition-colors px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 ${isActive
@@ -595,6 +596,9 @@ export default function MainLayout() {
 
       {/* CyberGod AI Floating Chatbot */}
       <CyberGodChatbot />
+
+      {/* Proactive Push Notification Opt-in / Sync */}
+      <PushNotificationBanner />
     </div>
   );
 }

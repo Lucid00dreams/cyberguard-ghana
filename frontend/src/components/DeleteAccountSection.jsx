@@ -144,7 +144,7 @@ export default function DeleteAccountSection({ compact = false }) {
             <ul className="list-disc pl-4 space-y-1 text-[11px] text-rose-900/90 leading-relaxed">
               <li>Removes your profile, enrollments, quiz records, and certificates</li>
               <li>Cancels scheduled 1-on-1 mentorship bookings</li>
-              <li>Unsubscribes your email from 7:00 AM daily safety tips</li>
+              <li>Unsubscribes your email from daily safety tips</li>
               <li>Wipes your CyberChat end-to-end encryption keys on this device</li>
             </ul>
           </div>

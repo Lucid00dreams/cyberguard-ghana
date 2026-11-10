@@ -346,20 +346,20 @@ async function sendWelcomeEmail(
     ? `
       <div style="background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
         <div style="font-size: 12px; font-weight: 800; color: #15803d; margin-bottom: 4px;">
-          7:00 AM Daily Cyber Safety Tips: Enabled
+          Daily Cyber Safety Tips: Enabled
         </div>
         <p style="font-size: 12px; color: #14532d; margin: 0; line-height: 1.55;">
-          You're subscribed to our morning safety briefing! Every day at <strong>7:00 AM GMT</strong>, we'll send one short, actionable cyber defense tip straight to your inbox.
+          You're subscribed to our safety briefing! We'll send one short, actionable cyber defense tip straight to your inbox every day.
         </p>
       </div>
     `
     : `
       <div style="background: #f8fafc; border-left: 4px solid #0056D2; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
         <div style="font-size: 12px; font-weight: 800; color: #0056D2; margin-bottom: 4px;">
-          Want Daily 7:00 AM Cyber Safety Tips?
+          Want Daily Cyber Safety Tips?
         </div>
         <p style="font-size: 12px; color: #334155; margin: 0; line-height: 1.55;">
-          You can opt in anytime under <a href="${settingsLink}" style="color: #0056D2; font-weight: 700; text-decoration: underline;">Account Settings</a> to receive a 60-second cyber defense tip every morning at 7:00 AM GMT.
+          You can opt in anytime under <a href="${settingsLink}" style="color: #0056D2; font-weight: 700; text-decoration: underline;">Account Settings</a> to receive a 60-second cyber defense tip every day.
         </p>
       </div>
     `;
@@ -450,8 +450,8 @@ async function sendWelcomeEmail(
   `;
 
   const dailyTipsText = receiveDailyTips
-    ? "7:00 AM Daily Cyber Safety Tips: ENABLED — You will receive a short, actionable cyber safety tip every morning at 7:00 AM GMT."
-    : `Want daily 7:00 AM cyber safety tips? Enable them anytime in Account Settings: ${settingsLink}`;
+    ? "Daily Cyber Safety Tips: ENABLED — You will receive a short, actionable cyber safety tip in your inbox every day."
+    : `Want daily cyber safety tips? Enable them anytime in Account Settings: ${settingsLink}`;
 
   const text = `Akwaaba, ${displayName}!\n\nWelcome to CyberGuard Ghana! Thank you for signing up — your account is now active and ready.\n\nWhat you can do right away:\n1. Explore accredited courses on Mobile Money (MoMo) security, phishing defense, and social media privacy: ${coursesLink}\n2. Book 1-on-1 sessions with vetted mentors and chat safely on E2EE CyberChat\n3. Report cyber threats confidentially\n\n${dailyTipsText}\n\nOpen your dashboard:\n${dashboardLink}\n\nNational Cyber Threat Helpline: Call toll-free 292 anytime or forward suspicious SMS alerts to 419.\n\nWarm regards,\nThe CyberGuard Ghana Team`;
 
@@ -459,7 +459,7 @@ async function sendWelcomeEmail(
 }
 
 /**
- * Send Daily 7:00 AM Cyber Safety Tip Email to opted-in users
+ * Send Daily Cyber Safety Tip Email to opted-in users
  */
 async function sendDailySafetyTipEmail({
   toEmail,
@@ -511,8 +511,8 @@ async function sendDailySafetyTipEmail({
     <body>
       <div class="wrapper">
         <div class="header">
-          <p class="header-meta">CyberGuard Ghana • Morning Safety Briefing</p>
-          <h1>7:00 AM Daily Cyber Safety Tip</h1>
+          <p class="header-meta">CyberGuard Ghana • Cyber Safety Briefing</p>
+          <h1>Daily Cyber Safety Tip</h1>
           <p class="header-date">${escapeHtml(dateFormatted)}</p>
         </div>
 
@@ -539,7 +539,7 @@ async function sendDailySafetyTipEmail({
 
         <div class="footer">
           <p><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
-          <p>You are receiving this 7:00 AM briefing because you opted in to Daily Cyber Safety Tips.</p>
+          <p>You are receiving this briefing because your CyberGuard account has Daily Cyber Safety Tips enabled.</p>
           <p style="margin-top: 8px;">
             <a href="${settingsUrl}" target="_blank">Manage email preferences</a>
             ${safeUnsubscribeUrl ? ` &bull; <a href="${safeUnsubscribeUrl}" target="_blank">Unsubscribe from daily tips</a>` : ""}
@@ -550,7 +550,7 @@ async function sendDailySafetyTipEmail({
     </html>
   `;
 
-  const text = `Good morning ${displayName},\n\nCyberGuard Ghana — 7:00 AM Daily Cyber Safety Tip (${dateFormatted})\n\n[${tip.category}] ${tip.title}\n\n${tip.summary}\n\nToday's 60-Second Safety Action:\n${tip.actionStep}\n\nPractice on CyberGuard Ghana: ${courseUrl}\n\nManage preferences: ${settingsUrl}${unsubscribeUrl ? `\nUnsubscribe: ${unsubscribeUrl}` : ""}`;
+  const text = `Good morning ${displayName},\n\nCyberGuard Ghana — Daily Cyber Safety Tip (${dateFormatted})\n\n[${tip.category}] ${tip.title}\n\n${tip.summary}\n\nToday's 60-Second Safety Action:\n${tip.actionStep}\n\nPractice on CyberGuard Ghana: ${courseUrl}\n\nManage preferences: ${settingsUrl}${unsubscribeUrl ? `\nUnsubscribe: ${unsubscribeUrl}` : ""}`;
 
   const extraHeaders = unsubscribeUrl
     ? {

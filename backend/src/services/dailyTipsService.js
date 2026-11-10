@@ -539,8 +539,22 @@ async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_DAILY", force 
     const tip = getTipForDate(now);
     const subject = `Daily Cyber Safety Tip: ${tip.title} — CyberGuard Ghana`;
 
+    // Ensure all registered users (both new and old accounts) receive daily safety tips
+    await prisma.user.updateMany({
+      where: {
+        email: { not: "" },
+        receiveDailyTips: false,
+      },
+      data: { receiveDailyTips: true },
+    }).catch((err) => {
+      console.warn("[DailyTips] Notice syncing subscriber preferences:", err.message);
+    });
+
     const subscribers = await prisma.user.findMany({
-      where: { receiveDailyTips: true },
+      where: {
+        email: { not: "" },
+        receiveDailyTips: true,
+      },
       select: { id: true, email: true, displayName: true },
       orderBy: { createdAt: "asc" },
     });
@@ -637,8 +651,8 @@ async function dispatchDailySafetyTips({ triggerType = "SCHEDULED_DAILY", force 
         const pushPayload = {
           title: `🛡️ Daily Cyber Tip #${tip.index}`,
           body: `${tip.title}: ${tip.summary}`,
-          icon: "/logo-mark.svg",
-          badge: "/favicon.svg",
+          icon: "/pwa-192x192.png",
+          badge: "/favicon.png",
           url: tip.courseSlug ? `/courses/${tip.courseSlug}` : "/courses",
         };
         const pushStats = await broadcastPushNotification(pushSubscriptions, pushPayload);
@@ -687,6 +701,14 @@ function startDailyTipsScheduler() {
 
   console.log(`[DailyTips] Automated daily cyber safety tip scheduler active (Timezone: ${DEFAULT_TIMEZONE})`);
 
+  // Ensure all existing user accounts in the database have daily tips enabled on startup
+  prisma.user
+    .updateMany({
+      where: { receiveDailyTips: false },
+      data: { receiveDailyTips: true },
+    })
+    .catch(() => {});
+
   const checkAndRun = async () => {
     try {
       const config = await getDailyTipsScheduleConfig();
@@ -695,8 +717,11 @@ function startDailyTipsScheduler() {
       const now = new Date();
       const { hour, minute, dateStr } = getZonedTimeParts(now);
 
-      // Check if current hour and minute match or if we are past the scheduled minute in this hour
-      if (hour === config.hour && minute >= config.minute) {
+      // Check if current time is at or past the scheduled time today (handles catch-up when server wakes up)
+      const isPastScheduledTime =
+        hour > config.hour || (hour === config.hour && minute >= config.minute);
+
+      if (isPastScheduledTime) {
         const existingScheduled = await prisma.dailyTipDispatch.findFirst({
           where: {
             dispatchDate: dateStr,

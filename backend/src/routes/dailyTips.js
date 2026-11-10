@@ -61,7 +61,7 @@ async function handleUnsubscribe(req, res) {
       <body>
         <div class="card">
           <h1>Daily Tips Paused</h1>
-          <p>We have unsubscribed <strong>${safeEmail}</strong> from the 7:00 AM Daily Cyber Safety Tips. You can re-enable them anytime in your Dashboard settings.</p>
+          <p>We have unsubscribed <strong>${safeEmail}</strong> from Daily Cyber Safety Tips. You can re-enable them anytime in your Dashboard settings.</p>
           <a href="${safeOrigin}/dashboard?tab=settings">Return to Dashboard</a>
         </div>
       </body>
@@ -101,11 +101,14 @@ router.post("/cron", async (req, res, next) => {
 });
 
 /**
- * Superadmin (ADMIN): Get current daily tips schedule settings
+ * Authenticated: Get current daily tips schedule settings.
+ * Accessible to all users so the frontend can dynamically display the broadcast time.
  */
-router.get("/schedule", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
+router.get("/schedule", requireAuth, async (req, res, next) => {
   try {
     const schedule = await getDailyTipsScheduleConfig();
+    const isStaff = req.user.role === "ADMIN" || req.user.role === "CSA_OFFICER";
+
     const { dateStr, hour, minute } = getZonedTimeParts(new Date());
     const todayScheduledDispatch = await prisma.dailyTipDispatch.findFirst({
       where: { dispatchDate: dateStr, triggerType: { startsWith: "SCHEDULED" } },
@@ -124,6 +127,7 @@ router.get("/schedule", requireAuth, requireRole("ADMIN"), async (req, res, next
       ...schedule,
       dispatchedToday: Boolean(todayScheduledDispatch),
       nextScheduledRunLabel,
+      isStaff,
     });
   } catch (err) {
     next(err);
@@ -131,9 +135,9 @@ router.get("/schedule", requireAuth, requireRole("ADMIN"), async (req, res, next
 });
 
 /**
- * Superadmin (ADMIN): Update daily tips dispatch schedule
+ * Superadmin (ADMIN / CSA_OFFICER): Update daily tips dispatch schedule
  */
-router.patch("/schedule", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
+router.patch("/schedule", requireAuth, requireRole("ADMIN", "CSA_OFFICER"), async (req, res, next) => {
   try {
     const { hour, minute, enabled } = req.body;
     if (hour === undefined || isNaN(parseInt(hour, 10)) || parseInt(hour, 10) < 0 || parseInt(hour, 10) > 23) {
@@ -161,9 +165,9 @@ router.patch("/schedule", requireAuth, requireRole("ADMIN"), async (req, res, ne
 });
 
 /**
- * Superadmin (ADMIN): Fetch comprehensive Daily Tips email logs, daily dispatches, and active subscribers
+ * Superadmin (ADMIN / CSA_OFFICER): Fetch comprehensive Daily Tips email logs, daily dispatches, and active subscribers
  */
-router.get("/logs", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
+router.get("/logs", requireAuth, requireRole("ADMIN", "CSA_OFFICER"), async (req, res, next) => {
   try {
     const { date, search, status } = req.query;
     const { dateStr: todayDateStr, hour, minute } = getZonedTimeParts(new Date());
@@ -283,10 +287,10 @@ router.get("/logs", requireAuth, requireRole("ADMIN"), async (req, res, next) =>
 });
 
 /**
- * Superadmin (ADMIN): Manually trigger today's cyber safety tip broadcast immediately
+ * Superadmin (ADMIN / CSA_OFFICER): Manually trigger today's cyber safety tip broadcast immediately
  * and record every recipient email in the daily logs.
  */
-router.post("/dispatch-now", requireAuth, requireRole("ADMIN"), async (req, res, next) => {
+router.post("/dispatch-now", requireAuth, requireRole("ADMIN", "CSA_OFFICER"), async (req, res, next) => {
   try {
     const result = await dispatchDailySafetyTips({
       triggerType: "MANUAL_ADMIN",

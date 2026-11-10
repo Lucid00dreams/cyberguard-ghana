@@ -88,8 +88,29 @@ export async function subscribeToPushNotifications() {
 
   const convertedKey = urlBase64ToUint8Array(publicKey);
 
-  // 4. Subscribe on browser PushManager
+  // 4. Subscribe on browser PushManager (safely replacing stale or mismatched keys)
   let subscription = await registration.pushManager.getSubscription();
+  if (subscription) {
+    try {
+      const existingKey = subscription.options?.applicationServerKey;
+      let matches = false;
+      if (existingKey) {
+        const existingArr = new Uint8Array(existingKey);
+        if (existingArr.length === convertedKey.length) {
+          matches = existingArr.every((val, i) => val === convertedKey[i]);
+        }
+      }
+      if (!matches) {
+        console.log("[PushManager] Existing push key outdated, refreshing subscription...");
+        await subscription.unsubscribe();
+        subscription = null;
+      }
+    } catch {
+      // If inspecting key fails, proceed with re-subscribe
+      subscription = null;
+    }
+  }
+
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
@@ -110,6 +131,21 @@ export async function subscribeToPushNotifications() {
     subscription,
     message: res.data?.message || "Notifications active!",
   };
+}
+
+/**
+ * Silently syncs push registration on device if permission is already granted
+ */
+export async function syncPushSubscriptionIfPermitted() {
+  if (!isPushSupported() || Notification.permission !== "granted") {
+    return null;
+  }
+  try {
+    return await subscribeToPushNotifications();
+  } catch (err) {
+    console.warn("[PushManager] Background push sync:", err.message);
+    return null;
+  }
 }
 
 export async function unsubscribeFromPushNotifications() {

@@ -379,7 +379,7 @@ export default function Landing() {
               Start Learning Digital Safety Today
             </h2>
             <p className="text-slate-100 text-xs sm:text-base leading-relaxed font-medium drop-shadow-sm">
-              Create a free account to track your lessons, earn verifiable certificates, and receive daily 7:00 AM cyber safety tips.
+              Create a free account to track your lessons, earn verifiable certificates, and receive daily cyber safety tips.
             </p>
             <div className="pt-2 flex flex-col sm:flex-row gap-3">
               <Link

@@ -51,8 +51,8 @@ async function sendPushNotification(subscription, payload = {}) {
   const formattedPayload = JSON.stringify({
     title: payload.title || "CyberGuard Ghana",
     body: payload.body || "New security alert available.",
-    icon: payload.icon || "/logo-mark.svg",
-    badge: payload.badge || "/favicon.svg",
+    icon: payload.icon || "/pwa-192x192.png",
+    badge: payload.badge || "/favicon.png",
     vibrate: payload.vibrate || [200, 100, 200],
     data: {
       url: payload.url || payload.data?.url || "/",

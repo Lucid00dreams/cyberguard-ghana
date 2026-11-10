@@ -91,8 +91,8 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [receiveDailyTips, setReceiveDailyTips] = useState(false);
-  const receiveDailyTipsRef = useRef(false);
+  const [receiveDailyTips, setReceiveDailyTips] = useState(true);
+  const receiveDailyTipsRef = useRef(true);
 
   // Step 2: Verification State
   const [otp, setOtp] = useState("");
@@ -710,7 +710,7 @@ export default function Register() {
                         <strong className="font-bold text-slate-900 block">
                           Receive daily cyber safety tips?
                         </strong>
-                        Get a short 60-second tip every morning at 7:00 AM in your inbox.
+                        Get a short 60-second tip every morning in your inbox.
                       </span>
                     </label>
 

@@ -76,9 +76,10 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordFeedback, setPasswordFeedback] = useState(null);
 
-  // Database-backed preference: Daily 7:00 AM GMT Cyber Safety Tips
+  // Database-backed preference: Daily Cyber Safety Tips
   const [receiveDailyTips, setReceiveDailyTips] = useState(Boolean(user?.receiveDailyTips));
   const [savingTipsPref, setSavingTipsPref] = useState(false);
+  const [scheduleTimeLabel, setScheduleTimeLabel] = useState("7:00 AM");
 
   // Web Push Notifications state
   const [pushSupported, setPushSupported] = useState(false);
@@ -91,6 +92,17 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
   const [loadingPush, setLoadingPush] = useState(false);
   const [testingPush, setTestingPush] = useState(false);
   const [pushFeedback, setPushFeedback] = useState(null);
+
+  useEffect(() => {
+    api
+      .get("/daily-tips/schedule")
+      .then((res) => {
+        if (res.data?.displayTime) {
+          setScheduleTimeLabel(res.data.displayTime);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -130,7 +142,7 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
         setPushStatus(updated);
         setPushFeedback({
           type: "success",
-          text: "Device subscribed! You'll receive instant 7:00 AM tips on your lock screen.",
+          text: `Device subscribed! You'll receive instant ${scheduleTimeLabel} tips on your lock screen.`,
         });
       }
       setTimeout(() => setPushFeedback(null), 4000);
@@ -179,8 +191,8 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
       setProfileFeedback({
         type: "success",
         text: checked
-          ? "Subscribed to 7:00 AM GMT Daily Cyber Safety Tips."
-          : "Unsubscribed from 7:00 AM GMT Daily Cyber Safety Tips.",
+          ? `Subscribed to ${scheduleTimeLabel} GMT Daily Cyber Safety Tips.`
+          : `Unsubscribed from ${scheduleTimeLabel} GMT Daily Cyber Safety Tips.`,
       });
       setTimeout(() => setProfileFeedback(null), 3500);
     } catch {
@@ -547,7 +559,7 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
             </div>
 
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">7:00 AM daily tips</span>
+              <span className="text-slate-500 font-medium">{scheduleTimeLabel} daily tips</span>
               <span
                 className={`font-semibold ${receiveDailyTips ? "text-emerald-700" : "text-slate-500"
                   }`}
@@ -884,7 +896,7 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
                     <div className="flex items-center gap-2">
                       <Smartphone className="w-4 h-4 text-[#0056D2] shrink-0" />
                       <span className="text-xs font-bold text-slate-900">
-                        7:00 AM Mobile Web Push Tips
+                        {scheduleTimeLabel} Mobile Web Push Tips
                       </span>
                       {pushStatus.isThisDeviceSubscribed && (
                         <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.2 rounded-full">
@@ -958,10 +970,10 @@ export default function AccountSettingsView({ isModal = false, onClose = undefin
               <label className="flex items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200/80 cursor-pointer hover:bg-slate-100/70 transition">
                 <div className="pr-4">
                   <p className="text-xs font-bold text-slate-900">
-                    Daily 7:00 AM Email Briefing
+                    Daily {scheduleTimeLabel} Email Briefing
                   </p>
                   <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                    Receive one short, practical cyber defense tip in your email inbox every morning at 7:00 AM GMT.
+                    Receive one short, practical cyber defense tip in your email inbox every morning at {scheduleTimeLabel} GMT.
                   </p>
                 </div>
                 <input

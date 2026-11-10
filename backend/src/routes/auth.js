@@ -422,7 +422,8 @@ router.post(
             avatarUrl: avatarUrl || null,
             phoneNumber: phoneNumber ? phoneNumber.trim() : null,
             bio: bio ? bio.trim() : null,
-            receiveDailyTips: Boolean(receiveDailyTips),
+            receiveDailyTips: receiveDailyTips !== undefined ? Boolean(receiveDailyTips) : true,
+            receiveDailyPushTips: true,
           },
         });
 
@@ -543,7 +544,8 @@ router.post(
             ageBand: effectiveAgeBand,
             role: "STUDENT",
             avatarUrl,
-            receiveDailyTips: Boolean(receiveDailyTips),
+            receiveDailyTips: receiveDailyTips !== undefined ? Boolean(receiveDailyTips) : true,
+            receiveDailyPushTips: true,
           },
         });
 
