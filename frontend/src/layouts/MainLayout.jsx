@@ -18,6 +18,7 @@ import {
   ChevronDown,
   LogOut,
   MessageSquare,
+  Radio,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useNotifications } from "../context/NotificationContext";
@@ -115,6 +116,9 @@ export default function MainLayout() {
                 </NavLink>
                 <NavLink to="/extensions" className={navLinkClass}>
                   <Wrench className="w-3.5 h-3.5 text-[#0056D2]" /> Safety Tools
+                </NavLink>
+                <NavLink to="/security-audit" className={navLinkClass}>
+                  <Radio className="w-3.5 h-3.5 text-blue-500 animate-pulse" /> Device Scan
                 </NavLink>
                 <NavLink to="/tutors" className={navLinkClass}>
                   <Users className="w-3.5 h-3.5" /> Mentors
@@ -327,6 +331,14 @@ export default function MainLayout() {
                   >
                     <Wrench className="w-4 h-4 text-[#0056D2]" />
                     <span>Browser Safety Tools</span>
+                  </NavLink>
+                  <NavLink
+                    to="/security-audit"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-50 transition"
+                  >
+                    <Radio className="w-4 h-4 text-[#0056D2] animate-pulse" />
+                    <span>Device &amp; Privacy Scan</span>
                   </NavLink>
                   <NavLink
                     to="/tutors"

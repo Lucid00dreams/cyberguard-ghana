@@ -33,6 +33,7 @@ const PhishingSimulator = lazy(() => import("./pages/PhishingSimulator"));
 const VerifyCertificate = lazy(() => import("./pages/VerifyCertificate"));
 const CyberChat = lazy(() => import("./pages/CyberChat"));
 const ExtensionsStorePage = lazy(() => import("./pages/ExtensionsStorePage"));
+const SecurityAudit = lazy(() => import("./pages/SecurityAudit"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 export default function App() {
@@ -97,6 +98,9 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="security-audit" element={<SecurityAudit />} />
+          <Route path="scan" element={<SecurityAudit />} />
 
           <Route
             path="extensions"
