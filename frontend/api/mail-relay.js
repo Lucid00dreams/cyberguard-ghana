@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import path from "path";
+import fs from "fs";
 
 const DEFAULT_ALLOWED_SENDER = "cyberguardgh@gmail.com";
 
@@ -9,6 +11,30 @@ function safeCompareSecret(a, b) {
   const bufB = Buffer.from(b);
   if (bufA.length !== bufB.length) return false;
   return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function resolveLogoAttachment() {
+  const candidates = [
+    path.join(process.cwd(), "public/logo.png"),
+    path.join(process.cwd(), "frontend/public/logo.png"),
+    path.join(process.cwd(), "public/logo-mark.png"),
+  ];
+
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        return {
+          filename: "cyberguard-logo.png",
+          path: p,
+          cid: "cyberguard-logo",
+          contentDisposition: "inline",
+        };
+      }
+    } catch {
+      // Continue
+    }
+  }
+  return null;
 }
 
 export default async function handler(req, res) {
@@ -26,7 +52,7 @@ export default async function handler(req, res) {
     }
 
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body || {};
-    const { to, subject, html, text, headers, from, replyTo, smtp } = body;
+    const { to, subject, html, text, headers, from, replyTo, smtp, attachments } = body;
 
     if (!to || typeof to !== "string" || !subject || typeof subject !== "string") {
       return res.status(400).json({ error: "Recipient (to) and subject are required." });
@@ -50,7 +76,7 @@ export default async function handler(req, res) {
     }
 
     const smtpUser = (process.env.SMTP_USER || smtp?.user || "").trim();
-    const smtpPass = providedPass || envPass;
+    const smtpPass = (providedPass || envPass).replace(/\s+/g, "");
 
     const allowedSenders = new Set([DEFAULT_ALLOWED_SENDER]);
     if (process.env.SMTP_USER) {
@@ -81,17 +107,39 @@ export default async function handler(req, res) {
     const replyToAddress =
       replyTo || process.env.REPLY_TO_EMAIL || smtpUser;
 
+    const senderDomain = smtpUser.includes("@") ? smtpUser.split("@")[1] : "gmail.com";
+    const uniqueMessageId = `<cyberguard.${crypto.randomBytes(12).toString("hex")}.${Date.now()}@${senderDomain}>`;
+
+    const finalAttachments = [];
+    const logoAtt = resolveLogoAttachment();
+    if (logoAtt) {
+      finalAttachments.push(logoAtt);
+    }
+    if (Array.isArray(attachments)) {
+      finalAttachments.push(...attachments);
+    }
+
     const info = await transporter.sendMail({
       from: fromAddress,
       to,
+      envelope: {
+        from: smtpUser,
+        to: Array.isArray(to) ? to : [to],
+      },
       replyTo: replyToAddress,
       subject,
-      text: text || "CyberGuard Ghana Notification",
+      text: text || "CyberGuard Ghana Security Notification",
       html,
+      attachments: finalAttachments,
       headers: {
-        "X-Priority": "3",
+        "Date": new Date().toUTCString(),
+        "Message-ID": uniqueMessageId,
+        "MIME-Version": "1.0",
+        "X-Mailer": "CyberGuard Ghana HTTPS Relay 1.0 (Act 1038)",
+        "X-Entity-Ref-ID": crypto.randomUUID(),
         "X-Auto-Response-Suppress": "OOF, AutoReply",
         "Auto-Submitted": "auto-generated",
+        "Reply-To": replyToAddress,
         ...(headers && typeof headers === "object" ? headers : {}),
       },
     });
@@ -104,6 +152,7 @@ export default async function handler(req, res) {
     console.error("[Vercel Mail Relay] Delivery error:", err.message);
     return res.status(502).json({
       error: "SMTP delivery failed.",
+      details: err.message,
     });
   }
 }

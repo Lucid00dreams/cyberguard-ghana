@@ -1,9 +1,10 @@
 import nodemailer from "nodemailer";
+import crypto from "crypto";
+import path from "path";
+import fs from "fs";
 
 const BACKEND_ORIGIN =
   process.env.BACKEND_ORIGIN || "https://cyberguard-ghana.onrender.com";
-
-const ALLOWED_VERCEL_HOST_REGEX = /^cyberguard-ghana(-[a-z0-9-]+)?\.vercel\.app$/i;
 
 function escapeHtml(value) {
   if (value === null || value === undefined) return "";
@@ -15,6 +16,29 @@ function escapeHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function resolveLogoAttachment() {
+  const candidates = [
+    path.join(process.cwd(), "public/logo.png"),
+    path.join(process.cwd(), "frontend/public/logo.png"),
+  ];
+
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        return {
+          filename: "cyberguard-logo.png",
+          path: p,
+          cid: "cyberguard-logo",
+          contentDisposition: "inline",
+        };
+      }
+    } catch {
+      // Continue
+    }
+  }
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -22,7 +46,7 @@ export default async function handler(req, res) {
   }
 
   const smtpUser = (process.env.SMTP_USER || "cyberguardgh@gmail.com").trim();
-  const smtpPass = (process.env.SMTP_PASS || "").trim();
+  const smtpPass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
 
   if (!smtpPass) {
     return res.status(200).json({ ok: false, skipped: "SMTP_PASS not set on Vercel." });
@@ -34,7 +58,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Cryptographically verify user identity & recent creation against backend /api/auth/me
     const meResp = await fetch(`${BACKEND_ORIGIN.replace(/\/$/, "")}/api/auth/me`, {
       headers: { Authorization: authHeader },
     });
@@ -48,42 +71,15 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, skipped: "Not a newly created account." });
     }
 
-    const rawHost = String(req.headers["x-forwarded-host"] || req.headers.host || "").trim();
-    const clientOrigin = ALLOWED_VERCEL_HOST_REGEX.test(rawHost)
-      ? `https://${rawHost}`
-      : "https://cyberguard-ghana.vercel.app";
-
-    const displayName = me.displayName || "CyberGuard Member";
-    const safeName = escapeHtml(displayName);
-    const safeEmail = escapeHtml(me.email);
-    const receiveDailyTips = Boolean(me.receiveDailyTips);
+    const host = req.headers["x-forwarded-host"] || req.headers.host || "cyberguard-ghana.vercel.app";
+    const clientOrigin = `https://${host}`;
     const dashboardLink = `${clientOrigin}/dashboard`;
     const coursesLink = `${clientOrigin}/courses`;
-    const settingsLink = `${clientOrigin}/dashboard?tab=settings`;
+    const safeName = escapeHtml(me.displayName || "CyberGuard Member");
+    const safeEmail = escapeHtml(me.email);
 
-    const subject = `Welcome to CyberGuard Ghana, ${displayName}!`;
-
-    const dailyTipsSectionHtml = receiveDailyTips
-      ? `
-        <div style="background: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
-          <div style="font-size: 12px; font-weight: 800; color: #15803d; margin-bottom: 4px;">
-            7:00 AM Daily Cyber Safety Tips: Enabled
-          </div>
-          <p style="font-size: 12px; color: #14532d; margin: 0; line-height: 1.55;">
-            You're subscribed to our morning safety briefing! Every day at <strong>7:00 AM GMT</strong>, we'll send one short, actionable cyber defense tip straight to your inbox.
-          </p>
-        </div>
-      `
-      : `
-        <div style="background: #f8fafc; border-left: 4px solid #0056D2; border-radius: 8px; padding: 14px 16px; margin: 20px 0;">
-          <div style="font-size: 12px; font-weight: 800; color: #0056D2; margin-bottom: 4px;">
-            Want Daily 7:00 AM Cyber Safety Tips?
-          </div>
-          <p style="font-size: 12px; color: #334155; margin: 0; line-height: 1.55;">
-            You can opt in anytime under <a href="${settingsLink}" style="color: #0056D2; font-weight: 700; text-decoration: underline;">Account Settings</a> to receive a 60-second cyber defense tip every morning at 7:00 AM GMT.
-          </p>
-        </div>
-      `;
+    const subject = `Welcome to CyberGuard Ghana, ${me.displayName}!`;
+    const preheader = "Akwaaba! Your CyberGuard account is ready. Explore safety courses, vetted mentors, and daily defense tips.";
 
     const html = `
       <!DOCTYPE html>
@@ -91,53 +87,76 @@ export default async function handler(req, res) {
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Welcome to CyberGuard Ghana</title>
+        <title>${escapeHtml(subject)}</title>
       </head>
-      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 0;">
-        <div style="max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 14px; border: 1px solid #e2e8f0; overflow: hidden;">
-          <div style="background-color: #001E3C; padding: 32px 36px; text-align: center; border-bottom: 4px solid #0056D2;">
-            <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800;">CyberGuard Ghana</h1>
-            <p style="color: #93c5fd; margin: 6px 0 0 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">National Cyber Safety &amp; Digital Defense Academy</p>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; margin: 0; padding: 0;">
+        <div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+          ${escapeHtml(preheader)}
+        </div>
+        <div style="max-width: 600px; margin: 30px auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);">
+          <!-- Header with Logo -->
+          <div style="background-color: #001E3C; padding: 28px 24px; text-align: center; border-bottom: 4px solid #0056D2;">
+            <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 0 auto; text-align: center;" align="center">
+              <tr>
+                <td align="center" style="padding-bottom: 12px;">
+                  <img src="cid:cyberguard-logo" alt="CyberGuard Ghana" width="76" height="76" style="display: block; width: 76px; height: 76px; border: 0; outline: none; margin: 0 auto; border-radius: 14px;" />
+                </td>
+              </tr>
+              <tr>
+                <td align="center">
+                  <span style="font-size: 22px; font-weight: 900; color: #FFFFFF; display: block; line-height: 1.25;">
+                    CYBERGUARD <span style="color: #00C4FF;">GHANA</span>
+                  </span>
+                  <span style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #93C5FD; display: block; margin-top: 5px;">
+                    National Cyber Safety &amp; Digital Defense Academy
+                  </span>
+                </td>
+              </tr>
+            </table>
           </div>
-          <div style="padding: 36px; text-align: left;">
-            <div style="font-size: 19px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">Akwaaba, ${safeName}!</div>
+
+          <div style="padding: 36px 32px; text-align: left;">
+            <div style="font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 12px;">Akwaaba, ${safeName}!</div>
             <p style="font-size: 14px; line-height: 1.65; color: #334155; margin-bottom: 16px;">
               Welcome to <strong>CyberGuard Ghana</strong>! Thank you for signing up—your account is now active and ready.
             </p>
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin: 20px 0;">
-              <div>
-                <div style="font-size: 13px; font-weight: 700; color: #0056D2; margin-bottom: 3px;">1. Accredited Cyber Safety Courses &amp; Certificates</div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+              <div style="margin-bottom: 14px;">
+                <div style="font-size: 13px; font-weight: 800; color: #0056D2; margin-bottom: 3px;">1. Accredited Cyber Safety Courses &amp; Certificates</div>
                 <p style="font-size: 12px; color: #475569; line-height: 1.5; margin: 0;">Complete bite-sized lessons on phishing detection, password hygiene, AI deepfakes, and Mobile Money protection.</p>
               </div>
-              <div style="margin-top: 14px;">
-                <div style="font-size: 13px; font-weight: 700; color: #0056D2; margin-bottom: 3px;">2. Vetted 1-on-1 Mentors &amp; Encrypted CyberChat</div>
+              <div style="margin-bottom: 14px;">
+                <div style="font-size: 13px; font-weight: 800; color: #0056D2; margin-bottom: 3px;">2. Vetted 1-on-1 Mentors &amp; Encrypted CyberChat</div>
                 <p style="font-size: 12px; color: #475569; line-height: 1.5; margin: 0;">Book live mentorship sessions and collaborate safely with end-to-end encryption.</p>
               </div>
-              <div style="margin-top: 14px;">
-                <div style="font-size: 13px; font-weight: 700; color: #0056D2; margin-bottom: 3px;">3. Confidential Incident Reporting</div>
+              <div>
+                <div style="font-size: 13px; font-weight: 800; color: #0056D2; margin-bottom: 3px;">3. Confidential Incident Reporting</div>
                 <p style="font-size: 12px; color: #475569; line-height: 1.5; margin: 0;">Report cyber scams or online harassment confidentially under Ghana's Child Online Protection (COP) framework.</p>
               </div>
             </div>
-            ${dailyTipsSectionHtml}
-            <div style="text-align: center; margin: 26px 0 18px 0;">
-              <a href="${dashboardLink}" style="display: inline-block; background-color: #0056D2; color: #ffffff; font-weight: 700; font-size: 14px; text-decoration: none; padding: 12px 28px; border-radius: 8px;" target="_blank">Open Your Dashboard</a>
+
+            <div style="text-align: center; margin: 28px 0 16px 0;">
+              <a href="${dashboardLink}" style="display: inline-block; background-color: #0056D2; color: #ffffff !important; font-weight: 700; font-size: 14px; text-decoration: none; padding: 13px 32px; border-radius: 10px;" target="_blank">Open Your Dashboard</a>
             </div>
-            <a href="${coursesLink}" style="display: block; text-align: center; font-size: 12px; color: #0056D2; text-decoration: underline; margin-bottom: 18px; font-weight: 600;" target="_blank">Or browse all cyber safety courses &rarr;</a>
-            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 14px; margin-top: 20px;">
-              <div style="font-size: 12px; font-weight: 700; color: #1e40af; margin-bottom: 3px;">National Cyber Threat Helpline: Toll-Free 292</div>
-              <p style="font-size: 12px; color: #1e3a8a; margin: 0; line-height: 1.45;">Call <strong>292</strong> toll-free anytime or forward suspicious SMS messages to <strong>419</strong>.</p>
+            <a href="${coursesLink}" style="display: block; text-align: center; font-size: 12px; color: #0056D2; text-decoration: underline; margin-bottom: 20px; font-weight: 600;" target="_blank">Or browse all cyber safety courses &rarr;</a>
+
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin-top: 24px;">
+              <div style="font-size: 12px; font-weight: 800; color: #1e40af; margin-bottom: 4px;">National Cyber Threat Helpline: Toll-Free 292</div>
+              <p style="font-size: 12px; color: #1e3a8a; margin: 0; line-height: 1.5;">Call <strong>292</strong> toll-free anytime or forward suspicious SMS messages to <strong>419</strong>.</p>
             </div>
           </div>
-          <div style="background-color: #f1f5f9; padding: 20px 36px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0;">
-            <p style="margin: 0;"><strong>CyberGuard Ghana • Child Online Protection Academy</strong></p>
-            <p style="margin: 6px 0 0 0; font-size: 10px;">This one-time welcome email was sent to ${safeEmail} because you created an account on CyberGuard Ghana.</p>
+
+          <div style="background-color: #f8fafc; padding: 24px 32px; text-align: center; font-size: 11px; color: #64748b; border-top: 1px solid #e2e8f0; line-height: 1.6;">
+            <p style="margin: 0 0 6px 0; font-weight: 700; color: #1e293b; font-size: 12px;">CyberGuard Ghana &bull; National Child Online Protection (COP) Framework</p>
+            <p style="margin: 0 0 8px 0; color: #475569;">Accra, Ghana &bull; Operated in alignment with the Cyber Security Authority (CSA), Ghana &bull; Act 1038</p>
+            <p style="margin: 0; font-size: 10px; color: #64748b;">This welcome email was sent to ${safeEmail} for your registered account.</p>
           </div>
         </div>
       </body>
       </html>
     `;
 
-    const text = `Akwaaba, ${displayName}!\n\nWelcome to CyberGuard Ghana! Your account is now active and ready.\n\nOpen your dashboard: ${dashboardLink}\nBrowse courses: ${coursesLink}\n\nNational Cyber Threat Helpline: Call toll-free 292 anytime.`;
+    const text = `Akwaaba, ${me.displayName}!\n\nWelcome to CyberGuard Ghana! Your account is active and ready.\n\nOpen your dashboard: ${dashboardLink}\nBrowse courses: ${coursesLink}\n\nNational Cyber Threat Helpline: Call toll-free 292 anytime.\nCyberGuard Ghana • National Child Online Protection`;
 
     const transporter = nodemailer.createTransport({
       host: "smtp.gmail.com",
@@ -149,13 +168,27 @@ export default async function handler(req, res) {
       auth: { user: smtpUser, pass: smtpPass },
     });
 
+    const attachments = [];
+    const logo = resolveLogoAttachment();
+    if (logo) attachments.push(logo);
+
     const info = await transporter.sendMail({
-      from: process.env.FROM_EMAIL || `"CyberGuard Ghana" <${smtpUser}>`,
+      from: `"CyberGuard Ghana" <${smtpUser}>`,
       to: me.email,
-      replyTo: process.env.REPLY_TO_EMAIL || smtpUser,
+      envelope: { from: smtpUser, to: [me.email] },
+      replyTo: smtpUser,
       subject,
       text,
       html,
+      attachments,
+      headers: {
+        "Date": new Date().toUTCString(),
+        "Message-ID": `<cyberguard.${crypto.randomBytes(12).toString("hex")}.${Date.now()}@gmail.com>`,
+        "MIME-Version": "1.0",
+        "X-Mailer": "CyberGuard Ghana Engine (Act 1038)",
+        "X-Auto-Response-Suppress": "OOF, AutoReply",
+        "Auto-Submitted": "auto-generated",
+      },
     });
 
     return res.status(200).json({ ok: true, messageId: info.messageId });
