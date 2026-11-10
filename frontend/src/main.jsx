@@ -5,7 +5,11 @@ import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { ThemeProvider } from "./context/ThemeContext.jsx";
 import { NotificationProvider } from "./context/NotificationContext.jsx";
+import { warmupBackend } from "./utils/api.js";
 import "./index.css";
+
+// Initiate early backend wake-up to eliminate cold starts
+warmupBackend();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

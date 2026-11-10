@@ -17,23 +17,50 @@ const CATEGORIES = [
 const EASE_OUT = [0.22, 1, 0.36, 1];
 
 export default function Courses() {
-  const [courses, setCourses] = useState([]);
+  const [courses, setCourses] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cg_courses_cache");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const [ageBand, setAgeBand] = useState("");
   const [selectedCat, setSelectedCat] = useState("All Categories");
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cg_courses_cache");
+      return !cached;
+    } catch {
+      return true;
+    }
+  });
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    setLoading(true);
+    const isDefaultFilter = !ageBand && selectedCat === "All Categories";
+    // Only show full loading spinner if we have no courses cached to display
+    if (!isDefaultFilter || courses.length === 0) {
+      setLoading(true);
+    }
     const params = {};
     if (ageBand) params.ageBand = ageBand;
     if (selectedCat !== "All Categories") params.category = selectedCat;
 
     api
       .get("/courses", { params })
-      .then((res) => setCourses(res.data))
-      .catch(() => setCourses([]))
+      .then((res) => {
+        setCourses(res.data);
+        if (isDefaultFilter) {
+          try {
+            sessionStorage.setItem("cg_courses_cache", JSON.stringify(res.data));
+          } catch {}
+        }
+      })
+      .catch(() => {
+        if (courses.length === 0) setCourses([]);
+      })
       .finally(() => setLoading(false));
   }, [ageBand, selectedCat]);
 

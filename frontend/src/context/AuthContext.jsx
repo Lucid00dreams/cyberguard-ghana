@@ -9,13 +9,32 @@ const SESSION_TIMEOUT_MS = 15 * 60 * 1000;
 const LAST_ACTIVITY_KEY = "cg_last_activity";
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(() => {
+    try {
+      const token = localStorage.getItem("cg_token");
+      const cached = localStorage.getItem("cg_user");
+      if (token && cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      // Fallback to null
+    }
+    return null;
+  });
+
+  const [loading, setLoading] = useState(() => {
+    const token = localStorage.getItem("cg_token");
+    const cached = localStorage.getItem("cg_user");
+    // If user is cached in local storage, start with loading=false for instant display!
+    return Boolean(token && !cached);
+  });
+
   const [sessionTimedOut, setSessionTimedOut] = useState(false);
   const lastActivityRef = useRef(Date.now());
 
   const logout = useCallback(() => {
     localStorage.removeItem("cg_token");
+    localStorage.removeItem("cg_user");
     localStorage.removeItem(LAST_ACTIVITY_KEY);
     setUser(null);
     setSessionTimedOut(false);
@@ -69,13 +88,19 @@ export function AuthProvider({ children }) {
       .get("/auth/me")
       .then((res) => {
         setUser(res.data);
+        localStorage.setItem("cg_user", JSON.stringify(res.data));
         const now = Date.now();
         lastActivityRef.current = now;
         localStorage.setItem(LAST_ACTIVITY_KEY, now.toString());
       })
-      .catch(() => {
-        localStorage.removeItem("cg_token");
-        localStorage.removeItem(LAST_ACTIVITY_KEY);
+      .catch((err) => {
+        // Only wipe credentials on genuine 401 Unauthorized, not temporary network latency or sleep
+        if (err.response?.status === 401) {
+          localStorage.removeItem("cg_token");
+          localStorage.removeItem("cg_user");
+          localStorage.removeItem(LAST_ACTIVITY_KEY);
+          setUser(null);
+        }
       })
       .finally(() => setLoading(false));
   }, [triggerSessionTimeout]);
@@ -125,6 +150,9 @@ export function AuthProvider({ children }) {
 
   function login(token, userData) {
     localStorage.setItem("cg_token", token);
+    if (userData) {
+      localStorage.setItem("cg_user", JSON.stringify(userData));
+    }
     const now = Date.now();
     lastActivityRef.current = now;
     localStorage.setItem(LAST_ACTIVITY_KEY, now.toString());
@@ -133,7 +161,13 @@ export function AuthProvider({ children }) {
   }
 
   function updateUser(updatedData) {
-    setUser((prev) => (prev ? { ...prev, ...updatedData } : updatedData));
+    setUser((prev) => {
+      const nextUser = prev ? { ...prev, ...updatedData } : updatedData;
+      if (nextUser) {
+        localStorage.setItem("cg_user", JSON.stringify(nextUser));
+      }
+      return nextUser;
+    });
   }
 
   function dismissSessionTimeoutModal() {

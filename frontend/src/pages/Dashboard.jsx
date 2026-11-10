@@ -47,11 +47,39 @@ export default function Dashboard() {
     return <Navigate to="/admin" replace />;
   }
 
-  const [bookings, setBookings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [bookings, setBookings] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cg_dash_bookings");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [myEnrollments, setMyEnrollments] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cg_dash_enrollments");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [myCertificates, setMyCertificates] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem("cg_dash_certs");
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      // Don't show blocking loading screen if we have cached dashboard enrollments
+      return !sessionStorage.getItem("cg_dash_enrollments");
+    } catch {
+      return true;
+    }
+  });
   const [selectedCert, setSelectedCert] = useState(null);
-  const [myEnrollments, setMyEnrollments] = useState([]);
-  const [myCertificates, setMyCertificates] = useState([]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => normalizeTab(searchParams.get("tab")));
@@ -93,16 +121,29 @@ export default function Dashboard() {
   }, []);
 
   async function loadDashboardData() {
-    setLoading(true);
+    // Only show full loading spinner if we don't have cached data yet
+    if (myEnrollments.length === 0 && bookings.length === 0) {
+      setLoading(true);
+    }
     try {
       const [bookingsRes, enrollmentsRes, certsRes] = await Promise.all([
         api.get("/tutors/bookings/mine").catch(() => ({ data: [] })),
         api.get("/courses/my-enrollments").catch(() => ({ data: [] })),
         api.get("/courses/my-certificates").catch(() => ({ data: [] })),
       ]);
-      setBookings(bookingsRes.data || []);
-      setMyEnrollments(enrollmentsRes.data || []);
-      setMyCertificates(certsRes.data || []);
+      const bData = bookingsRes.data || [];
+      const eData = enrollmentsRes.data || [];
+      const cData = certsRes.data || [];
+
+      setBookings(bData);
+      setMyEnrollments(eData);
+      setMyCertificates(cData);
+
+      try {
+        sessionStorage.setItem("cg_dash_bookings", JSON.stringify(bData));
+        sessionStorage.setItem("cg_dash_enrollments", JSON.stringify(eData));
+        sessionStorage.setItem("cg_dash_certs", JSON.stringify(cData));
+      } catch {}
     } finally {
       setLoading(false);
     }

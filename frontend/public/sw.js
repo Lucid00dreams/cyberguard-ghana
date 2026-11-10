@@ -35,7 +35,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Network-first fetch handler required for PWA installability criteria
+// High-performance caching: Stale-While-Revalidate for static assets, Network-First for navigations
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
@@ -46,6 +46,32 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const isStaticAsset =
+    url.pathname.startsWith("/assets/") ||
+    /\.(js|css|png|jpg|jpeg|svg|webp|ico|woff2?)$/i.test(url.pathname);
+
+  if (isStaticAsset) {
+    // Stale-While-Revalidate: Instant response from cache, update cache in background
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.match(request).then((cachedResponse) => {
+          const fetchPromise = fetch(request)
+            .then((networkResponse) => {
+              if (networkResponse && networkResponse.status === 200 && networkResponse.type === "basic") {
+                cache.put(request, networkResponse.clone());
+              }
+              return networkResponse;
+            })
+            .catch(() => cachedResponse);
+
+          return cachedResponse || fetchPromise;
+        });
+      })
+    );
+    return;
+  }
+
+  // Network-first for HTML navigations to ensure latest page structure
   event.respondWith(
     fetch(request)
       .then((response) => {
